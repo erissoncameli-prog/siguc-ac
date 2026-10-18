@@ -44,8 +44,55 @@
 .mlb-close:hover{color:var(--cinza-700);}
 .mlb-dropdown-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:min(560px,80vh);overflow-y:auto;}
 /* Aba unificada — Áreas Territoriais (seções recolhíveis) */
-.areas-sec{border:1px solid var(--borda);border-radius:9px;overflow:hidden;}
-.areas-sec-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:var(--cinza-50);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--cinza-700);transition:background .14s;}
+.areas-sec{border:1px solid var(--borda);border-radius:9px;overflow:hidden;flex-shrink:0;}
+.areas-sec-head{display:flex;align-items:stretch;background:var(--cinza-50);transition:background .14s;}
+.areas-sec-head:hover{background:var(--cinza-100);}
+.areas-sw{display:flex;align-items:center;padding:0 4px 0 10px;cursor:pointer;flex-shrink:0}
+.areas-sw input{position:absolute;opacity:0;width:1px;height:1px}
+.areas-sw-trilho{position:relative;width:30px;height:17px;border-radius:9px;background:var(--cinza-300);transition:background .15s}
+.areas-sw-trilho::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+.areas-sw input:checked + .areas-sw-trilho{background:var(--areas-cor,#1F4E2C)}
+.areas-sw input:checked + .areas-sw-trilho::after{left:15px}
+.areas-sw input:focus-visible + .areas-sw-trilho{outline:2px solid var(--areas-cor,#1F4E2C);outline-offset:2px}
+.areas-sec-abrir{flex:1;min-width:0;display:flex;align-items:center;gap:7px;padding:9px 10px 9px 6px;background:none;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--cinza-700);text-align:left}
+.areas-sec-abrir:focus-visible{outline:2px solid var(--areas-cor,#1F4E2C);outline-offset:-2px}
+.areas-sec-nome{flex:1;min-width:0;line-height:1.25}
+.areas-sec-n{font-size:10.5px;font-weight:700;color:var(--areas-cor,#1F4E2C);font-variant-numeric:tabular-nums}
+.areas-sec.desligada .areas-sec-n,.areas-sec.desligada .areas-amostra{opacity:.4}
+.areas-amostra{display:flex;align-items:center}
+.areas-sec-abrir[aria-expanded="true"] .areas-chev{transform:rotate(180deg)}
+.areas-sec[data-areas-sec="uc"]{--areas-cor:#1F4E2C}
+.areas-sec[data-areas-sec="ti"]{--areas-cor:#b45309}
+.areas-sec[data-areas-sec="pa"]{--areas-cor:#6D28D9}
+/* Bloco "Aparência" (js/mapa-aparencia.js) */
+.ap-bloco{margin-top:10px;border:1px solid var(--borda);border-radius:8px;background:#fff}
+.ap-sum{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--cinza-700);list-style:none;min-height:30px}
+.ap-sum::-webkit-details-marker{display:none}
+.ap-sum::after{content:'▾';font-size:11px;color:var(--cinza-400);transition:transform .18s}
+.ap-bloco[open] .ap-sum::after{transform:rotate(180deg)}
+.ap-sum span{flex:1}
+.ap-sum:focus-visible{outline:2px solid var(--ap-acento);outline-offset:-2px;border-radius:8px}
+.ap-corpo{padding:4px 10px 10px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--cinza-100)}
+.ap-amostra-grande{display:flex;justify-content:center;padding:6px 0;background:repeating-conic-gradient(#f3f4f6 0 25%,#fff 0 50%) 0 0/12px 12px;border-radius:6px}
+.ap-amostra-grande .ap-svg{max-width:100%}
+.ap-rot{font-size:11px;color:var(--cinza-600);font-weight:600}
+.ap-val{float:right;color:var(--cinza-500);font-weight:400}
+.ap-cores{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.ap-cor{width:24px;height:24px;border-radius:50%;border:1px solid rgba(0,0,0,.25);cursor:pointer;padding:0;position:relative}
+.ap-cor.sel{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--ap-acento)}
+.ap-cor:focus-visible{outline:2px solid var(--ap-acento);outline-offset:3px}
+.ap-cor-propria{background:conic-gradient(#1F4E2C,#2563eb,#dc2626,#E69F00,#1F4E2C)}
+.ap-cor-outra{display:flex;align-items:center;gap:4px;height:24px;padding:0 4px 0 7px;border:1px solid var(--cinza-300);border-radius:12px;font-size:10.5px;color:var(--cinza-600);cursor:pointer}
+.ap-cor-outra input{width:22px;height:18px;padding:0;border:none;background:none;cursor:pointer}
+.ap-grade{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
+.ap-campo{display:flex;flex-direction:column;gap:3px}
+.ap-campo select{height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff}
+.ap-campo input[type=range]{accent-color:var(--ap-acento);width:100%}
+.ap-check{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;cursor:pointer;min-height:24px}
+.ap-check input{accent-color:var(--ap-acento);width:14px;height:14px}
+.ap-restaurar{align-self:flex-end;background:none;border:none;color:var(--cinza-500);font:600 11px 'DM Sans',sans-serif;cursor:pointer;text-decoration:underline;min-height:24px;padding:0 2px}
+.ap-restaurar:hover{color:var(--cinza-800)}
+.mlb-dropdown.mlb-estreito{min-width:0;width:300px}
 .areas-sec-head.uc{border-left:3px solid #1F4E2C;}
 .areas-sec-head.ti{border-left:3px solid #d97706;}
 .areas-sec-head.pa{border-left:3px solid #6D28D9;}
@@ -67,10 +114,9 @@
 .pa-mod-sigla{font-weight:700;color:#5B21B6;min-width:30px}
 .pa-mod-nome{flex:1;color:var(--cinza-600)}
 .pa-mod-n{color:var(--cinza-500);font-variant-numeric:tabular-nums}
-.areas-sec-head:hover{background:var(--cinza-100);}
-.areas-sec-body{padding:12px;border-top:1px solid var(--borda);max-height:420px;overflow-y:auto;}
+.areas-sec-body{padding:12px;border-top:1px solid var(--borda);}
+.areas-sec-body[hidden]{display:none}
 .areas-chev{font-size:11px;color:var(--cinza-400);transition:transform .18s;}
-.areas-chev.areas-chev-col{transform:rotate(-90deg);}
 /* Popup */
 .mapa-popup{min-width:200px;max-width:280px;font-family:'DM Sans',sans-serif;}
 .camada-popup{font-family:'DM Sans',sans-serif;font-size:12px;color:#374151;}
@@ -497,6 +543,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <!-- Recorte geográfico (limite do Acre + ponto-em-UC): helper único,
      compartilhado com pages/alertas-ambientais.html. Ver js/mapa-recorte.js. -->
 <script src="../js/mapa-recorte.js"></script>
+<script src="../js/mapa-aparencia.js"></script>
 <script src="../js/mapa-assentamentos.js"></script>
 <script src="../js/mapa-linha-tempo.js"></script>
 <script src="../js/grafico-teclado.js"></script>
@@ -1498,27 +1545,6 @@ function toggleBloco(id){
   const el = document.getElementById(id); if(!el) return;
   el.style.display = el.style.display === 'none' ? '' : 'none';
 }
-// Acordeão das seções da aba Áreas Territoriais (com rotação do chevron)
-function toggleBlocoChevron(id, chevId){
-  const el = document.getElementById(id); if(!el) return;
-  const oculto = el.style.display === 'none';
-  el.style.display = oculto ? '' : 'none';
-  document.getElementById(chevId)?.classList.toggle('areas-chev-col', !oculto);
-  // Ao abrir uma seção, fecha a outra (acordeão)
-  if(oculto){
-    const par = {
-      'areas-sec-uc': {outro:'areas-sec-ti', chevOutro:'areas-chev-ti'},
-      'areas-sec-ti': {outro:'areas-sec-uc', chevOutro:'areas-chev-uc'}
-    }[id];
-    if(par){
-      const outroEl = document.getElementById(par.outro);
-      if(outroEl && outroEl.style.display !== 'none'){
-        outroEl.style.display = 'none';
-        document.getElementById(par.chevOutro)?.classList.add('areas-chev-col');
-      }
-    }
-  }
-}
 function abrirPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.add('mobile-aberto'); document.getElementById('mapa-backdrop').classList.add('ativo'); }
 function fecharPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.remove('mobile-aberto'); document.getElementById('mapa-backdrop').classList.remove('ativo'); }
 
@@ -1732,6 +1758,7 @@ function toggleLayerBar(id){
   _layerBarAtiva = id;
   document.querySelectorAll('.mlb-tab').forEach(t => t.classList.toggle('ativo', t.id==='mlb-btn-'+id));
   dd.innerHTML = _renderDropdown(id);
+  dd.classList.remove('mlb-estreito');
   dd.style.display = '';
   // Ao abrir a aba Áreas Territoriais, sincroniza os controles (UC e TI)
   // com o estado atual mantido nas variáveis.
@@ -1753,6 +1780,8 @@ function toggleLayerBar(id){
     _tiAplicarEstadoUI();
     _tiAtualizarResumo();
     if(typeof paAtualizarPainel==='function') paAtualizarPainel();
+    document.querySelectorAll('.ap-bloco').forEach(apAtualizar);
+    areasAtualizarCabecalhos();
   }
   // Cobertura Vegetal: carrega os mosaicos Planet/NICFI e as datas Sentinel-2.
   if(id === 'veg'){
@@ -1811,26 +1840,25 @@ function _renderDropdown(id){
     const corpo = s => s
       .replace(/^[\s\S]*?<div class="mlb-dropdown-body">/, '')
       .replace(/<\/div>\s*$/, '');
-    return hdr('🌿 Áreas Territoriais') + `
-      <div class="areas-sec">
-        <button type="button" class="areas-sec-head uc" onclick="toggleBlocoChevron('areas-sec-uc','areas-chev-uc')">
-          <span>🌿 Unidades de Conservação</span><span id="areas-chev-uc" class="areas-chev">▾</span>
-        </button>
-        <div id="areas-sec-uc" class="areas-sec-body">${corpo(_renderDropdown('uc'))}</div>
-      </div>
-      <div class="areas-sec">
-        <button type="button" class="areas-sec-head ti" onclick="toggleBlocoChevron('areas-sec-ti','areas-chev-ti')">
-          <span>🪶 Terras Indígenas</span><span id="areas-chev-ti" class="areas-chev areas-chev-col">▾</span>
-        </button>
-        <div id="areas-sec-ti" class="areas-sec-body" style="display:none">${corpo(_renderDropdown('ti'))}</div>
-      </div>
-      <div class="areas-sec">
-        <button type="button" class="areas-sec-head pa" onclick="toggleBlocoChevron('areas-sec-pa','areas-chev-pa')">
-          <span>🏘 Projetos de Assentamento</span><span id="areas-chev-pa" class="areas-chev areas-chev-col">▾</span>
-        </button>
-        <div id="areas-sec-pa" class="areas-sec-body" style="display:none">${typeof paSecaoHTML==='function'?paSecaoHTML():''}</div>
-      </div>
-    ` + foot;
+    let aberta = ''; try{ aberta = localStorage.getItem('siguc_areas_sec') || ''; }catch(e){}
+    const sec = (k, nome, toggle, corpoHtml) => `
+      <div class="areas-sec" data-areas-sec="${k}">
+        <div class="areas-sec-head ${k}">
+          <label class="areas-sw" title="Mostrar ou ocultar no mapa">
+            <input type="checkbox" id="${k}-toggle" onchange="${toggle}" aria-label="Exibir ${nome} no mapa"><span class="areas-sw-trilho"></span>
+          </label>
+          <button type="button" class="areas-sec-abrir" aria-expanded="${aberta===k}" aria-controls="areas-sec-${k}" onclick="areasAbrir('${k}')">
+            <span class="areas-sec-nome">${nome}</span><span class="areas-sec-n" id="areas-n-${k}"></span>
+            <span class="areas-amostra" id="areas-am-${k}"></span><span class="areas-chev">▾</span>
+          </button>
+        </div>
+        <div id="areas-sec-${k}" class="areas-sec-body"${aberta===k?'':' hidden'}>${corpoHtml}</div>
+      </div>`;
+    return hdr('🌿 Áreas Territoriais')
+      + sec('uc', 'Unidades de Conservação', 'toggleUC(this.checked)', corpo(_renderDropdown('uc')))
+      + sec('ti', 'Terras Indígenas', 'toggleTI(this.checked)', corpo(_renderDropdown('ti')))
+      + sec('pa', 'Projetos de Assentamento', 'togglePA(this.checked)', typeof paSecaoHTML==='function'?paSecaoHTML():'')
+      + foot;
   }
   if(id==='veg') return hdr('🌿 Cobertura Vegetal & Desmatamento') + `
     ${_vegCard('mapbiomas','MapBiomas Coleção 8','Uso e cobertura do solo. Resolução 30m. Ano base 2023.','#16a34a')}
@@ -2014,68 +2042,22 @@ function _renderDropdown(id){
     </div>
   ` + foot;
   if(id==='uc') return hdr('🌿 Unidades de Conservação') + `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer">
-        <input type="checkbox" id="uc-toggle" checked style="accent-color:#1F4E2C;width:14px;height:14px" onchange="toggleUC(this.checked)">
-        Exibir no mapa
-      </label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:8px">
-        <input type="checkbox" id="uc-labels-toggle" checked style="accent-color:#1F4E2C;width:12px;height:12px" onchange="ucToggleLabels(this.checked)"> Labels
-      </label>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <span style="font-size:11px;color:var(--cinza-600);flex-shrink:0">Opacidade:</span>
-      <input type="range" id="uc-opacity" min="0" max="100" value="40" style="flex:1;accent-color:#1F4E2C" oninput="ucAlterarOpacidade(this.value)">
-      <span style="font-size:11px;color:var(--cinza-600);width:28px" id="uc-opacity-val">40%</span>
-    </div>
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-estadual" checked style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Estadual</label>
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-federal"   style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Federal</label>
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-municipal" style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Municipal</label>
-    </div>
-    <div style="border-top:1px solid var(--cinza-100);margin:10px 0 6px;padding-top:10px">
-      <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Estilo das bordas</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor da borda</label>
-          <input type="color" id="uc-cor-linha" value="#1F4E2C" oninput="_aplicarEstiloUCGlobal()"
-            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Espessura</label>
-          <select id="uc-peso" onchange="_aplicarEstiloUCGlobal()"
-            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
-            <option value="0.8">Fina (0.8)</option>
-            <option value="2" selected>Normal (2)</option>
-            <option value="3">Grossa (3)</option>
-            <option value="4">Muito grossa (4)</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Tracejado</label>
-        <select id="uc-dash" onchange="_aplicarEstiloUCGlobal()"
-          style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
-          <option value="" selected>S&#xF3;lido &#x2500;&#x2500;&#x2500;</option>
-          <option value="6 4">Tracejado - - -</option>
-          <option value="2 4">Pontilhado &middot; &middot; &middot;</option>
-          <option value="8 4">Tra&#xE7;o longo &#x2014;&#x2014;</option>
-          <option value="8 4 2 4">Tra&#xE7;o-ponto -&middot;-</option>
-        </select>
-      </div>
     </div>
     <div id="uc-loading" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--cinza-500);padding:8px 0"><div class="spinner" style="width:14px;height:14px"></div> Carregando...</div>
     <div id="uc-controles" style="display:none">
       <div class="uc-secao-titulo">Proteção Integral</div><div id="uc-tipos-pi"></div>
       <div class="uc-secao-titulo" style="margin-top:8px">Uso Sustentável</div><div id="uc-tipos-us"></div>
     </div>
+    ${_ucAparenciaHTML()}
     <div id="uc-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>
   ` + foot;
   if(id==='ti') return hdr('🪶 Terras Indígenas') + `
-    <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
-      <input type="checkbox" id="ti-toggle" style="accent-color:#d97706;width:14px;height:14px" onchange="toggleTI(this.checked)">
-      Exibir Terras Indígenas</label>
-      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 0">Fonte: FUNAI · GeoJSON oficial. Inclui TIs homologadas, declaradas e em estudo.</p>
+    <div>
+      <p style="font-size:11px;color:var(--cinza-500);margin:0">Fonte: FUNAI · GeoJSON oficial. Inclui TIs homologadas, declaradas e em estudo.</p>
     </div>
     <div id="ti-resumo" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:10px">
       <div style="display:flex;gap:6px">
@@ -2084,54 +2066,7 @@ function _renderDropdown(id){
         <div style="flex:1;text-align:center"><div id="ti-res-pct" style="font-size:16px;font-weight:700;color:#b45309;line-height:1">—</div><div style="font-size:9px;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-top:2px">% Acre</div></div>
       </div>
     </div>
-    <div id="ti-opcoes" style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor da linha</label>
-          <input type="color" id="ti-cor-linha" value="#d97706" oninput="_aplicarEstiloTI()"
-            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor de preenchimento</label>
-          <input type="color" id="ti-cor-fill" value="#f59e0b" oninput="_aplicarEstiloTI()"
-            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Tracejado</label>
-          <select id="ti-dash" onchange="_aplicarEstiloTI()"
-            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
-            <option value="">S&#xF3;lido &#x2500;&#x2500;&#x2500;</option>
-            <option value="6 4" selected>Tracejado - - -</option>
-            <option value="2 4">Pontilhado &middot; &middot; &middot;</option>
-            <option value="8 4">Tra&#xE7;o longo &#x2014;&#x2014;</option>
-            <option value="8 4 2 4">Tra&#xE7;o-ponto -&middot;-</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Espessura</label>
-          <select id="ti-peso" onchange="_aplicarEstiloTI()"
-            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
-            <option value="0.8">Fina (0.8)</option>
-            <option value="2" selected>Normal (2)</option>
-            <option value="3">Grossa (3)</option>
-            <option value="4">Muito grossa (4)</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">
-          Opacidade do preenchimento
-          <span id="ti-opacity-val" style="float:right;color:var(--cinza-500)">40%</span>
-        </label>
-        <input type="range" id="ti-opacity" min="0" max="100" value="40" style="width:100%;accent-color:#d97706" oninput="_aplicarEstiloTI()">
-      </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;font-weight:600">
-        <input type="checkbox" id="ti-nomes" style="accent-color:#d97706;width:13px;height:13px" onchange="_aplicarEstiloTI()">
-        Exibir nomes das Terras Ind&#xED;genas
-      </label>
-    </div>
+    ${_tiAparenciaHTML()}
     <div id="ti-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>
   ` + foot;
   if(id==='mun') return hdr('🏙 Municípios do Acre') + `
@@ -2820,6 +2755,7 @@ async function salvarNovaCamada(){
 // LEGENDA CARTOGRÁFICA — atualiza dinamicamente conforme camadas
 // ══════════════════════════════════════════════════════════════
 function _atualizarLegendaMapa(){
+  areasAtualizarCabecalhos();
   if(typeof CART === 'undefined') return;
   const itens = [];
 
@@ -4472,13 +4408,70 @@ async function toggleUC(ativo){
 function ucToggleLabels(v){ _ucLabels=v; _renderizarUC(); }
 function ucAlterarOpacidade(v){ _ucOpacity=v/100; document.getElementById('uc-opacity-val').textContent=v+'%'; _renderizarUC(); _prefsAgendarSalvamento(); }
 function _aplicarEstiloUCGlobal(){
-  _ucCorLinha = document.getElementById('uc-cor-linha')?.value || '';
+  // "Cor de cada UC" escolhida no bloco Aparência = sem cor única de borda
+  const propria = document.querySelector('.ap-bloco[data-ap-chave="uc"] .ap-cor-propria.sel');
+  _ucCorLinha = propria ? '' : (document.getElementById('uc-cor-linha')?.value || '');
   _ucDash     = document.getElementById('uc-dash')?.value     || '';
   _ucPeso     = parseFloat(document.getElementById('uc-peso')?.value) || 2;
   try{ localStorage.setItem('siguc_uc_estilo', JSON.stringify({cor:_ucCorLinha,dash:_ucDash,peso:_ucPeso})); }catch(e){}
   if(_ucLayer) _ucLayer.setStyle(f=>{ const cor=_ucCorNome(f.properties.nome,f.properties.cor); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; });
   _atualizarLegendaMapa?.();
   _prefsAgendarSalvamento();
+}
+function ucUsarCorPropria(){ _aplicarEstiloUCGlobal(); }
+const AP_PESOS = [['0.8','Fina'],['2','Normal'],['3','Grossa'],['4','Muito grossa']];
+function _ucAparenciaHTML(){
+  return apBlocoHTML({ chave:'uc', cor:'#1F4E2C',
+    linha:{ id:'uc-cor-linha', valor:_ucCorLinha||'#1F4E2C', ao:'_aplicarEstiloUCGlobal()', propria:{ ativa:!_ucCorLinha, ao:'ucUsarCorPropria' } },
+    dash:{ id:'uc-dash', valor:_ucDash, ao:'_aplicarEstiloUCGlobal()' },
+    peso:{ id:'uc-peso', valor:String(_ucPeso), ao:'_aplicarEstiloUCGlobal()', opcoes:AP_PESOS },
+    opac:{ id:'uc-opacity', valorId:'uc-opacity-val', valor:Math.round(_ucOpacity*100), ao:'ucAlterarOpacidade(this.value)' },
+    nomes:{ id:'uc-labels-toggle', valor:_ucLabels, ao:'ucToggleLabels(this.checked)', rotulo:'Exibir nomes das UCs' },
+    padrao:{ 'uc-dash':'', 'uc-peso':'2', 'uc-opacity':'40', 'uc-labels-toggle':true },
+    aposRestaurar:'ucUsarCorPropria' });
+}
+function _tiAparenciaHTML(){
+  const e = _tiEstadoUI || { cor:'#d97706', fill:'#f59e0b', dash:'6 4', peso:'2', opacity:'40', nomes:false };
+  return apBlocoHTML({ chave:'ti', cor:'#b45309',
+    linha:{ id:'ti-cor-linha', valor:e.cor, ao:'_aplicarEstiloTI()' },
+    fill:{ id:'ti-cor-fill', valor:e.fill, ao:'_aplicarEstiloTI()' },
+    dash:{ id:'ti-dash', valor:e.dash, ao:'_aplicarEstiloTI()' },
+    peso:{ id:'ti-peso', valor:e.peso, ao:'_aplicarEstiloTI()', opcoes:AP_PESOS },
+    opac:{ id:'ti-opacity', valorId:'ti-opacity-val', valor:e.opacity, ao:'_aplicarEstiloTI()' },
+    nomes:{ id:'ti-nomes', valor:e.nomes, ao:'_aplicarEstiloTI()', rotulo:'Exibir nomes das Terras Indígenas' },
+    padrao:{ 'ti-cor-linha':'#d97706', 'ti-cor-fill':'#f59e0b', 'ti-dash':'6 4', 'ti-peso':'2', 'ti-opacity':'40', 'ti-nomes':false } });
+}
+apRegistrarCamada('uc', () => _ucLayer);
+apRegistrarCamada('ti', () => _tiLayer);
+apRegistrarCamada('pa', () => (typeof _paLayer !== 'undefined' ? _paLayer : null));
+
+// Guia Áreas Territoriais: uma seção aberta por vez (a última fica lembrada)
+function areasAbrir(k){
+  const alvo = document.getElementById('areas-sec-'+k); if(!alvo) return;
+  const abrir = alvo.hidden;
+  document.querySelectorAll('.areas-sec-body').forEach(b => { b.hidden = true; });
+  document.querySelectorAll('.areas-sec-abrir').forEach(b => b.setAttribute('aria-expanded','false'));
+  document.querySelectorAll('.areas-sec-body[hidden] .ap-bloco[open]').forEach(d => { d.open = false; });
+  if(abrir){ alvo.hidden = false; document.querySelector(`[aria-controls="areas-sec-${k}"]`)?.setAttribute('aria-expanded','true'); }
+  document.getElementById('mlb-dropdown')?.classList.toggle('mlb-estreito', !!document.querySelector('#mlb-dropdown .ap-bloco[open]'));
+  try{ localStorage.setItem('siguc_areas_sec', abrir ? k : ''); }catch(e){}
+}
+// Cabeçalho de cada seção: chave liga/desliga, nº no mapa e amostra da cor
+function areasAtualizarCabecalhos(){
+  const n = {
+    uc: (_ucAtivo && _ucGeojson) ? (() => { const f=_ucsFeaturesVisiveis(); const at=new Set(Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e=>e.dataset.ucNome)); return at.size ? f.filter(x=>at.has(x.properties.nome)).length : f.length; })() : null,
+    ti: (_tiAtivo && _tiGeojson) ? (_tiGeojson.features||[]).length : null,
+    pa: (typeof _paAtivo !== 'undefined' && _paAtivo && _paGeojson) ? paFeaturesVisiveis().length : null,
+  };
+  const ativo = { uc:_ucAtivo, ti:_tiAtivo, pa:typeof _paAtivo !== 'undefined' && _paAtivo };
+  ['uc','ti','pa'].forEach(k => {
+    const t = document.getElementById(k+'-toggle'); if(t) t.checked = !!ativo[k];
+    const c = document.getElementById('areas-n-'+k); if(c){ c.textContent = n[k]==null ? '' : n[k].toLocaleString('pt-BR'); c.title = n[k]==null ? '' : 'no mapa'; }
+    const a = document.getElementById('areas-am-'+k);
+    const mini = document.querySelector(`.ap-bloco[data-ap-chave="${k}"] [data-ap-svg="mini"]`);
+    if(a) a.innerHTML = mini ? mini.outerHTML : '';
+    document.querySelector(`[data-areas-sec="${k}"]`)?.classList.toggle('desligada', !ativo[k]);
+  });
 }
 function _ucSincronizarControlesEstilo(){
   const cl=document.getElementById('uc-cor-linha'); if(cl && _ucCorLinha) cl.value=_ucCorLinha;

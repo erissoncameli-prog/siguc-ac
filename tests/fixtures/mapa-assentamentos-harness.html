@@ -11,8 +11,11 @@
   function _atualizarLegendaMapa(){ window._legendas++ }
   function _prefsAgendarSalvamento(){ window._prefsAgendado = true }
 </script>
+<script src="../../js/mapa-aparencia.js"></script>
 <script src="../../js/mapa-assentamentos.js"></script>
 </head><body>
+<!-- a chave liga/desliga vive no cabeçalho da seção, em pages/mapa.html -->
+<input type="checkbox" id="pa-toggle" onchange="togglePA(this.checked)">
 <div id="painel" style="width:320px"></div>
 <span id="pa-count-badge" style="display:none">0</span>
 <div id="mapa" style="width:700px;height:500px"></div>

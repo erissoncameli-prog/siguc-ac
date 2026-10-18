@@ -95,6 +95,7 @@ test('estilo: cor e nomes aplicados à camada e lembrados', async ({ page }) => 
   await page.waitForFunction(() => document.querySelectorAll('.leaflet-overlay-pane path').length === 110);
   await page.evaluate(() => { const e = document.getElementById('pa-cor-linha'); e.value = '#ff0000'; e.dispatchEvent(new Event('input')) });
   expect(await page.locator('.leaflet-overlay-pane path').first().getAttribute('stroke')).toBe('#ff0000');
+  await page.click('.ap-bloco[data-ap-chave="pa"] summary'); // bloco Aparência nasce recolhido
   await page.check('#pa-nomes');
   await expect(page.locator('.leaflet-tooltip').first()).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_pa_estilo')).cor)).toBe('#ff0000');
@@ -103,7 +104,7 @@ test('estilo: cor e nomes aplicados à camada e lembrados', async ({ page }) => 
 test('pages/mapa.html ligado ao módulo', () => {
   const html = fs.readFileSync(path.join(RAIZ, 'pages/mapa.html'), 'utf8');
   expect(html).toContain('<script src="../js/mapa-assentamentos.js"></script>');
-  expect(html).toContain("id=\"areas-sec-pa\"");
+  expect(html).toContain("sec('pa', 'Projetos de Assentamento'");
   expect(html).toContain('paSecaoHTML()');
   expect(html).toContain('id="pa-count-badge"');
   expect(html).toContain('paItemLegenda()');          // legenda da tela e da impressão

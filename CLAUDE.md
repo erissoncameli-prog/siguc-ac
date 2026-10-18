@@ -1118,6 +1118,31 @@ federais do AC, 110 polígonos, SIRGAS 2000), enviado por Pedro Henrique em
   `tests/fixtures/mapa-assentamentos-harness.html` (`PA_GEOJSON_URL` aponta o
   arquivo a partir do harness). Sem mudança em `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — guia Áreas Territoriais: seções e bloco "Aparência" (18/10/2026)
+Relato do usuário: "não consigo configurar cor e linha dos assentamentos". Medido a
+1366×768: a coluna flex do painel ESPREMIA as seções (UC com 239 de 412 px; cabeçalho da
+TI com 22 de 34), havia rolagem dentro de rolagem (`.areas-sec-body` com `max-height`
+própria) e os controles de cor do PA ficavam abaixo da borda do painel.
+- **Uma seção aberta por vez**, todas recolhidas no 1º uso, a última lembrada em
+  `localStorage['siguc_areas_sec']` (`areasAbrir`). `.areas-sec{flex-shrink:0}` e o corpo
+  sem `max-height`: **só `.mlb-dropdown-body` rola**. Não voltar a pôr rolagem no corpo.
+- **Cabeçalho = chave liga/desliga + nome + nº no mapa + amostra da cor** (`sec()` em
+  `_renderDropdown('areas')`). Os `#uc-toggle`/`#ti-toggle`/`#pa-toggle` MORAM no cabeçalho
+  (mesmo id, mesmo handler) e a chave não abre a seção. `areasAtualizarCabecalhos()` é a
+  única sincronização (chamada por `_atualizarLegendaMapa`, que toda troca de camada já chama).
+- **Bloco "Aparência" único: `js/mapa-aparencia.js`** (`apBlocoHTML`), recolhido, igual nas
+  3 camadas: 8 amostras (Okabe-Ito + branco p/ satélite) + "Outra…" (o próprio
+  `<input type=color>` com o id de sempre), traço, espessura, opacidade, nomes, "Restaurar
+  padrão" e amostra desenhada. **Não aplica estilo**: troca o valor do controle e dispara o
+  evento que o handler da camada já escuta (`_aplicarEstiloUCGlobal`, `_aplicarEstiloTI`,
+  `paAplicarEstilo`). Camada nova na guia = um `apBlocoHTML({...})` + `apRegistrarCamada`.
+- UC tem a amostra **"Cor de cada UC"** (`ucUsarCorPropria`): `_ucCorLinha = ''`. O handler
+  da UC lê essa marca — sem isso, mexer na espessura voltava tudo para uma cor só.
+- Aparência aberta ⇒ painel estreito (`.mlb-estreito`, 300 px) e o mapa enquadra a camada à
+  direita dele (`apAoAlternar`, `fitBounds` com `paddingTopLeft` = largura do painel).
+- Guarda: `tests/mapa-areas-aparencia.test.js` (3, página REAL a 1366×768 com stub do
+  supabase-js e dos plugins de CDN do Leaflet). Sem mudança em `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de
