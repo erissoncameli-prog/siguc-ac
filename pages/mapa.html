@@ -48,6 +48,17 @@
 .areas-sec-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:var(--cinza-50);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--cinza-700);transition:background .14s;}
 .areas-sec-head.uc{border-left:3px solid #1F4E2C;}
 .areas-sec-head.ti{border-left:3px solid #d97706;}
+.areas-sec-head.pa{border-left:3px solid #6D28D9;}
+.pa-resumo{display:flex;gap:6px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;margin-top:10px}
+.pa-resumo>div{flex:1;text-align:center;display:flex;flex-direction:column;gap:2px}
+.pa-resumo b{font-size:15px;font-weight:700;color:#5B21B6;line-height:1;font-variant-numeric:tabular-nums}
+.pa-resumo span{font-size:9px;color:#5B21B6;text-transform:uppercase;letter-spacing:.05em}
+.pa-mods{display:flex;flex-direction:column;gap:4px}
+.pa-mod{display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;padding:3px 2px;min-height:24px}
+.pa-mod input{accent-color:#6D28D9;width:13px;height:13px}
+.pa-mod-sigla{font-weight:700;color:#5B21B6;min-width:30px}
+.pa-mod-nome{flex:1;color:var(--cinza-600)}
+.pa-mod-n{color:var(--cinza-500);font-variant-numeric:tabular-nums}
 .areas-sec-head:hover{background:var(--cinza-100);}
 .areas-sec-body{padding:12px;border-top:1px solid var(--borda);max-height:420px;overflow-y:auto;}
 .areas-chev{font-size:11px;color:var(--cinza-400);transition:transform .18s;}
@@ -478,6 +489,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <!-- Recorte geográfico (limite do Acre + ponto-em-UC): helper único,
      compartilhado com pages/alertas-ambientais.html. Ver js/mapa-recorte.js. -->
 <script src="../js/mapa-recorte.js"></script>
+<script src="../js/mapa-assentamentos.js"></script>
 <script src="../js/mapa-linha-tempo.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
@@ -1151,7 +1163,7 @@ function renderPagina(){
         <div class="drag-grip" id="lb-drag-grip" title="Arrastar · duplo clique para redefinir posição"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2.5" r="1.3"/><circle cx="7" cy="2.5" r="1.3"/><circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="3" cy="11.5" r="1.3"/><circle cx="7" cy="11.5" r="1.3"/></svg></div>
         <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span> <span class="mlb-badge" id="pa-count-badge" title="Projetos de Assentamento" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-hidro" onclick="toggleLayerBar('hidro')">💧 Rec. Hídricos <span class="mlb-badge" id="hidro-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
@@ -1732,6 +1744,7 @@ function toggleLayerBar(id){
     if(tt) tt.checked = _tiAtivo;
     _tiAplicarEstadoUI();
     _tiAtualizarResumo();
+    if(typeof paAtualizarPainel==='function') paAtualizarPainel();
   }
   // Cobertura Vegetal: carrega os mosaicos Planet/NICFI e as datas Sentinel-2.
   if(id === 'veg'){
@@ -1802,6 +1815,12 @@ function _renderDropdown(id){
           <span>🪶 Terras Indígenas</span><span id="areas-chev-ti" class="areas-chev areas-chev-col">▾</span>
         </button>
         <div id="areas-sec-ti" class="areas-sec-body" style="display:none">${corpo(_renderDropdown('ti'))}</div>
+      </div>
+      <div class="areas-sec">
+        <button type="button" class="areas-sec-head pa" onclick="toggleBlocoChevron('areas-sec-pa','areas-chev-pa')">
+          <span>🏘 Projetos de Assentamento</span><span id="areas-chev-pa" class="areas-chev areas-chev-col">▾</span>
+        </button>
+        <div id="areas-sec-pa" class="areas-sec-body" style="display:none">${typeof paSecaoHTML==='function'?paSecaoHTML():''}</div>
       </div>
     ` + foot;
   }
@@ -2794,6 +2813,9 @@ function _atualizarLegendaMapa(){
 
   // Terras Indígenas — usa _tiLayer para garantir que o GeoJSON já foi renderizado
   if(_tiAtivo && _tiLayer){ const _tcl=document.getElementById('ti-cor-linha')?.value||'#d97706'; const _tcf=document.getElementById('ti-cor-fill')?.value||'#f59e0b'; itens.push({ simbolo:'rect', cor:_tcf, opacidade:(_tiOpacity||0.4), cor_borda:_tcl, label:'Terras Indígenas' }); }
+
+  // Projetos de Assentamento (INCRA) — js/mapa-assentamentos.js
+  const _paLeg = typeof paItemLegenda==='function' ? paItemLegenda() : null; if(_paLeg) itens.push(_paLeg);
 
   // Municípios
   if(_munAtivo){ const _mcl=document.getElementById('mun-cor-linha')?.value||'#6366f1'; itens.push({ simbolo:'rect', cor:_mcl, opacidade:0, somente_borda:true, label:'Municípios' }); }
@@ -8814,6 +8836,7 @@ function _prefsCapturar(){
     uc_opacity:  _ucOpacity,
     uc_cores:    _ucCoresLS || {},
     ti:          _tiEstadoUI || {},
+    pa:          typeof paPrefsCapturar==='function' ? paPrefsCapturar() : {},
     acre:        _acreEstilo || {},
     camadas_vis: (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}'); }catch(e){ return {}; } })(),
     lb_pos:      (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_lb_pos')||'null'); }catch(e){ return null; } })(),
@@ -8846,6 +8869,8 @@ function _prefsAplicar(dados){
     _tiEstadoUI = dados.ti;
     try{ localStorage.setItem('siguc_ti_estilo', JSON.stringify(dados.ti)); }catch(e){}
   }
+  // Projetos de Assentamento
+  if(dados.pa && typeof paPrefsAplicar==='function') paPrefsAplicar(dados.pa);
   // Acre
   if(dados.acre && Object.keys(dados.acre).length){
     _acreEstilo = { ..._acreEstilo, ...dados.acre };
