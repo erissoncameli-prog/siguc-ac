@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<title>Harness · assentamentos no mapa</title>
+<!-- Página vazia dedicada (as páginas reais declaram `let db` próprio e
+     colidem). Carrega o módulo real com o arquivo real de data/. -->
+<link rel="stylesheet" href="vendor/leaflet.css">
+<script src="vendor/leaflet.js"></script>
+<script>
+  window.PA_GEOJSON_URL = '../../data/assentamentos_acre.geojson'
+  window._legendas = 0
+  function _atualizarLegendaMapa(){ window._legendas++ }
+  function _prefsAgendarSalvamento(){ window._prefsAgendado = true }
+</script>
+<script src="../../js/mapa-assentamentos.js"></script>
+</head><body>
+<div id="painel" style="width:320px"></div>
+<span id="pa-count-badge" style="display:none">0</span>
+<div id="mapa" style="width:700px;height:500px"></div>
+<script>
+  var mapaL = L.map('mapa').setView([-9.5, -69.5], 7)
+  document.getElementById('painel').innerHTML = paSecaoHTML()
+</script>
+</body></html>

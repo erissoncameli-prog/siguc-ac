@@ -1025,7 +1025,7 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   do Mapa) — mudou num, muda no outro. Embargo VIGENTE = ponto de atenção
   e motivo de prioridade (dano na Alta, também na Média). Consulta
   `car_embargos_busca` (retângulo OU nº do CAR); `car_embargos_bbox` (360)
-  ficou sem chamador — `DROP` pendente no SQL Editor.
+  foi removida (DROP no SQL Editor, 18/10/2026).
 - Selo Verde AC (`seloverde.sema.ac.gov.br/consultar-car/`): o relatório por
   CAR é protegido por captcha (`cap.js`, `/imagery/get_by_car_unificado.php`)
   — NÃO é fonte automatizável; usamos as fontes abertas que ele cita.
@@ -1073,6 +1073,35 @@ relatório do imóvel CAR (`js/relatorio-car.js`), impressão do mapa
   `tests/fixtures/relatorio-mapa-harness.html`) + `tests/car-uc-relatorio.test.js`
   (29). O teste da impressão reprova a versão antiga do `CART.imprimir`.
 - Sem mudança em `pwa/sw.js` (telas de mesa).
+
+## Regra do sistema — Projetos de Assentamento no Mapa das UCs (INCRA)
+Terceira seção da guia "Áreas Territoriais" (`pages/mapa.html`), abaixo de UC
+e Terras Indígenas. Shapefile do Acervo Fundiário do INCRA (assentamentos
+federais do AC, 110 polígonos, SIRGAS 2000), enviado por Pedro Henrique em
+07/10/2026.
+- **Camada estática** `data/assentamentos_acre.geojson`, no mesmo molde de
+  `ti_acre.geojson` — sem tabela no banco. Gerada SÓ por
+  `scripts/assentamentos_geojson.py <pasta do shapefile>` (pyshp + shapely;
+  `--autoteste` sem arquivo). Versão nova do INCRA = rodar o script de novo,
+  nunca editar o GeoJSON à mão.
+- Lógica da seção em `js/mapa-assentamentos.js` (prefixo `pa`): liga/desliga,
+  resumo (nº, área do polígono, famílias, % do Acre), filtro por modalidade
+  (PA, PAE, PDS, PAF — derivada do prefixo do nome), estilo, nomes, janela,
+  item de legenda (`paItemLegenda`, vale para tela e impressão) e preferências
+  (`siguc_pa_estilo` + `preferencias_mapa.dados.pa`). A página só chama o módulo.
+- **Duas áreas, nunca uma escolhida em silêncio**: `area_ato_ha` (do ato de
+  criação, texto no .dbf) e `area_poligono_ha` (calculada). Em 10 PAs divergem
+  mais de 30% (Taquari 56.951 × 9.456 ha; Santa Rosa 37.460 × 4.956 ha); a
+  janela mostra as duas e avisa acima de 10%. O resumo soma a do polígono (o
+  que está desenhado).
+- Fase = código do SIPRA (3 criado · 4 em instalação · 5 em estruturação ·
+  6 em consolidação · 7 consolidado).
+- PA Porto Alonso e PA Bandeirante (Porto Acre) têm ~42% do polígono fora do
+  limite do Acre de `data/acre_estado.geojson` — dado da fonte, não recortado.
+- Sem dado pessoal no arquivo (só o projeto) → fora do ROPA.
+- Guarda: `tests/mapa-assentamentos.test.js` (6) + harness
+  `tests/fixtures/mapa-assentamentos-harness.html` (`PA_GEOJSON_URL` aponta o
+  arquivo a partir do harness). Sem mudança em `pwa/sw.js` (tela de mesa).
 
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
