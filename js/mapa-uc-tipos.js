@@ -131,11 +131,22 @@ function uctAtualizarPainel() {
   box.innerHTML = linhas + (indiv ? `<div class="uct-aviso">${indiv} UC${indiv > 1 ? 's' : ''} ocultada${indiv > 1 ? 's' : ''} uma a uma — veja em "Cada UC".</div>` : '');
 }
 
+// Paleta montada com createElement (sem HTML em string)
 function _uctPaleta(chave, atual) {
-  const cores = (typeof AP_CORES !== 'undefined' ? AP_CORES : []).map(([c, nome]) =>
-    `<button type="button" class="ap-cor${c.toLowerCase() === String(atual).toLowerCase() ? ' sel' : ''}" style="background:${c}" data-uct-escolher="${c}" title="${nome}" aria-label="${nome}"></button>`).join('');
-  return `<div class="uct-paleta" data-uct-paleta="${_uctEsc(chave)}">${cores}
-    <label class="ap-cor-outra" title="Outra cor…"><span>Outra…</span><input type="color" value="${atual}" data-uct-outra></label></div>`;
+  const box = document.createElement('div');
+  box.className = 'uct-paleta'; box.dataset.uctPaleta = chave;
+  (typeof AP_CORES !== 'undefined' ? AP_CORES : []).forEach(([c, nome]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ap-cor' + (c.toLowerCase() === String(atual).toLowerCase() ? ' sel' : '');
+    b.style.background = c; b.dataset.uctEscolher = c; b.title = nome; b.setAttribute('aria-label', nome);
+    box.appendChild(b);
+  });
+  const lb = document.createElement('label');
+  lb.className = 'ap-cor-outra'; lb.title = 'Outra cor…';
+  const sp = document.createElement('span'); sp.textContent = 'Outra…';
+  const inp = document.createElement('input'); inp.type = 'color'; inp.value = atual; inp.dataset.uctOutra = '';
+  lb.append(sp, inp); box.appendChild(lb);
+  return box;
 }
 
 function _uctDefinirCor(chave, cor) {
@@ -156,7 +167,7 @@ document.addEventListener('click', ev => {
     document.querySelectorAll('.uct-paleta').forEach(p => p.remove());
     document.querySelectorAll('[data-uct-cor]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if (!aberta) {
-      linha.insertAdjacentHTML('afterend', _uctPaleta(t.dataset.uctCor, t.style.background ? _uctHexDe(t.style.background) : '#000000'));
+      linha.after(_uctPaleta(t.dataset.uctCor, t.style.background ? _uctHexDe(t.style.background) : '#000000'));
       t.setAttribute('aria-expanded', 'true');
     }
   } else {
