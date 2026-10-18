@@ -219,12 +219,20 @@ function paItemLegenda() {
 }
 
 function paSecaoHTML() {
+  const e = _paEstado, P = PA_ESTILO_PADRAO;
+  const aparencia = typeof apBlocoHTML === 'function' ? apBlocoHTML({
+    chave: 'pa', cor: '#6D28D9',
+    linha: { id: 'pa-cor-linha', valor: e.cor, ao: 'paAplicarEstilo()' },
+    fill: { id: 'pa-cor-fill', valor: e.fill, ao: 'paAplicarEstilo()' },
+    dash: { id: 'pa-dash', valor: e.dash, ao: 'paAplicarEstilo()' },
+    peso: { id: 'pa-peso', valor: e.peso, ao: 'paAplicarEstilo()', opcoes: [['0.8', 'Fina'], ['1.5', 'Normal'], ['2.5', 'Grossa'], ['4', 'Muito grossa']] },
+    opac: { id: 'pa-opacity', valorId: 'pa-opacity-val', valor: e.opacity, ao: 'paAplicarEstilo()' },
+    nomes: { id: 'pa-nomes', valor: !!e.nomes, ao: 'paAplicarEstilo()', rotulo: 'Exibir nomes dos assentamentos' },
+    padrao: { 'pa-cor-linha': P.cor, 'pa-cor-fill': P.fill, 'pa-dash': P.dash, 'pa-peso': P.peso, 'pa-opacity': P.opacity, 'pa-nomes': P.nomes },
+  }) : '';
+  // A chave liga/desliga (#pa-toggle) fica no cabeçalho da seção (pages/mapa.html)
   return `
-    <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
-      <input type="checkbox" id="pa-toggle" style="accent-color:#6D28D9;width:14px;height:14px" onchange="togglePA(this.checked)">
-      Exibir Projetos de Assentamento</label>
-      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 0">Fonte: INCRA · Acervo Fundiário (assentamentos federais do Acre, recebido em 07/10/2026).</p>
-    </div>
+    <p style="font-size:11px;color:var(--cinza-500);margin:0">Fonte: INCRA · Acervo Fundiário (assentamentos federais do Acre, recebido em 07/10/2026).</p>
     <div id="pa-resumo" class="pa-resumo" style="display:none">
       <div><b id="pa-res-total">—</b><span>Assentamentos</span></div>
       <div><b id="pa-res-area">—</b><span>Milhões ha</span></div>
@@ -235,31 +243,7 @@ function paSecaoHTML() {
       <div style="font-size:11px;color:var(--cinza-600);margin:10px 0 4px;font-weight:600">Modalidade</div>
       <div id="pa-mods" class="pa-mods"><span style="font-size:11px;color:var(--cinza-400)">Ligue a camada para ver as modalidades.</span></div>
     </div>
-    <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor da linha</label>
-          <input type="color" id="pa-cor-linha" value="${_paEstado.cor}" oninput="paAplicarEstilo()" style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer"></div>
-        <div><label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor de preenchimento</label>
-          <input type="color" id="pa-cor-fill" value="${_paEstado.fill}" oninput="paAplicarEstilo()" style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Tracejado</label>
-          <select id="pa-dash" onchange="paAplicarEstilo()" style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
-            <option value="">Sólido ───</option><option value="6 4">Tracejado - - -</option><option value="2 4">Pontilhado · · ·</option>
-            <option value="8 4">Traço longo ——</option><option value="8 4 2 4">Traço-ponto -·-</option>
-          </select></div>
-        <div><label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Espessura</label>
-          <select id="pa-peso" onchange="paAplicarEstilo()" style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
-            <option value="0.8">Fina (0.8)</option><option value="1.5">Normal (1.5)</option><option value="2.5">Grossa (2.5)</option><option value="4">Muito grossa (4)</option>
-          </select></div>
-      </div>
-      <div><label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Opacidade do preenchimento
-          <span id="pa-opacity-val" style="float:right;color:var(--cinza-500)">${Math.round(parseFloat(_paEstado.opacity) || 0)}%</span></label>
-        <input type="range" id="pa-opacity" min="0" max="100" value="${_paEstado.opacity}" style="width:100%;accent-color:#6D28D9" oninput="paAplicarEstilo()"></div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;font-weight:600">
-        <input type="checkbox" id="pa-nomes" style="accent-color:#6D28D9;width:13px;height:13px" onchange="paAplicarEstilo()">
-        Exibir nomes dos assentamentos</label>
-    </div>
+    ${aparencia}
     <div id="pa-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>`;
 }
 
