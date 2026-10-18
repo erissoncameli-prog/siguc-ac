@@ -33,11 +33,15 @@ for f in "$RAIZ"/supabase/migrations/362b_socio_interpretador.sql \
 done
 
 # estruturas de teste viram tabela (os testes e o teste cruzado leem daqui)
-python3 - "$DIR" > "$TMP/fixtures.sql" <<'PY'
+# o modelo que o editor da mesa oferece (js/socio-previa.js) tem de passar na
+# mesma conferência que barra a publicação
+node -e "process.stdout.write(JSON.stringify(require('$RAIZ/js/socio-previa.js').modelo()))" > "$TMP/estrutura-modelo.json"
+cp "$DIR"/estrutura-domicilio.json "$DIR"/estrutura-pessoa.json "$TMP/"
+python3 - "$TMP" > "$TMP/fixtures.sql" <<'PY'
 import sys, json, os
 d = sys.argv[1]
 print("create table public.teste_estruturas (nome text primary key, estrutura jsonb not null);")
-for n in ("domicilio", "pessoa"):
+for n in ("domicilio", "pessoa", "modelo"):
     j = json.dumps(json.load(open(os.path.join(d, f"estrutura-{n}.json"), encoding="utf-8")), ensure_ascii=False)
     print(f"insert into public.teste_estruturas values ('{n}', $j${j}$j$::jsonb);")
 print("grant select on public.teste_estruturas to authenticated;")

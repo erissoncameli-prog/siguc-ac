@@ -2,7 +2,8 @@
 
 > **Status:** Fase 1 ENTREGUE (18/10/2026) — migrations 362/362b/362c aplicadas em
 > produção, `js/socio-regras.js`, testes em `supabase/tests/socio/rodar.sh`.
-> Fases 2–5 a fazer.
+> Fase 2 ENTREGUE (18/10/2026) — `pages/socio-questionarios.html` (mesa: catálogo,
+> versões com editor e pré-visualização, equipe, pedidos de acesso). Fases 3–5 a fazer.
 > **Origem:** o Diagnóstico Socioambiental do dima-plataforma (`diag_*`,
 > migrations `20260926_diag_01` a `20261009_diag_20`). O desenho e as regras
 > vêm de lá. O código é portado e adaptado ao SIGUC, não copiado às cegas.

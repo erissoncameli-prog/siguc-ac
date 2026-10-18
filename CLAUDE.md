@@ -4865,11 +4865,28 @@ retenção são as Fases 2–5. Nada veio do DIMA (nem fichas, nem estrutura).
 - Guarda: `supabase/tests/socio/rodar.sh` (Postgres 16 local + stub do SIGUC):
   ~70 asserções de acesso e fluxo + 1.800 casos aleatórios JS × SQL. Contrafactual
   conferido (super_admin lendo ficha e JS divergente reprovam).
-- Sem mudança em `pwa/sw.js`: nenhuma página usa o módulo ainda.
+- **Mesa — Fase 2** (`pages/socio-questionarios.html`, grupo "Diagnóstico
+  Socioeconômico" no menu, logo abaixo de Principal e fora dos superblocos, sem
+  `modulo:`/`perfis:` — a página é aberta a todos): abas Do meu departamento ·
+  Catálogo (com "Pedir acesso") · Pedidos (recebidos com contador + os meus); no
+  questionário, Versões (editor JSON + pré-visualização + conferência ao vivo por
+  `fn_socio_validar_estrutura`, publicar/arquivar com confirmação), Equipe
+  (chefe = gestor nato, caixa travada; super_admin só com justificativa), Acessos
+  (decidir/revogar — super_admin acompanha, não decide) e Cadastro (troca de dono
+  só super_admin). A tela só esconde botão: quem decide é o banco.
+  Pré-visualização em `js/socio-previa.js` (pura, saltos e derivadas escritos em
+  português; também oferece o MODELO do editor, que o `rodar.sh` confere contra a
+  validação do banco). Estilos em `css/socio.css` (prefixo `soc-`; `.card` do
+  SIGUC não tem padding — conteúdo solto vai em `.soc-corpo`). Erro do banco
+  `socio:<codigo>: <texto>` → a tela mostra só o texto (`msgErro`).
+  Guarda: `tests/socio-questionarios.test.js` (9, página real + banco falso em
+  memória; contrafactual conferido). `tests/sidebar-grupos.test.js` passou a
+  esperar 'socio' depois de 'principal'.
+- `pwa/sw.js`: frota 113 → 114 (`js/layout.js` está no shell do Frota).
 
 ## Próxima tarefa
-**Diagnóstico Socioeconômico** — Fase 2 (mesa: catálogo, editor de versões,
-papéis, pedidos de acesso) em `docs/socioeconomico/plano.md` §3/§5.
+**Diagnóstico Socioeconômico** — Fases 1 e 2 entregues; próxima é a Fase 3
+(app de campo offline + bucket `socio-fotos`), em `docs/socioeconomico/plano.md` §3/§5.
 
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).

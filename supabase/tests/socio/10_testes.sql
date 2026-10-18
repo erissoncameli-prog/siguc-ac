@@ -425,4 +425,8 @@ select pg_temp.ok((select count(*) from lgpd_tratamentos where codigo = 'TRAT-02
 select pg_temp.ok((select bool_and(exists (select 1 from information_schema.tables where table_name = t))
                      from lgpd_tratamentos, unnest(tabelas) t where codigo = 'TRAT-021'), 'ROPA cita só tabelas que existem');
 
+-- ── 13. O modelo do editor (js/socio-previa.js) passa na conferência ───
+select pg_temp.ok(cardinality(fn_socio_validar_estrutura(pg_temp.est('modelo'))) = 0,
+                  'modelo oferecido pelo editor é publicável: ' || array_to_string(fn_socio_validar_estrutura(pg_temp.est('modelo')), '; '));
+
 select 'testes de acesso e fluxo: OK' as resultado;
