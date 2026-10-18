@@ -1,0 +1,185 @@
+# Diagnóstico Socioeconômico — Plano
+
+> **Status:** proposta para aprovação. Nenhuma migration nem código criado.
+> **Origem:** o Diagnóstico Socioambiental do dima-plataforma (`diag_*`,
+> migrations `20260926_diag_01` a `20261009_diag_20`). O desenho e as regras
+> vêm de lá. O código é portado e adaptado ao SIGUC, não copiado às cegas.
+
+---
+
+## 0. Decisões já tomadas
+
+| Tema | Decisão | Data |
+|------|---------|------|
+| Nome | **Diagnóstico Socioeconômico**. Módulo `socio` no código, prefixo `socio_` nas tabelas e `fn_socio_` nas funções | 18/10/2026 |
+| Dados do DIMA | **começar do zero**: nenhuma ficha migrada. Só a *estrutura* do questionário v7 pode servir de 1º instrumento (§1.4) | 18/10/2026 |
+| Vários questionários | sim, quantos forem necessários (instrumento → versão → campanha → ficha, §1) | 18/10/2026 |
+| UC | **opcional**: o instrumento não depende de UC. Cada campanha decide se exige UC, município ou nenhum dos dois (§1.3) | 18/10/2026 |
+| Dono | **todo instrumento pertence ao departamento que o solicitou** (`unidades_organizacionais`) | 18/10/2026 |
+| Acesso | o módulo é **aberto a todos**; um departamento **não vê** o instrumento de outro sem **pedir e receber permissão** (§2) | 18/10/2026 |
+
+Regras do projeto que valem aqui sem exceção:
+- nada impede o trabalho de campo;
+- cálculo num lugar só;
+- policy por `TO authenticated`, nunca `USING (true)`;
+- toda função nova com `REVOKE … FROM anon` explícito e `SET search_path = public`;
+- tabela nova com dado pessoal ganha linha no ROPA na mesma entrega.
+
+---
+
+## 1. Modelo
+
+```
+socio_instrumentos (dono: unidade_org_id)
+  └─ socio_questionarios (versão, JSON imutável depois de publicado)
+       └─ socio_campanhas (onde, quando, quem aplica)
+            └─ socio_fichas (+ moradores, identificação, fotos)
+```
+
+### 1.1 Instrumento — `socio_instrumentos`
+Cada questionário: `codigo` (único, 2–10 letras, vira o prefixo do código da
+ficha: `DSA-…`, `PESCA-…`), `titulo`, `finalidade`, `unidade_analise`
+(`domicilio | pessoa | comunidade | estabelecimento`) e **`unidade_org_id`
+(departamento dono, obrigatório)**. Não se apaga, só se arquiva.
+
+### 1.2 Versão — `socio_questionarios`
+Mesmo formato e regras do DIMA:
+- `estrutura` jsonb e `aviso_entrevistado`;
+- `hash_sha256` GERADO;
+- `rascunho → publicado → arquivado`;
+- versão publicada é imutável (trigger); correção = versão nova.
+
+O interpretador é portado com o teste cruzado SQL × JS:
+- no SQL: `fn_socio_aplicaveis`, `_normalizar_respostas`, `_calcular_alertas`, `_derivar`, `_cond`, `max_marcar`, `maior_nivel`;
+- no JS: `js/socio-regras.js`.
+
+Nova é a validação da própria estrutura antes de publicar
+(`fn_socio_validar_estrutura`: chaves únicas, salto apontando para pergunta
+anterior, opções de `unica`/`multipla`), porque agora quem escreve
+questionário são vários departamentos, não uma equipe só.
+
+### 1.3 Campanha — `socio_campanhas`
+Uma aplicação concreta de uma **versão publicada**. Guarda:
+- período (`inicio`, `fim`) e situação (`planejada | aberta | encerrada`);
+- **escopo territorial configurável**: `exige_uc` / `exige_municipio` (booleanos) e, opcionalmente, a lista de UCs e municípios permitidos;
+- equipe de campo: `socio_campanha_aplicadores`.
+
+O app de campo só baixa as campanhas **abertas** em que a pessoa é aplicadora.
+
+**Território na ficha:**
+
+| Campo | Obrigatório? |
+|-------|--------------|
+| `cd_mun` (de `municipios_acre`) | conforme a campanha |
+| `uc_id` | conforme a campanha |
+| `comunidade_id` (`socio_comunidades`: nome + município + UC opcional, cadastro comum a todos os departamentos) | opcional, ou texto novo como no DIMA |
+
+### 1.4 Ficha — `socio_fichas` e satélites
+Mesmo desenho do DIMA, já testado em campo:
+- `uuid_cliente` UNIQUE CONSTRAINT, que é a idempotência da fila (índice parcial não serve, lição da 257b);
+- envio só pela RPC `socio_enviar_ficha` (transação única);
+- mudança de status só por `socio_mudar_status`;
+- **identificação separada**: `socio_fichas_identificacao`, `socio_moradores_identificacao`, `socio_fotos` em bucket privado `socio-fotos`;
+- modo treino (`treino`, código `TRE-`), fora de todo indicador;
+- histórico de status imutável.
+
+**1º instrumento (opcional):** carregar a *estrutura* do questionário v7 do
+DIMA (DSA, 91 perguntas) como `rascunho` de um departamento a definir. O dono
+revisa e publica. Nenhuma ficha vem junto.
+
+---
+
+## 2. Acesso por departamento (o ponto novo)
+
+### 2.1 Princípio
+Ter o módulo não dá acesso a instrumento nenhum. O acesso a cada instrumento
+vem de **pertencer ao departamento dono** ou de uma **permissão concedida pelo
+dono**. É uma regra própria do módulo, escrita numa função só:
+`fn_socio_papel(instrumento_id) → 'gestor' | 'aplicador' | 'leitor' | 'agregados' | null`.
+Toda policy e RPC do módulo passa por ela. Nenhuma página decide acesso.
+
+### 2.2 Quem é do departamento
+Usa a fonte única do organograma, `usuario_unidades()` (lotação **+ cargo
+ocupado**), com a mesma herança de `alcance_por_lotacao()`:
+- lotado na unidade dona **ou num descendente** (divisão, núcleo) = membro;
+- lotado num **ancestral** (diretoria, secretaria = chefia acima) = `leitor` de agregados, nunca de ficha identificada.
+
+### 2.3 Papéis dentro do instrumento — `socio_instrumento_membros`
+
+| Papel | Pode | Como se ganha |
+|-------|------|---------------|
+| `gestor` | editar e publicar versões, abrir campanhas, validar e devolver fichas, exportar, aprovar pedidos de outros departamentos | **automático para o titular do cargo de chefia da unidade dona** (`cargo_ocupacoes`); o gestor designa outros |
+| `aplicador` | aplicar no app, ver as **próprias** fichas | designado pelo gestor (por campanha) |
+| `leitor` | ver fichas **sem identificação** e indicadores | designado pelo gestor |
+| membro sem papel | ver o instrumento e os indicadores agregados | estar no departamento (§2.2) |
+
+### 2.4 Outro departamento — pedir permissão
+- **Catálogo comum:** todos veem *que* o instrumento existe (título, departamento dono, finalidade, situação). Não veem perguntas, fichas nem números. É isso que permite pedir.
+- **Pedido** (`socio_acessos`): quem pede escolhe o nível (`agregados | leitor | aplicador`), escreve a justificativa (mínimo de 20 caracteres, conferido no banco) e o prazo (`data_fim` obrigatória, mesma regra de `credenciamentos`).
+- **Decisão:** **o gestor do departamento dono** decide (nunca quem pediu), com parecer obrigatório na recusa.
+- **Avisos:** no sino, ao pedir e ao decidir.
+- **Revogação e histórico:** vencido ou revogado, o acesso cai sozinho. O registro não se apaga e entra na `trilha_auditoria`.
+- **Teto:** `aplicador` de outro departamento não recebe identificação de fichas alheias. Nenhum pedido dá `gestor`.
+
+### 2.5 super_admin
+Administra o catálogo, **troca o departamento dono** e corrige papéis (com
+justificativa), mas **por padrão não lê fichas identificadas** de instrumento
+algum. Se precisar, pede como qualquer outro. *(Ver pergunta Q1.)*
+
+### 2.6 ⚠️ Pré-requisito medido: lotação
+Em produção (18/10/2026), **14 dos 71 usuários ativos têm lotação** e 53 não
+têm. Com a regra acima, quem não tem lotação nem cargo não é membro de
+departamento nenhum. Não perde acesso a nada que já tem, mas só entra no
+Diagnóstico por pedido. Mitigação:
+- a tela diz isso claramente ("sem lotação cadastrada — peça à administração", com o link da aba Lotações);
+- antes de abrir a 1ª campanha, conferir a lotação de quem vai aplicar (`vw_usuarios_sem_lotacao`);
+- **nenhum fail-open aqui**: diferente de `nivel_efetivo()`, cair no padrão abriria o instrumento de um departamento para todos, que é exatamente o que a decisão proíbe.
+
+---
+
+## 3. Telas
+
+**Mesa:** grupo próprio na sidebar, "Diagnóstico Socioeconômico", visível a
+todos (sem `modulo:` de gate). As páginas são:
+
+| Página | Conteúdo |
+|--------|----------|
+| `socio-instrumentos.html` | "Do meu departamento" e "Catálogo" (com o botão **Pedir acesso**); editor de versão (JSON + pré-visualização + validação, no molde dos "Gabaritos de laudo"); publicação; membros; pedidos recebidos |
+| `socio-campanhas.html` | período, escopo territorial, aplicadores |
+| `socio-validacao.html` | fila do gestor; ficha aberta; validar, devolver ou descartar |
+| `socio-indicadores.html` | por instrumento, campanha, UC e município, gerados a partir do JSON; supressão abaixo de 5 fichas; exportação registrada (ExcelJS) |
+
+**Campo:** `pages/socio-app.html`, 5º app offline:
+- PWA primeiro, com `VERSOES.socio` e `SHELLS.socio` em `pwa/sw.js`;
+- reaproveita `pin-baralho`, `luz-nav`, `guia-app`, `foto-otimizar`, `brigada-captura` (GPS pontual), `fotos-privadas` e `lgpd-campo` (slug `socio`);
+- APK Capacitor (`app-socio/`) numa fase própria, porque o contador em `VERSOES` dispara o build automático assim que existir workflow.
+
+---
+
+## 4. LGPD
+- **ROPA:** novo `TRAT-0xx` "Diagnóstico Socioeconômico", com as tabelas reais. Dado sensível possível (saúde, filiação), titulares terceiros e menores (lista de moradores). Base legal: art. 7º III / art. 11 II "b", **nunca consentimento**. O entrevistado é avisado e pode recusar.
+- **Aviso por instrumento:** `aviso_entrevistado` é versionado com o questionário, porque cada departamento coleta coisas diferentes.
+- **Retenção:** identificação e fotos apagadas 2 anos após a validação (como no DIMA). Prazo lido do ROPA, cron diário. Arquivo removido do Storage por fila.
+- **Log de acesso:** fichas identificadas lidas por outro departamento (acesso concedido) são registradas em `lgpd_acesso_dado_terceiro`, com `origem = 'socio'`.
+
+---
+
+## 5. Fases
+
+| Fase | Entrega | Guarda |
+|------|---------|--------|
+| **1** | Banco: instrumentos, versões, campanhas, comunidades, fichas e satélites, `fn_socio_papel`, pedidos de acesso, RLS, ROPA, interpretador SQL + `js/socio-regras.js` | teste cruzado SQL × JS (porte do `supabase/tests/diagnostico`); testes de acesso como membro, como outro departamento antes e depois da concessão, como sem lotação e como `anon` |
+| **2** | `socio-instrumentos.html` (catálogo, editor, membros, pedidos) | Playwright com stub |
+| **3** | App de campo offline + envio + treino | Playwright: salvar offline, reenviar sem duplicar, treino isolado |
+| **4** | Campanhas + validação | — |
+| **5** | Indicadores + exportação + retenção | — |
+| depois | áudio + transcrição local, editor visual, APK, visita com vários instrumentos no mesmo domicílio | — |
+
+---
+
+## 6. Perguntas em aberto
+
+- **Q1** — super_admin lê fichas identificadas de qualquer departamento (como no resto do SIGUC) ou também precisa pedir (§2.5)? *Proposta: precisa pedir.*
+- **Q2** — Chefia acima (diretoria, secretaria) vê só agregados (§2.2) ou também fichas sem identificação? *Proposta: só agregados.*
+- **Q3** — Quem é o departamento dono do 1º instrumento (o DSA do DIMA), ou ele nem deve ser carregado?
+- **Q4** — Pedido de acesso pode ser por **departamento inteiro** (vale para todos de lá) ou só por **pessoa**? *Proposta: só pessoa na v1.*
