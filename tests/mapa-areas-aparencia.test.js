@@ -129,3 +129,74 @@ test('cor e espessura mudam o mapa nas três camadas pelo mesmo bloco', async ({
   await page.selectOption('#uc-peso', '3'); // mexer na espessura não volta para a cor única
   expect(await page.evaluate(() => _ucCorLinha)).toBe('');
 });
+
+// ── UCs por tipo e nível ("Colorir por", js/mapa-uc-tipos.js) ──────────
+// Trava: cada modo pinta pela cor do tipo e a legenda acompanha; a cor do
+// tipo é editável; os filtros se SOMAM (categoria oculta + esfera desligada
+// = só o cruzamento); e voltar a "Cada UC" devolve a cor individual.
+const abrirUC = async page => {
+  await abrir(page);
+  await page.evaluate(() => { localStorage.removeItem('siguc_uc_colorir'); localStorage.removeItem('siguc_uc_tipo_ocultos'); localStorage.removeItem('siguc_uc_cores_tipo') });
+  await page.click('[aria-controls="areas-sec-uc"]');
+  await expect(page.locator('#areas-sec-uc')).toBeVisible();
+  // parte de todas as esferas ligadas (o padrão é só estaduais). Com mais de uma
+  // esfera o card de estatísticas lançava ReferenceError (areaTotal) e cortava o redesenho.
+  await page.evaluate(() => { ['federal', 'municipal'].forEach(e => { document.getElementById('uc-esfera-' + e).checked = true }); toggleUCEsfera() });
+};
+const nUC = page => page.evaluate(() => _ucLayer.getLayers().length);
+const fillsUC = page => page.evaluate(() => _ucLayer.getLayers().map(l => [l.feature.properties.categoria, l.feature.properties.esfera, l.options.fillColor]));
+
+test('colorir por categoria: cor do tipo no mapa, linhas com contagem e legenda', async ({ page }) => {
+  await abrirUC(page);
+  const total = await nUC(page);
+  await page.click('[data-uct-modo="categoria"]');
+  await expect(page.locator('#uc-controles')).toBeHidden(); // lista por UC dá lugar às categorias
+  const linhas = page.locator('#uct-lista .uct-linha');
+  expect(await linhas.count()).toBe(8);
+  if (process.env.SHOT2) await page.screenshot({ path: process.env.SHOT2 });
+  await expect(linhas.first()).toContainText('5');
+  const f = await fillsUC(page);
+  expect(f).toHaveLength(total);
+  const porCat = {}; f.forEach(([c, , cor]) => { (porCat[c] = porCat[c] || new Set()).add(cor) });
+  Object.values(porCat).forEach(s => expect(s.size).toBe(1));                 // uma cor por categoria
+  expect(new Set(Object.values(porCat).map(s => [...s][0])).size).toBe(8);   // e oito cores diferentes
+  const leg = await page.evaluate(() => uctItensLegenda(_ucsFeaturesVisiveis(), 0.4).map(i => i.label));
+  expect(leg).toContain('UC — Reserva Extrativista');
+  // mudar a cor de uma categoria
+  await page.click('[data-uct-cor="categoria:Reserva Extrativista"]');
+  await page.click('[data-uct-paleta] [data-uct-escolher="#CC79A7"]');
+  const resex = (await fillsUC(page)).filter(x => x[0] === 'Reserva Extrativista').map(x => x[2]);
+  expect(new Set(resex)).toEqual(new Set(['#CC79A7']));
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_uc_cores_tipo')).categoria['Reserva Extrativista'])).toBe('#CC79A7');
+});
+
+test('filtros juntos: categoria oculta + esfera desligada; voltar a "Cada UC" mantém o filtro', async ({ page }) => {
+  await abrirUC(page);
+  const gj = await page.evaluate(() => _ucGeojson.features.map(f => f.properties));
+  expect(await nUC(page)).toBe(gj.length);
+  await page.click('[data-uct-modo="categoria"]');
+  // só Florestas: oculta todas as categorias menos Floresta Estadual/Nacional
+  const cats = [...new Set(gj.map(p => p.categoria))].filter(c => !c.startsWith('Floresta'));
+  for (const c of cats) await page.uncheck(`[data-uct-mostrar="categoria:${c}"]`);
+  expect(await nUC(page)).toBe(gj.filter(p => p.categoria.startsWith('Floresta')).length);
+  // + só estaduais (pelo modo Esfera, que usa o filtro de sempre)
+  await page.click('[data-uct-modo="esfera"]');
+  await page.uncheck('[data-uct-mostrar="esfera:federal"]');
+  await page.uncheck('[data-uct-mostrar="esfera:municipal"]');
+  expect(await page.evaluate(() => _ucEsfFed)).toBe(false);
+  const so = gj.filter(p => p.categoria.startsWith('Floresta') && p.esfera === 'estadual');
+  expect(so.length).toBeGreaterThan(0);
+  expect(await nUC(page)).toBe(so.length);
+  // cor por esfera: todas iguais (só estaduais)
+  expect(new Set((await fillsUC(page)).map(x => x[2])).size).toBe(1);
+  // volta a "Cada UC": filtro continua, cores individuais voltam
+  await page.click('[data-uct-modo="uc"]');
+  await expect(page.locator('#uc-controles')).toBeVisible();
+  expect(await nUC(page)).toBe(so.length);
+  const individuais = await page.evaluate(() => _ucLayer.getLayers().map(l => l.options.fillColor === _ucCorNome(l.feature.properties.nome, l.feature.properties.cor)));
+  expect(individuais.every(Boolean)).toBe(true);
+  // preferências guardam modo e filtros
+  const pref = await page.evaluate(() => _prefsCapturar().uc_tipos);
+  expect(pref.modo).toBe('uc');
+  expect(pref.ocultos.length).toBe(cats.length);
+});
