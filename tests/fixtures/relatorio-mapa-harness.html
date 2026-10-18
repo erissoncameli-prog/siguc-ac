@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<title>Harness · relatórios do mapa</title>
+<!-- Página vazia dedicada (mesmo motivo do sidebar-harness.html: as páginas
+     reais declaram `let db` próprio e colidem). Carrega os MESMOS arquivos
+     que pages/mapa.html usa para os relatórios, com stubs do resto. -->
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="../../css/relatorio-print.css">
+<script src="vendor/leaflet.js"></script>
+<script src="../../js/vendor/proj4-2.11.0.min.js"></script>
+<script>
+  window.toast = (m) => { (window._toasts = window._toasts || []).push(m) }
+  window.bico = () => ''
+  window.getCabecalhoRelatorio = async (mod) => {
+    window._cabModulo = mod
+    return { governo: 'Governo do Estado do Acre', secretaria: 'Secretaria de Estado do Meio Ambiente do Acre', siglaSecr: 'SEMA-AC',
+      diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA', departamento: 'Departamento de Unidades de Conservação', siglaDep: 'DEUC',
+      logoGoverno: window._semLogo ? null : 'logo-acre.png', logoSecr: window._semLogo ? null : 'logo-sema.png', responsaveis: [] }
+  }
+  window.gerarProtocolo = async () => 'SIGUC-2026-0042'
+</script>
+<script src="../../js/mapa-moldura.js"></script>
+<script src="../../js/relatorio-car.js"></script>
+<script src="../../js/mapa-cartografia.js"></script>
+</head><body>
+<div class="mapa-wrapper" id="wrap"><div id="mapa" style="position:relative;width:800px;height:400px"></div></div>
+</body></html>

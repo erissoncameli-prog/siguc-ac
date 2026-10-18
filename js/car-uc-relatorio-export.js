@@ -43,7 +43,7 @@ async function carucMontarPdf(rel, protocolo) {
   const cab = await getCabecalhoRelatorio(CARUC_PDF_MODULO)
   const pdf = _carucPdfNovoDocumento()
   const ctx = _agpdfCtx(pdf, cab, protocolo)
-  ctx.linhaModulo = 'Unidades de Conservação · CAR'
+  ctx.linhaModulo = 'Relatório CAR na UC'
   const { uc, resumo: r, opcoes: o } = rel
 
   pdf.setFont('DMSans', 'bold'); pdf.setFontSize(14); pdf.setTextColor(...AGPDF_COR.floresta)
@@ -151,7 +151,7 @@ async function carucMontarPdf(rel, protocolo) {
           ...estiloRel,
           head: [['Nº', 'Fora da UC · mesmo titular · Nº do CAR', 'Imóvel', 'Município', 'Situação', 'Área declarada (ha)']],
           headStyles: { ...estiloRel.headStyles, fillColor: [146, 64, 14] },
-          body: fora.map((f, k) => ['F' + (k + 1), f.cod, f.nome_imovel || '—', f.municipio || '—', f.situacao || '—', _carucN(f.area_declarada_ha)]),
+          body: fora.map((f, k) => ['F' + (k + 1), f.cod, f.nome_imovel || '—', f.municipio || '—', [f.situacao || '—', _carucCanceladoEm(f)].filter(Boolean).join('\n'), _carucN(f.area_declarada_ha)]),
           columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 62 }, 5: { halign: 'right', cellWidth: 26 } },
         })
         if (g.fora.length > fora.length) _agpdfParagrafo(ctx, `… e mais ${g.fora.length - fora.length} CAR(s) deste titular fora da UC — todos estão no mapa e na planilha Excel (aba "Fora da UC").`, { muted: true })
@@ -166,12 +166,14 @@ async function carucMontarPdf(rel, protocolo) {
     'Geometria dos imóveis: WFS público do SICAR, consultado no momento da geração. Atributos cadastrais: planilha SICAR local importada no sistema; CPF/CNPJ sempre mascarado. A consulta foi registrada no log de acesso a dado de terceiro (LGPD).',
     'Área na UC/ZA: interseção do polígono do imóvel com o limite da UC (ou da zona de amortecimento), calculada no sistema.',
   ]
+  notas.push('Situação e status vêm do SICAR no momento da consulta (a planilha local só completa o que o SICAR não trouxer). O SICAR não publica a data do cancelamento: "Cancelado em" é a data da última atualização do registro no SICAR, que nos cancelados coincide com o lote de cancelamento — se o registro for alterado depois, a data acompanha.')
+  notas.push(carucEmbargosFonteTexto(rel))
   if (o.focos) notas.push(`Focos: mesma série da linha do tempo do mapa — temporada de fogo (1º/jul a 4/nov), VIIRS S-NPP + MODIS; antes de 2012 não é comparável (entrada do VIIRS).`)
   if (o.deter) notas.push('DETER: alertas gravados no sistema, que começam em jun/2026.')
   if (o.prodes) notas.push('PRODES/INPE (TerraBrasilis): o ano PRODES vai de agosto a julho; "após o marco" soma os anos 2009 em diante, os primeiros inteiramente posteriores a 22/07/2008 (Lei 12.651/2012). "Até 2007" é a camada de desmatamento acumulado do INPE.')
   if (rel.falhas.prodes) notas.push(`ATENÇÃO: ${rel.falhas.prodes} de ${rel.falhas.prodes_quadrantes} quadrantes do PRODES não responderam — os valores de PRODES podem estar incompletos.`)
   if (rel.falhas.ambiental) notas.push(`ATENÇÃO: focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
-  notas.push('Prioridade — Alta: UC de proteção integral ou zona de proteção, com desmatamento PRODES após 2008 ou alerta DETER (só quando pedidos). Média: CAR em proteção integral, zona de proteção, imóvel particular em UC de domínio público, inscrição após a criação da UC, possível fracionamento, classe Vermelho ou sobreposição com outro CAR. Baixa: nenhum desses.')
+  notas.push('Prioridade — Alta: UC de proteção integral ou zona de proteção, com desmatamento PRODES após 2008, alerta DETER (só quando pedidos) ou embargo vigente. Média: CAR em proteção integral, zona de proteção, imóvel particular em UC de domínio público, inscrição após a criação da UC, possível fracionamento, classe Vermelho, sobreposição com outro CAR ou embargo vigente. Baixa: nenhum desses.')
   notas.push('Titular: o agrupamento por CPF/CNPJ é feito no servidor e o número do titular vale só neste relatório. Possível fracionamento: mesmo CPF com 2 ou mais imóveis de até 4 módulos fiscais somando mais de 4. Sobreposição entre CARs conta a partir de 0,1 ha.')
   if (rel.agrupado) notas.push(`Mapa por titular (2 ou mais CARs no recorte): o número no polígono é o da linha da tabela. ${o.foraUc ? 'F1, F2… são CARs do mesmo CPF/CNPJ fora da UC — não entram em nenhum total da UC; a consulta registrou cada um no log de acesso a dado de terceiro (LGPD).' : 'Os CARs do mesmo titular fora da UC não foram pedidos nesta consulta.'}`)
   if (usouSatelite) notas.push(CARUC_MAPA_CREDITO + '.')
@@ -201,7 +203,7 @@ function _carucPdfColunas(rel, agrupado) {
     ? { rotulo: 'Imóvel', valor: i => i.nome_imovel || '—' }
     : { rotulo: 'Imóvel / titular', valor: i => [i.nome_imovel || '—', [i.titular, i.documento].filter(Boolean).join(' · ')].filter(Boolean).join('\n') })
   cols.push({ rotulo: 'Município', largura: 20, valor: i => i.municipio || '—' })
-  cols.push({ rotulo: 'Situação / classe', largura: 25, valor: i => [i.situacao || '—', i.classe].filter(Boolean).join('\n') })
+  cols.push({ rotulo: 'Situação / classe', largura: 25, valor: i => [i.situacao || '—', _carucCanceladoEm(i), i.classe].filter(Boolean).join('\n') })
   cols.push({ rotulo: 'Tipo', largura: 17, valor: i => carucTipoImovel(i.tipo_imovel) })
   cols.push({ rotulo: 'Área na UC (ha · %)', largura: 19, direita: true,
     valor: i => `${n2(i.area_analise_ha)}${i.pct_analise != null ? `\n${carucFormatarValor(i.pct_analise, 1)}%` : ''}` })
@@ -218,12 +220,19 @@ function _carucPdfColunas(rel, agrupado) {
   return cols
 }
 
+// "Cancelado em dd/mm/aaaa" — data_atualizacao do SICAR (ver carucSituacaoAtual).
+function _carucCanceladoEm(i) {
+  return i.data_cancelamento ? 'Cancelado em ' + i.data_cancelamento.split('-').reverse().join('/') : ''
+}
+
 // Linha própria, de largura inteira, abaixo do imóvel: o texto longo que
 // espremido numa coluna virava uma letra por linha.
 function _carucPdfNota(i) {
   const partes = []
   if (i.prioridade?.motivos?.length) partes.push('Motivo: ' + i.prioridade.motivos.join('; '))
   if (i.atencoes?.length) partes.push('Atenção: ' + i.atencoes.join('; '))
+  if (i.embargos?.length) partes.push('Embargo: ' + i.embargos.slice(0, 4).map(e => `${carucEmbargoRotulo(e)} (${CARUC_EMBARGO_SITUACAO[e.situacao] || e.situacao})`).join('; ')
+    + (i.embargos.length > 4 ? ` e mais ${i.embargos.length - 4}` : ''))
   if (i.sobreposicoes?.length) partes.push('Sobrepõe: ' + i.sobreposicoes.slice(0, 4).map(s => `${s.cod} (${_carucN(s.ha)} ha${s.mesmo_titular ? ', mesmo titular' : ''})`).join('; ')
     + (i.sobreposicoes.length > 4 ? ` e mais ${i.sobreposicoes.length - 4}` : ''))
   return partes.join('   ·   ')
@@ -248,14 +257,17 @@ async function _carucPdfMapaGrupo(ctx, rel, g, fundo, acre) {
       ctx.pdf.setDrawColor(...AGPDF_COR.borda); ctx.pdf.setLineWidth(0.2); ctx.pdf.rect(x, ctx.y, w, ALT)
       x += w + 3
     }
-    ctx.y += ALT + 3.5
-    ctx.pdf.setFont('DMSans', 'normal'); ctx.pdf.setFontSize(6.6); ctx.pdf.setTextColor(...AGPDF_COR.muted)
-    const leg = ['1º quadro: CARs do titular ampliados (nº = coluna "Nº")', '2º: UC inteira, retângulo = área ampliada', 'traço contínuo: limite da UC']
-    if (rel.geo?.zonas?.length) leg.push('tracejado: zonas de manejo')
-    if (m.acre) leg.push('3º: Acre, pontos F1, F2… = CARs do mesmo titular fora da UC')
-    if (m.semSatelite) leg.push('imagem de satélite indisponível na geração — sem fundo')
-    ctx.pdf.text(leg.join(' · '), AGPDF_M, ctx.y)
-    ctx.y += 4
+    ctx.y += ALT + 1.5
+    // Legenda + referência + fundo: o MESMO SVG que a tela mostra
+    // (carucMapaRodapeSVG / js/mapa-moldura.js), na largura da fileira.
+    const larguraFileira = x - 3 - AGPDF_M
+    if (m.rodape) {
+      const rod = await carucMapaSvgParaImagem(m.rodape, 2, false)
+      const h = larguraFileira * rod.h / rod.w
+      _agpdfGarantirEspaco(ctx, h + 2)
+      ctx.pdf.addImage(rod.dataUrl, 'PNG', AGPDF_M, ctx.y, larguraFileira, h)
+      ctx.y += h + 3
+    }
     return sat
   } catch (e) {
     console.warn('[caruc] mapa do titular no PDF', e)
@@ -326,16 +338,18 @@ async function carucMontarXlsx(rel) {
         { header: 'Titular nº', width: 11 }, { header: 'Titular', width: 36 }, { header: 'No mapa', width: 9 },
         { header: 'Nº do CAR', width: 48 }, { header: 'Imóvel', width: 30 }, { header: 'Município', width: 20 },
         { header: 'Situação', width: 14 }, { header: 'Área declarada (ha)', width: 18 },
+        { header: 'Cancelado em (última atualização no SICAR)', width: 22 },
       ]
       for (const g of comFora) g.fora.forEach((f, k) => {
         const l = wf.addRow([g.grupo, g.titular || '', 'F' + (k + 1), f.cod, f.nome_imovel || '', f.municipio || '', f.situacao || '',
-          f.area_declarada_ha != null ? Number(f.area_declarada_ha) : ''])
+          f.area_declarada_ha != null ? Number(f.area_declarada_ha) : '',
+          f.data_cancelamento ? f.data_cancelamento.split('-').reverse().join('/') : ''])
         l.getCell(8).numFmt = '#,##0.00'
       })
       const cf = wf.getRow(1)
       cf.font = { bold: true, color: { argb: 'FFFFFFFF' } }
       cf.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } }
-      wf.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 8 } }
+      wf.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 9 } }
     }
   }
 

@@ -5,7 +5,11 @@
 // O que este teste trava:
 //  - filtro de LOCAL (Acre todo / todas as UCs / uma UC) recorta fogo e
 //    desmatamento do jeito certo, e o período também;
-//  - "Acre todo" usa o número OFICIAL do INPE, nunca a soma das UCs;
+//  - "Acre todo" usa a área dos polígonos publicada pelo INPE, nunca a
+//    soma das UCs;
+//  - TAXA OFICIAL do INPE (migration 361) é série à parte: card próprio só
+//    em "Acre todo", estimativa vazada, nunca somada aos polígonos nem
+//    misturada no gráfico de área ou na tendência;
 //  - ano sem registro vira null (buraco declarado), nunca zero;
 //  - ano em curso sai marcado como parcial;
 //  - rosca: "dentro × fora" soma o total do Acre; com uma UC escolhida,
@@ -129,7 +133,7 @@ test('focos por mês somam o período e respeitam o local', async ({ page }) => 
   expect(m).toEqual([{ mes: 7, n: 0 }, { mes: 8, n: 105 }, { mes: 9, n: 0 }, { mes: 10, n: 0 }, { mes: 11, n: 0 }]);
 });
 
-test('desmatamento: Acre todo = número oficial; UC = interseção; sem PRODES = null', async ({ page }) => {
+test('desmatamento: Acre todo = área dos polígonos do INPE; UC = interseção; sem PRODES = null', async ({ page }) => {
   await carregar(page);
   const acre = await rodar(page, 'pfdDesmatPorAno', F({}));
   expect(acre.map(p => p.ha)).toEqual([41135, 27546, null]);
@@ -137,6 +141,51 @@ test('desmatamento: Acre todo = número oficial; UC = interseção; sem PRODES =
   expect(ucs.map(p => p.ha)).toEqual([4317, 3000, null]);
   const b = await rodar(page, 'pfdDesmatPorAno', F({ escopo: 'B' }));
   expect(b.map(p => p.ha)).toEqual([12, 0, null]);
+});
+
+test('taxa oficial: série à parte, só no Acre todo, estimativa marcada, nunca somada aos polígonos', async ({ page }) => {
+  await carregar(page);
+  const r = await page.evaluate(() => {
+    const d = {
+      prodesAno: [{ ano: 2024, poligonos: 5699, area_ha: 41135 }, { ano: 2025, poligonos: 5096, area_ha: 27546 }],
+      prodesTaxa: [
+        { uf: 'AC', ano: 2024, km2: 449, tipo: 'consolidada', km2_estimado: 448 },
+        { uf: 'AC', ano: 2025, km2: 324, tipo: 'consolidada', km2_estimado: null, divulgado_em: '2026-10-16' },
+        { uf: 'AC', ano: 2026, km2: 252, tipo: 'estimada', km2_estimado: null, divulgado_em: '2026-10-16' },
+      ],
+    };
+    const f = { escopo: '', anoIni: 2024, anoFim: 2026 };
+    const t = pfdTaxaOficial(d, f);
+    const html = pfdTaxaCardHTML(t);
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const barras = [...doc.querySelectorAll('svg path')];
+    return {
+      t, html: doc.body.textContent.replace(/\s+/g, ' '),
+      vazadas: barras.filter(b => b.getAttribute('stroke-dasharray')).map(b => b.querySelector('title').textContent),
+      solidas: barras.filter(b => !b.getAttribute('stroke-dasharray')).length,
+      ate2025: pfdTaxaOficial(d, { escopo: '', anoIni: 2024, anoFim: 2025 }).ultimo,
+      uc: pfdTaxaOficial(d, { escopo: 'A', anoIni: 2024, anoFim: 2026 }),
+      mun: pfdTaxaOficial(d, { escopo: 'mun:1200401', anoIni: 2024, anoFim: 2026 }),
+      semSerie: pfdTaxaOficial({ prodesAno: d.prodesAno }, f),
+      areaAcre: pfdDesmatPorAno(d, f).map(p => p.ha),
+    };
+  });
+  expect(r.t.ultimo).toEqual({ ano: 2026, km2: 252, tipo: 'estimada', km2_estimado: null });
+  expect(r.t.variacao).toBeCloseTo(-22.22, 1);
+  expect(r.t.semPoligonos).toEqual([2026]);
+  expect(r.t.par).toEqual({ ano: 2025, taxa: 324, poligonos: 275.46 });
+  expect(r.html).toContain('252 km²');
+  expect(r.html).toContain('Estimativa');
+  expect(r.html).toContain('queda de 22,2% em relação a 2025 (324 km²)');
+  expect(r.html).toContain('1º semestre de 2027');
+  expect(r.html).toMatch(/taxa oficial foi 324 km² e os polígonos mapeados somam 275 km²/);
+  expect(r.vazadas).toEqual(['2026 (estimativa) — 252 km²']);   // estimativa nunca sólida
+  expect(r.solidas).toBe(2);
+  expect(r.ate2025).toEqual({ ano: 2025, km2: 324, tipo: 'consolidada', km2_estimado: null });
+  expect(r.uc).toBeNull();      // INPE não publica taxa por UC
+  expect(r.mun).toBeNull();     // nem por município
+  expect(r.semSerie).toBeNull();
+  expect(r.areaAcre).toEqual([41135, 27546, null]);   // a taxa nunca vira área de polígono
 });
 
 test('acumulado ignora ano sem dado sem zerar a soma', async ({ page }) => {
@@ -565,6 +614,12 @@ const TABELAS = {
     { ano: 2024, focos: 1010, origem: 'serie_historica', periodo_ini: '2024-07-01', periodo_fim: '2024-11-04' },
   ],
   prodes_resumo_ano: [{ ano: 2023, poligonos: 5877, area_ha: 46295 }, { ano: 2024, poligonos: 5699, area_ha: 41135 }],
+  prodes_taxa_ano: [
+    { uf: 'AC', ano: 2023, km2: 601, tipo: 'consolidada', km2_estimado: null, divulgado_em: '2026-10-16' },
+    { uf: 'AC', ano: 2024, km2: 449, tipo: 'consolidada', km2_estimado: 448, divulgado_em: '2026-10-16' },
+    { uf: 'AC', ano: 2025, km2: 324, tipo: 'consolidada', km2_estimado: null, divulgado_em: '2026-10-16' },
+    { uf: 'AC', ano: 2026, km2: 252, tipo: 'estimada', km2_estimado: null, divulgado_em: '2026-10-16' },
+  ],
   focos_bdq_uc_mes: [
     { ano: 2023, mes: 3, uc_id: null, focos: 12 },
     { ano: 2023, mes: 9, uc_id: 'A', focos: 250 },
@@ -715,6 +770,7 @@ test('página: abre com linha, barras, tendência, rosca, ranking e área nas du
     `Leitura do período — Acre todo, 2023 a ${new Date().getFullYear()}`,
     'Focos de calor por ano', 'Focos por mês da temporada', 'Tendência dos focos de calor', 'Focos dentro × fora de UCs', 'UCs com mais focos',
     'Focos por município',
+    'Taxa oficial de desmatamento do INPE — Acre',
     'Área desmatada × floresta que resta — Acre todo', 'Como chegou até aqui — Acre todo',
     'Área desmatada por ano', 'Desmatamento acumulado', 'Tendência do desmatamento', 'Área dentro × fora de UCs', 'UCs com mais área desmatada',
     'Área desmatada por município',
@@ -723,6 +779,23 @@ test('página: abre com linha, barras, tendência, rosca, ranking e área nas du
   expect(await page.locator('.pfd-card svg title').count()).toBeGreaterThan(10);
   await expect(page.locator('.pfd-kpi').first()).toContainText('4.310');   // 3.300 + 1.010 focos
   await expect(page.locator('.pfd-kpis')).toContainText('87.430');          // 46.295 + 41.135 ha oficiais
+});
+
+test('página: card da taxa oficial no Acre todo, avisa o ano sem polígonos e some no recorte', async ({ page }) => {
+  await abrirPainel(page);
+  const card = page.locator('.pfd-taxa');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('252 km²');
+  await expect(card).toContainText('Estimativa');
+  await expect(page.locator('.pfd-aviso')).toContainText('o INPE divulgou a taxa');
+  const tend = page.locator('.pfd-card', { has: page.locator('h3', { hasText: 'Tendência do desmatamento' }) });
+  await expect(tend).toContainText('não entra nesta tendência');
+  // o KPI de área continua sendo a soma dos POLÍGONOS (2023 + 2024), sem a taxa
+  await expect(page.locator('.pfd-kpis')).toContainText('87.430');
+  const pg2 = await page.context().newPage();
+  await abrirPainel(pg2, '#onde=mun&mun=1200302');
+  await expect(pg2.locator('.pfd-secao-titulo').first()).toContainText('Feijó');
+  await expect(pg2.locator('.pfd-taxa')).toHaveCount(0);   // INPE não publica taxa por município
 });
 
 test('página: "Só queimadas" esconde o desmatamento e vice-versa', async ({ page }) => {

@@ -17,6 +17,23 @@ function _traduzStatusCAR(v) {
   const k = String(v).trim().toUpperCase();
   return _SICAR_STATUS[k] || String(v); // se já vier legível, mantém
 }
+// Situação ATUAL: o SICAR ao vivo (WFS) vence a planilha local (retrato de
+// ago/2025, em que ~1/3 dos cancelados ainda constava "Ativo"). O SICAR não
+// publica data de cancelamento; a única é data_atualizacao (última alteração
+// do registro, em UTC → dia no fuso do Acre). Mesma regra de
+// carucSituacaoAtual (js/car-uc-relatorio.js) — mudou lá, muda aqui.
+function _relSituacaoAtual(local, p) {
+  const cod = p.status_imovel || local.ind_status || null;
+  const condicao = p.condicao || local.condicao_i || '';
+  const cancelado = String(cod || '').trim().toUpperCase() === 'CA'
+    || /cancel/i.test(String(condicao).normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  let dataCanc = null;
+  if (cancelado && p.data_atualizacao) {
+    const d = new Date(p.data_atualizacao);
+    if (!isNaN(d.getTime())) dataCanc = new Date(d.getTime() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+  return { status: _traduzStatusCAR(cod || condicao), condicao, dataCanc };
+}
 // Formata data ISO (YYYY-MM-DD) ou qualquer data para pt-BR
 function _relDataBR(v) {
   if (!v || v === '—') return '—';
@@ -26,22 +43,34 @@ function _relDataBR(v) {
   return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('pt-BR');
 }
 
-function _calcularEscalaLeaflet(zoom, lat) {
-  const mPx = 156543.03392 * Math.cos((lat||0) * Math.PI / 180) / Math.pow(2, zoom||10);
-  const raw  = Math.round(mPx * 96 / 0.0254);
-  const escalas = [500,1000,2000,5000,10000,25000,50000,100000,250000,500000,1000000,2000000];
-  const nearest = escalas.reduce((p,c) => Math.abs(c-raw)<Math.abs(p-raw)?c:p);
-  return `1:${nearest.toLocaleString('pt-BR')}`;
+// Fundo dos mapas do relatório: satélite (padrão) ou sem fundo. Os mesmos
+// dois do CAR na UC — moldura e fundo vêm de js/mapa-moldura.js.
+let _relFundo = 'satelite';
+function _relSetFundo(v) { _relFundo = v === 'sem' ? 'sem' : 'satelite'; }
+function _relSat() { return _relFundo === 'satelite'; }
+// Cores que se leem no fundo escolhido: verde-escuro some sobre floresta
+// no satélite, por isso o contorno do imóvel vira amarelo (o mesmo do
+// CAR na UC) e o da UC, branco.
+function _relCor(chave) {
+  const sat = _relSat();
+  return ({ car: sat ? '#FACC15' : '#1F4E2C', uc: sat ? '#FFFFFF' : '#0A1A0F', grade: sat ? '#FFFFFF' : '#475569' })[chave];
+}
+function _relCamadaFundo(map) {
+  if (_relSat() && typeof MOLD_SATELITE_URL !== 'undefined') {
+    L.tileLayer(MOLD_SATELITE_URL, { crossOrigin: 'anonymous', maxZoom: 19 }).addTo(map);
+  } else {
+    map.getContainer().style.background = typeof MOLD_SEM_FUNDO_COR !== 'undefined' ? MOLD_SEM_FUNDO_COR : '#EEF1EA';
+  }
+}
+function _relFonteMapa(fonte) {
+  const cred = _relSat() && typeof MOLD_SATELITE_CREDITO !== 'undefined' ? MOLD_SATELITE_CREDITO : 'Sem imagem de fundo';
+  return [fonte, cred].filter(Boolean).join(' · ');
 }
 
 // ── Cartografia ABNT/IBGE: UTM SIRGAS 2000, grid, norte, legenda, inset ────
 
 // Seta de norte cartográfica (Web Mercator é norte-acima, sem rotação)
-const _SETA_NORTE = `<svg viewBox="0 0 22 26" width="20" height="24" aria-label="Norte">
-  <polygon points="11,1 17,15 11,11 5,15" fill="#0A1A0F"/>
-  <polygon points="11,1 11,11 5,15" fill="#4b5563"/>
-  <text x="11" y="25" text-anchor="middle" font-size="8" font-weight="700" fill="#0A1A0F" font-family="Arial">N</text>
-</svg>`;
+const _SETA_NORTE = typeof moldNorteSVG === 'function' ? moldNorteSVG() : '';
 
 const _utmZone   = lon => Math.floor((lon + 180) / 6) + 1;
 const _utmDef    = zone => `+proj=utm +zone=${zone} +south +ellps=GRS80 +towgs84=0,0,0 +units=m +no_defs`;
@@ -70,7 +99,7 @@ function _desenharGridUTM(map, zone) {
   const minN = Math.min(...Ns), maxN = Math.max(...Ns);
   const step = Math.max(_niceStep(maxE - minE), _niceStep(maxN - minN));
   const NS = 24; // amostras p/ acompanhar a curvatura no Web Mercator
-  const estilo = { color: '#475569', weight: 0.5, opacity: 0.65, interactive: false, dashArray: '3 4' };
+  const estilo = { color: _relCor('grade'), weight: 0.6, opacity: 0.75, interactive: false, dashArray: '3 4' };
   const lbl = (latlng, txt, pos) => L.marker(latlng, {
     interactive: false, keyboard: false,
     icon: L.divIcon({ className: 'rel-grid-anchor', html: `<span class="rel-grid-lbl rel-grid-${pos}">${txt}</span>`, iconSize: [0, 0] })
@@ -97,14 +126,16 @@ function _desenharGridUTM(map, zone) {
 }
 
 // Legenda com amostras de cor fiéis às camadas
+// Mesma amostra de cor de todo mapa do sistema (js/mapa-moldura.js).
+// `color: 'car'`/'uc' resolve pela cor do fundo escolhido.
 function _legendaHTML(camadas) {
-  return (camadas || []).map(c => {
-    let sw;
-    if (c.kind === 'line') sw = `<span class="rel-leg-sw" style="height:0;width:14px;border-bottom:2px ${c.dash ? 'dashed' : 'solid'} ${c.color}"></span>`;
-    else if (c.kind === 'point') sw = `<span class="rel-leg-sw" style="width:8px;height:8px;border-radius:50%;background:${c.color}"></span>`;
-    else sw = `<span class="rel-leg-sw" style="width:13px;height:9px;background:${c.color}55;border:1px solid ${c.color}"></span>`;
-    return `<span class="rel-leg-item">${sw}${_relEsc(c.label)}</span>`;
-  }).join('');
+  const itens = (camadas || []).map(c => ({
+    rotulo: c.label, cor: c.color === 'car' || c.color === 'uc' ? _relCor(c.color) : c.color,
+    tipo: c.kind === 'line' ? 'linha' : c.kind === 'point' ? 'ponto' : 'area', tracejado: !!c.dash,
+    // Linha branca (UC no satélite) sumiria na legenda clara: ganha borda escura, como no mapa.
+    halo: c.color === 'uc' && _relSat() ? '#374151' : null,
+  }));
+  return typeof moldLegendaHTML === 'function' ? moldLegendaHTML(itens) : itens.map(i => `<span class="rel-leg-item">${_relEsc(i.rotulo)}</span>`).join('');
 }
 
 // Inset de localização: contorno do Acre (SVG) + ponto do imóvel
@@ -146,7 +177,7 @@ function _insetAcreSVG(centroide) {
 // Legendas fiéis às camadas efetivamente desenhadas em cada mapa
 const _LEG_LOC = [{ label: 'Imóvel (CAR)', color: '#dc2626', kind: 'fill' }];
 const _LEG_DET = [
-  { label: 'Limite do imóvel (CAR)', color: '#1F4E2C', kind: 'line', dash: true },
+  { label: 'Limite do imóvel (CAR)', color: 'car', kind: 'line', dash: true },
   { label: 'Desmat. autorizado',     color: '#16a34a', kind: 'fill' },
   { label: 'Desmat. irregular',      color: '#f97316', kind: 'fill' },
   { label: 'Desmat. ilegal/a verificar', color: '#dc2626', kind: 'fill' },
@@ -430,6 +461,16 @@ function abrirModalRelatorio() {
       </div>
       <div style="font-size:10px;color:#9ca3af;margin-top:4px">Camadas marcadas são analisadas (interseção/contagem) no recorte do relatório.</div>
       <hr class="rm-sep">
+      <div class="rm-label">Fundo dos mapas</div>
+      <div class="rm-modos">
+        <div class="rm-modo${_relFundo === 'satelite' ? ' ativo' : ''}" id="rel-fundo-sat" onclick="_relEscolherFundo('satelite')">
+          <h4>Satélite</h4><p>Imagem Esri World Imagery, com crédito no mapa.</p>
+        </div>
+        <div class="rm-modo${_relFundo === 'sem' ? ' ativo' : ''}" id="rel-fundo-sem" onclick="_relEscolherFundo('sem')">
+          <h4>Sem fundo</h4><p>Só os limites e camadas — impressão mais leve.</p>
+        </div>
+      </div>
+      <hr class="rm-sep">
       <div class="rm-label">Nível de detalhamento</div>
       <div class="rm-modos">
         <div class="rm-modo" id="rel-modo-sint" onclick="_relSetModo('sintetico')">
@@ -460,6 +501,12 @@ function abrirModalRelatorio() {
     console.error('[Relatório] Erro ao abrir modal:', err);
     toast('Erro ao abrir relatório: ' + err.message, 'error');
   }
+}
+
+function _relEscolherFundo(v) {
+  _relSetFundo(v);
+  document.getElementById('rel-fundo-sat')?.classList.toggle('ativo', _relFundo === 'satelite');
+  document.getElementById('rel-fundo-sem')?.classList.toggle('ativo', _relFundo === 'sem');
 }
 
 function _fecharModalRelatorio() {
@@ -510,6 +557,71 @@ function _relColetarImoveis() {
   return _carAbertoFeat ? [_carAbertoFeat] : [];
 }
 
+// ── Embargos ambientais (IBAMA, IMAC — migration 360/360b) ───────────────
+// Mesma regra do relatório "CAR na UC" (carucEmbargosDoImovel em
+// js/car-uc-relatorio.js — mudou num, muda no outro): vínculo pelo nº do
+// CAR (o IMAC informa) ou por sobreposição com o polígono (o IBAMA não
+// informa o CAR). Falha de consulta nunca vira "sem embargo".
+const _REL_EMB_FONTE = { ibama: 'IBAMA', imac: 'IMAC', icmbio: 'ICMBio' };
+const _REL_EMB_SIT = { vigente: 'Vigente', desembargado: 'Desembargado', cancelado: 'Cancelado', desconhecida: 'Situação não informada' };
+async function _relEmbargos(carPoly, cod) {
+  if (!carPoly || typeof db === 'undefined') return { lista: [], falhou: 'consulta indisponível' };
+  try {
+    const bb = turf.bbox(carPoly);
+    const [r, a] = await Promise.all([
+      db.rpc('car_embargos_busca', { p_xmin: bb[0], p_ymin: bb[1], p_xmax: bb[2], p_ymax: bb[3], p_cods: cod ? [cod] : null }),
+      db.rpc('car_embargos_atualizacao'),
+    ]);
+    if (r.error) throw r.error;
+    const codN = String(cod || '').trim().toUpperCase();
+    const lista = [];
+    for (const e of (r.data || [])) {
+      let g = null; try { g = JSON.parse(e.geojson); } catch (_) {}
+      const f = g ? { type: 'Feature', geometry: g, properties: {} } : null;
+      const peloCar = !!codN && String(e.cod_car || '').trim().toUpperCase() === codN;
+      let ha = null, sobrepoe = false;
+      if (f) {
+        try {
+          if (g.type === 'Point') sobrepoe = turf.booleanPointInPolygon(f, carPoly);
+          else { const inter = turf.intersect(carPoly, f); ha = inter ? turf.area(inter) / 10000 : 0; sobrepoe = ha >= 0.01; }
+        } catch (_) { sobrepoe = false; }
+      }
+      if (!peloCar && !sobrepoe) continue;
+      lista.push({ ...e, geojson: undefined, ha: sobrepoe ? ha : null, vinculo: peloCar && sobrepoe ? 'nº do CAR e sobreposição' : peloCar ? 'nº do CAR' : 'sobreposição' });
+    }
+    lista.sort((x, y) => (x.situacao === 'vigente' ? 0 : 1) - (y.situacao === 'vigente' ? 0 : 1) || String(y.data_embargo || '').localeCompare(String(x.data_embargo || '')));
+    return { lista, falhou: null, atualizacao: a.error ? [] : (a.data || []) };
+  } catch (e) {
+    console.warn('[relatorio-car] embargos', e);
+    return { lista: [], falhou: e.message || String(e) };
+  }
+}
+
+function _relEmbargosHTML(emb) {
+  if (!emb) return '';
+  const fontes = ['ibama', 'imac'].map(f => {
+    const a = (emb.atualizacao || []).find(x => x.fonte === f);
+    return `${_REL_EMB_FONTE[f]}: ${a ? 'carga de ' + _relDataBR(String(a.executado_em).slice(0, 10)) + (a.ok ? '' : ' (última tentativa falhou)') : 'sem carga no sistema'}`;
+  }).join(' · ');
+  if (emb.falhou) return `<div class="rel-secao-subtitulo">Embargos ambientais</div>
+    <div style="font-size:9px;color:#92400e">Não foi possível consultar os embargos (${_relEsc(emb.falhou)}) — a ausência de embargo NÃO foi conferida.</div>`;
+  const nota = `<div style="font-size:8px;color:#6b7280;margin-top:3px">IMAC: pelo nº do CAR informado no embargo ou por sobreposição; IBAMA: só por sobreposição (a fonte não traz o nº do CAR). ${_relEsc(fontes)}. ICMBio não consultado (arquivo público não localizado).</div>`;
+  if (!emb.lista.length) return `<div class="rel-secao-subtitulo">Embargos ambientais</div>
+    <div style="font-size:9px">Nenhum embargo do IBAMA ou do IMAC sobre este imóvel.</div>${nota}`;
+  return `<div class="rel-secao-subtitulo">Embargos ambientais</div>
+    <table class="rel-table rel-table-sm">
+      <tr><th>Órgão</th><th>Termo / AI</th><th>Data</th><th>Situação</th><th>No imóvel</th><th>Descrição</th></tr>
+      ${emb.lista.map(e => `<tr>
+        <td>${_relEsc(_REL_EMB_FONTE[e.fonte] || e.fonte)}</td>
+        <td>${_relEsc(e.num_termo || (e.num_auto ? 'AI ' + e.num_auto : '—'))}${e.num_processo ? `<br><span style="color:#6b7280">Proc. ${_relEsc(e.num_processo)}</span>` : ''}</td>
+        <td>${_relEsc(_relDataBR(e.data_embargo))}</td>
+        <td><strong style="color:${e.situacao === 'vigente' ? '#dc2626' : '#374151'}">${_relEsc(_REL_EMB_SIT[e.situacao] || e.situacao)}</strong>${e.data_desembargo ? `<br>em ${_relEsc(_relDataBR(e.data_desembargo))}` : ''}</td>
+        <td>${e.ha != null ? _relF2(e.ha) + ' ha' : '—'}<br><span style="color:#6b7280">${_relEsc(e.vinculo)}</span></td>
+        <td>${_relEsc(e.descricao || '—')}</td>
+      </tr>`).join('')}
+    </table>${nota}`;
+}
+
 // ── Monta dados de um imóvel (usa caches existentes) ─────────────────────
 
 async function _montarDadosRelatorio(feat) {
@@ -537,6 +649,8 @@ async function _montarDadosRelatorio(feat) {
 
   const numModulo = parseFloat(local.num_modulo || p.num_modulo || 0);
   const pequenaProp = numModulo > 0 && numModulo <= 4;
+  const sit = _relSituacaoAtual(local, p);
+  const embargos = await _relEmbargos(carPoly, cod);
   const totalGeral  = pr?.totalGeral || 0;
   const haConsol    = pr?.haConsolidado || 0;
 
@@ -548,8 +662,11 @@ async function _montarDadosRelatorio(feat) {
     nome_compl:   local.nome_compl  || '',
     cpf_cnpj:     local.cpf_cnpj    || p.cpf_cnpj || '—',
     nom_munici:   local.nom_munici  || p.municipio || '—',
-    ind_status:   _traduzStatusCAR(local.ind_status || p.condicao),  // ponto 5
-    condicao_analise: local.condicao_i || '',        // condição de análise (legível)
+    ind_status:   sit.status,                        // ponto 5 — SICAR ao vivo primeiro
+    condicao_analise: sit.condicao,                  // condição (legível; no cancelado, o motivo)
+    dat_cancelamento: sit.dataCanc ? _relDataBR(sit.dataCanc) : '',
+    embargos,
+    embargosVigentes: embargos.lista.filter(e => e.situacao === 'vigente').length,
     nome_class:   local.nome_class  || '—',
     num_modulo:   numModulo,
     dat_criaca:   _relDataBR(local.dat_criaca),      // ponto 5
@@ -607,10 +724,10 @@ function _htmlMapaABNT({ id, titulo, altura, fonte, camadas, zona }) {
     <div id="${id}" class="rel-mapa-div" data-zona="${z}" style="height:${altura||240}px"></div>
     <div class="rel-mapa-rodape">
       <div class="rel-mapa-norte">${_SETA_NORTE}</div>
-      <div class="rel-mapa-info"><strong>Escala</strong><span id="${id}__esc">—</span></div>
-      <div class="rel-mapa-info"><strong>Sist. de Referência</strong>SIRGAS 2000<br>UTM ${z}S · EPSG:${_epsgUTM(z)}</div>
+      <div class="rel-mapa-info"><strong>Escala</strong><span id="${id}__esc" class="rel-mapa-escala">—</span></div>
+      <div class="rel-mapa-info"><strong>Sist. de Referência</strong>SIRGAS 2000<br>Grade UTM ${z}S · EPSG:${_epsgUTM(z)} (km)<br>Exibição Web Mercator</div>
       <div class="rel-mapa-legenda">${_legendaHTML(camadas)}</div>
-      <div class="rel-mapa-fonte">${_relEsc(fonte||'')}<br>Quadrícula UTM (km) · Emitido: ${_relData()}</div>
+      <div class="rel-mapa-fonte">${_relEsc(_relFonteMapa(fonte))}<br>Emitido: ${_relData()}</div>
     </div>
   </div>`;
 }
@@ -680,7 +797,7 @@ function _htmlFolhaCapa(imoveis, cab, protocolo, modo, mapaId) {
         </table>
       </div>
       ${_htmlMapaABNT({ id: mapaId, titulo:'Mapa de Localização Geral — Todos os Imóveis', altura:320,
-        zona:_zonaImovel(imoveis[0]), fonte:'SICAR/SFB · IBGE · OpenStreetMap',
+        zona:_zonaImovel(imoveis[0]), fonte:'SICAR/SFB · IBGE',
         camadas:[{label:'Limite dos imóveis (CAR)', color:'#dc2626', kind:'line'}] })}
     </div>
     <div class="rel-pag-rodape">
@@ -698,19 +815,22 @@ function _htmlCabecalho(cab, protocolo, data, mini=false) {
     <span class="sec">${_relEsc(cab.siglaSecr)} · ${_relEsc(cab.siglaDiret)} · Laudo Técnico · Prot. ${_relEsc(protocolo)} · Pág.</span>
   </div>`;
 
-  const logoGov  = cab.logoGoverno  ? `<img src="${cab.logoGoverno}"  alt="Logo Governo">` : '🌿';
-  const logoSecr = cab.logoSecr     ? `<img src="${cab.logoSecr}"     alt="Logo Secretaria">` : '🏛';
+  // Mesmas 3 linhas e mesma ordem do timbre em PDF (js/relatorio-cabecalho-pdf.js):
+  // Secretaria (negrito) / Diretoria / Departamento · módulo. Sem logo
+  // cadastrada fica o espaço vazio — nunca emoji no lugar da marca.
+  const logoGov  = cab.logoGoverno ? `<img src="${_relEsc(cab.logoGoverno)}" alt="Governo do Estado do Acre">` : '';
+  const logoSecr = cab.logoSecr    ? `<img src="${_relEsc(cab.logoSecr)}" alt="${_relEsc(cab.siglaSecr || 'SEMA')}">` : '';
   return `
   <div class="rel-cabecalho">
     <div class="rel-logo">${logoGov}</div>
     <div class="rel-inst">
-      <div class="gov">${_relEsc(cab.governo)}${cab.gestao?' · '+cab.gestao:''}</div>
       <div class="sec">${_relEsc(cab.secretaria)} — ${_relEsc(cab.siglaSecr)}</div>
-      <div class="dir">${_relEsc(cab.diretoria)} · ${_relEsc(cab.departamento)}</div>
+      <div class="dir">${_relEsc(cab.diretoria)}</div>
+      <div class="dep">${_relEsc(cab.departamento)}${cab.linhaModulo ? ' · ' + _relEsc(cab.linhaModulo) : ''}</div>
     </div>
     <div class="rel-logo-secr-col">
+      <div class="rel-meta">SIGUC-AC${protocolo ? '<br>Prot. nº ' + _relEsc(protocolo) : ''}<br>Emitido: ${data}</div>
       <div class="rel-logo">${logoSecr}</div>
-      <div class="rel-meta">SIGUC-AC<br>Emitido: ${data}<br>Prot. nº ${_relEsc(protocolo)}</div>
     </div>
   </div>`;
 }
@@ -773,7 +893,7 @@ function _htmlFolhaSintetica(d, cab, protocolo, idx, total, multi) {
       <!-- Mapas lado a lado -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         ${_htmlMapaABNT({ id: mapLocId, titulo:'Mapa 1 — Localização Regional', altura:200,
-          zona:_zonaImovel(d), fonte:'IBGE · OpenStreetMap · SICAR/SFB', camadas:_LEG_LOC })}
+          zona:_zonaImovel(d), fonte:'IBGE · SICAR/SFB', camadas:_LEG_LOC })}
         ${_htmlMapaABNT({ id: mapDetId, titulo:'Mapa 2 — Detalhe do Imóvel', altura:200,
           zona:_zonaImovel(d), fonte:'PRODES/INPE · SICAR/SFB', camadas:_LEG_DET })}
       </div>
@@ -851,17 +971,19 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
           <tr><td>Módulos fiscais</td><td>${d.num_modulo>0?_relF1(d.num_modulo)+' módulos'+(d.pequenaPropriedade?' (pequena propriedade — Art. 67 CF)':''):'—'}</td></tr>
           <tr><td>Situação CAR</td><td>${_relEsc(d.ind_status)}</td></tr>
           ${d.condicao_analise?`<tr><td>Condição (análise)</td><td>${_relEsc(d.condicao_analise)}</td></tr>`:''}
+          ${d.dat_cancelamento?`<tr><td>Cancelado em</td><td>${_relEsc(d.dat_cancelamento)} <span style="color:#9ca3af">(data da última atualização do registro no SICAR — o SICAR não publica a data do cancelamento)</span></td></tr>`:''}
           <tr><td>Classificação SICAR</td><td>${d.nome_class==='Vermelho'?'<strong style="color:#dc2626">🔴 Vermelho — Art. 78-A CF aplicável</strong>':_relEsc(d.nome_class)}</td></tr>
           ${d.dat_criaca&&d.dat_criaca!=='—'?`<tr><td>Data de cadastro</td><td>${_relEsc(d.dat_criaca)}</td></tr>`:''}
           ${!d.naPlanilha?`<tr><td>Cadastro local</td><td><strong style="color:#d97706">⚠️ Imóvel não consta na planilha SICAR local — proprietário e CPF/CNPJ não disponíveis</strong></td></tr>`:''}
           ${d.emUC?`<tr><td>Sobreposição com UC</td><td><strong style="color:#d97706">⚠️ ${_relEsc(d.ucNome||'UC do Acre')} — ${_relF2(d.areaUC)} ha sobrepostos</strong></td></tr>`:''}
         </table>
+        ${_relEmbargosHTML(d.embargos)}
       </div>
 
       <div class="rel-secao">
         <div class="rel-secao-subtitulo">Mapa 1 — Localização Regional</div>
         ${_htmlMapaABNT({ id: mapLocId, titulo:'Mapa de Localização — Estado do Acre · '+d.nom_munici, altura:230,
-          zona:_zonaImovel(d), fonte:'IBGE · OpenStreetMap · SICAR/SFB · Elaborado: SIGUC-AC/SEMA-AC',
+          zona:_zonaImovel(d), fonte:'IBGE · SICAR/SFB · Elaborado: SIGUC-AC/SEMA-AC',
           camadas:_LEG_LOC })}
       </div>
     </div>
@@ -1012,6 +1134,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
           </th></tr>
           <tr><td>Prioridade</td><td>${d.haAVerificar>0&&d.asvBase&&d.focosCorrelAnos.length?'🔴 Alta':d.haAVerificar>0?'🟡 Média':'🟢 Baixa'}</td></tr>
           <tr><td>Recomendação</td><td>${rec}</td></tr>
+          ${d.embargosVigentes ? `<tr><td>Embargo</td><td><strong style="color:#dc2626">${d.embargosVigentes} embargo(s) vigente(s) sobre o imóvel — ver seção 1</strong></td></tr>` : ''}
           ${d.nome_class==='Vermelho'?`<tr><td>Crédito rural</td><td>Art. 78-A CF: restrição aplicável até regularização</td></tr>`:''}
         </table>
       </div>
@@ -1160,7 +1283,7 @@ function _htmlFolhasLaudoUC(d, cab, protocolo) {
   const pag = n => `Pág. ${n} · Prot. ${_relEsc(protocolo)}`;
 
   const legUC = [
-    { label: 'Limite da UC', color: '#0A1A0F', kind: 'line' },
+    { label: 'Limite da UC', color: 'uc', kind: 'line' },
     ...(d.camadasAnalise || []).filter(r => r.valor > 0).map(r => ({
       label: r.nome, color: r.cor,
       kind: r.tipo === 'ponto' ? 'point' : r.tipo === 'linha' ? 'line' : 'fill',
@@ -1184,7 +1307,7 @@ function _htmlFolhasLaudoUC(d, cab, protocolo) {
         <div class="rel-kpi ${d.conselho_gestor?'kpi-verde':'kpi-lrnj'}"><div class="kl">Conselho Gestor</div><div class="kv">${d.conselho_gestor?'Sim':'Não'}</div><div class="ks">&nbsp;</div></div>
       </div>
       ${_htmlMapaABNT({ id: mapUCId, titulo:'Mapa de Localização da UC — '+_relEsc(d.ucNome), altura:300,
-        zona: d.zona, fonte:'SEMA-AC · IBGE · OpenStreetMap · Elaborado: SIGUC-AC', camadas: legUC })}
+        zona: d.zona, fonte:'SEMA-AC · IBGE · Elaborado: SIGUC-AC', camadas: legUC })}
     </div>
     <div class="rel-pag-rodape">
       <span>${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)}</span>
@@ -1299,8 +1422,6 @@ function _renderizarCamadasNoMapa(mapa, camadasSel) {
 }
 
 async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
-  const TILE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const OSM_ATTR = '© OpenStreetMap';
   await _carregarAcreOutline();
 
   // Helper: aguarda tiles carregarem
@@ -1310,9 +1431,12 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
     m.once('load', ok);
     setTimeout(ok, 4000); // fallback 4s
   });
+  // Barra gráfica medida no próprio mapa (js/mapa-moldura.js) — nunca
+  // "1:N", que só vale num tamanho de impressão.
   const setEscala = (map, id) => {
     const el = document.getElementById(id + '__esc');
-    if (el) { const c = map.getCenter(); el.textContent = _calcularEscalaLeaflet(map.getZoom(), c.lat); }
+    const m = typeof moldMetrosPorPxLeaflet === 'function' ? moldMetrosPorPxLeaflet(map) : null;
+    if (el) el.innerHTML = m ? moldEscalaSVG(m, '#0A1A0F', 70) : '—';
   };
 
   const mapPromises = [];
@@ -1326,11 +1450,14 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
     if (elUC && dadosUC.ucFeat) {
       const zona = dadosUC.zona;
       const mUC = L.map(elUC, { zoomControl: true, attributionControl: false });
-      L.tileLayer(TILE, { attribution: OSM_ATTR }).addTo(mUC);
-      try { L.geoJSON(dadosUC.ucFeat, { style: { color: '#0A1A0F', weight: 2.5, fillOpacity: 0.08 } }).addTo(mUC); } catch (_) {}
+      _relCamadaFundo(mUC);
+      try {
+        // Branco no satélite precisa de traço escuro por baixo para não sumir em nuvem/campo.
+        if (_relSat()) L.geoJSON(dadosUC.ucFeat, { style: { color: '#111827', weight: 5, opacity: .6, fill: false } }).addTo(mUC);
+        L.geoJSON(dadosUC.ucFeat, { style: { color: _relCor('uc'), weight: 2.5, fillOpacity: 0.08 } }).addTo(mUC);
+      } catch (_) {}
       _renderizarCamadasNoMapa(mUC, camadasSel);
       try { mUC.fitBounds([[dadosUC.bbox[1], dadosUC.bbox[0]], [dadosUC.bbox[3], dadosUC.bbox[2]]], { padding: [20, 20] }); } catch (_) {}
-      L.control.scale({ imperial: false, metric: true, position: 'bottomleft' }).addTo(mUC);
       let gridUC = _desenharGridUTM(mUC, zona);
       setEscala(mUC, ucMapId);
       mUC.on('zoomend moveend', () => {
@@ -1358,7 +1485,7 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
         return [Math.min(acc[0],d.bbox[0]),Math.min(acc[1],d.bbox[1]),Math.max(acc[2],d.bbox[2]),Math.max(acc[3],d.bbox[3])];
       }, [Infinity,Infinity,-Infinity,-Infinity]);
       const mc = L.map(elC,{zoomControl:false,attributionControl:false});
-      L.tileLayer(TILE,{attribution:OSM_ATTR}).addTo(mc);
+      _relCamadaFundo(mc);
       imoveis.forEach((d,i) => {
         try {
           const cor = ['#dc2626','#2563eb','#16a34a','#d97706','#7c3aed','#0891b2'][i%6];
@@ -1366,9 +1493,9 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
         } catch(_) {}
       });
       mc.fitBounds([[bboxAll[1],bboxAll[0]],[bboxAll[3],bboxAll[2]]],{padding:[20,20]});
-      L.control.scale({imperial:false,metric:true,position:'bottomleft'}).addTo(mc);
       _desenharGridUTM(mc, _zonaImovel(imoveis[0]));
       setEscala(mc, 'rel-mapa-consolidado');
+      mc.on('zoomend moveend', () => setEscala(mc, 'rel-mapa-consolidado'));
       mapPromises.push(aguardarMapa(mc));
     }
   }
@@ -1382,9 +1509,8 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
     const elLoc = document.getElementById(locId);
     if (elLoc) {
       const mLoc = L.map(elLoc,{zoomControl:false,attributionControl:false}).setView([-9.5,-70.5],6);
-      L.tileLayer(TILE,{attribution:OSM_ATTR}).addTo(mLoc);
+      _relCamadaFundo(mLoc);
       try { L.geoJSON({type:'Feature',geometry:d.geometry},{style:{color:'#dc2626',weight:2,fillColor:'#dc2626',fillOpacity:.25}}).addTo(mLoc); } catch(_){}
-      L.control.scale({imperial:false,metric:true,position:'bottomleft'}).addTo(mLoc);
       setEscala(mLoc, locId);
       mLoc.on('zoomend moveend', () => setEscala(mLoc, locId));
       mapPromises.push(aguardarMapa(mLoc));
@@ -1395,9 +1521,9 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
     const elDet = document.getElementById(detId);
     if (elDet && d.bbox) {
       const mDet = L.map(elDet,{zoomControl:true,attributionControl:false});
-      L.tileLayer(TILE,{attribution:OSM_ATTR}).addTo(mDet);
+      _relCamadaFundo(mDet);
       // Limite CAR
-      try { L.geoJSON({type:'Feature',geometry:d.geometry},{style:{color:'#1F4E2C',weight:2.5,fillOpacity:.05,dashArray:'6 3'}}).addTo(mDet); } catch(_){}
+      try { L.geoJSON({type:'Feature',geometry:d.geometry},{style:{color:_relCor('car'),weight:2.5,fillOpacity:.05,dashArray:'6 3'}}).addTo(mDet); } catch(_){}
       // PRODES anual (colorido por CF)
       if (d.geojsonFeatAnual.length) {
         L.geoJSON({type:'FeatureCollection',features:d.geojsonFeatAnual},{
@@ -1414,7 +1540,6 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
       // Camadas vetoriais do usuário
       _renderizarCamadasNoMapa(mDet, camadasSel);
       mDet.fitBounds([[d.bbox[1],d.bbox[0]],[d.bbox[3],d.bbox[2]]],{padding:[20,20]});
-      L.control.scale({imperial:false,metric:true,position:'bottomleft'}).addTo(mDet);
       let gridGrp = _desenharGridUTM(mDet, zona);
       setEscala(mDet, detId);
       // Redesenha grid e escala ao interagir
@@ -1438,12 +1563,41 @@ async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
 }
 
 // ── Preview overlay ───────────────────────────────────────────────────────
+// Departamento do timbre = dono do grupo Gestão (DEUC), o MESMO do CAR na
+// UC (js/car-uc-relatorio-export.js) — o campo genérico de Configurações
+// divergia (e estava gravado sem acento).
+const REL_CAB_MODULO = 'monitoramento';
+
+// Prévia de folha(s) A4 com barra Fechar / Imprimir. Reaproveitada pelo
+// relatório do imóvel, pela impressão do Mapa das UCs e pelo relatório de
+// desmatamento por zona. `aoFechar` roda ao fechar (a impressão do mapa
+// devolve o mapa para a página).
+function relAbrirPreview({ titulo, modo, html, aoFechar }) {
+  document.getElementById('rel-preview-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'rel-preview-overlay';
+  overlay.innerHTML = `
+  <div id="rel-preview-toolbar">
+    <span class="rel-tb-titulo">${_relEsc(titulo)}</span>
+    <span class="rel-tb-modo">${_relEsc(modo || '')}</span>
+    <button class="btn btn-outline" style="font-size:11px" data-rel-fechar>← Fechar</button>
+    <button class="btn btn-primary" style="font-size:11px" onclick="_executarPrint()">Imprimir / Salvar PDF</button>
+  </div>
+  <div id="rel-preview-area">${html}</div>`;
+  const fechar = () => { try { aoFechar?.(); } finally { overlay.remove(); document.removeEventListener('keydown', esc); } };
+  const esc = ev => { if (ev.key === 'Escape') fechar(); };
+  overlay.querySelector('[data-rel-fechar]').addEventListener('click', fechar);
+  document.addEventListener('keydown', esc);
+  document.body.appendChild(overlay);
+  return { overlay, area: overlay.querySelector('#rel-preview-area'), fechar };
+}
 
 async function _abrirPreviewRelatorio() {
   _fecharModalRelatorio();
   toast('Gerando relatório…', 'info');
 
-  const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()]);
+  const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(REL_CAB_MODULO), gerarProtocolo()]);
+  cab.linhaModulo = 'Cadastro Ambiental Rural';
   cab.responsavel = _resolverResponsavel(cab);
 
   let html, dadosList = [], dadosUC = null;
@@ -1466,19 +1620,7 @@ async function _abrirPreviewRelatorio() {
     : (dadosList[0]?.nom_imovel || 'Imóvel') + (dadosList.length > 1 ? ' + ' + (dadosList.length - 1) + ' imóveis' : '');
   const modoBar = dadosUC ? 'LAUDO DE UC' : (_relModo === 'sintetico' ? 'SINTÉTICO' : 'DETALHADO');
 
-  const overlay = document.createElement('div');
-  overlay.id = 'rel-preview-overlay';
-  overlay.innerHTML = `
-  <div id="rel-preview-toolbar">
-    <span class="rel-tb-titulo">${_relEsc(tituloBar)}</span>
-    <span class="rel-tb-modo">${modoBar}</span>
-    <button class="btn btn-outline" style="font-size:11px" onclick="document.getElementById('rel-preview-overlay').remove()">← Fechar</button>
-    <button class="btn btn-outline" style="font-size:11px" onclick="_abrirNovaAba()">↗ Nova aba</button>
-    <button class="btn btn-primary" style="font-size:11px" onclick="_executarPrint()">Imprimir / Salvar PDF</button>
-  </div>
-  <div id="rel-preview-area">${html}</div>`;
-
-  document.body.appendChild(overlay);
+  relAbrirPreview({ titulo: tituloBar, modo: modoBar, html });
 
   if (dadosUC) {
     await _inicializarMapasRelatorio([], false, dadosUC);
@@ -1512,27 +1654,3 @@ async function _executarPrint() {
   window.print();
 }
 
-async function _abrirNovaAba() {
-  const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()]);
-  cab.responsavel = _resolverResponsavel(cab);
-  let html;
-  if (_relEscopo === 'uc') {
-    const d = await _montarDadosLaudoUC(_carUCAtual);
-    html = await _gerarHTMLRelatorio([], _relModo, cab, protocolo, d);
-  } else {
-    const imovelFeats = _relColetarImoveis();
-    const dadosList = await Promise.all(imovelFeats.map(_montarDadosRelatorio));
-    html = await _gerarHTMLRelatorio(dadosList, _relModo, cab, protocolo, null);
-  }
-  const win = window.open('', '_blank');
-  if (!win) { toast('Popup bloqueado — use o botão Imprimir.', 'warning'); return; }
-  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
-    <meta charset="UTF-8">
-    <title>Relatório SIGUC-AC</title>
-    <link rel="stylesheet" href="${location.origin}/css/relatorio-print.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
-    <style>body{background:#374151;padding:20px;font-family:'DM Sans',system-ui,sans-serif}</style>
-  </head><body>${html}</body></html>`);
-  win.document.close();
-}

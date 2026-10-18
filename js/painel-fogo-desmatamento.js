@@ -9,7 +9,12 @@
 // Dados (migration 342), todos pré-agregados no banco:
 //  - focos_uc_mes  ano × mês × UC (uc_id null = fora de UC). Temporada
 //    de fogo 1º/jul a 4/nov — a MESMA definição de vw_focos_linha_tempo.
-//  - prodes_resumo_ano  total OFICIAL do estado (área declarada pelo INPE).
+//  - prodes_resumo_ano  área dos POLÍGONOS do PRODES no estado (soma do
+//    incremento publicado pelo INPE). NÃO é a taxa oficial.
+//  - prodes_taxa_ano (migration 361)  TAXA OFICIAL do INPE por estado, em
+//    km² (com correção de nuvem etc.). Medida diferente da área dos
+//    polígonos (2025: 324 km² × 275 km²): card próprio, só em "Acre todo",
+//    nunca somada, nunca no mesmo gráfico dos polígonos nem na tendência.
 //  - prodes_uc_ano  área por UC = interseção calculada no banco.
 //  - focos_bdq_uc_mes / focos_bdq_resumo_ano (migration 343)  BDQueimadas/
 //    INPE, satélite de referência, ANO CIVIL inteiro. Série à parte da do
@@ -146,7 +151,9 @@ function pfdFocosPorMes(dados, f) {
 }
 
 // ── Desmatamento ──────────────────────────────────────────────────
-// Acre todo = número OFICIAL do INPE; UC/município = interseção calculada.
+// Acre todo = área dos polígonos publicada pelo INPE (prodes_resumo_ano);
+// UC/município = interseção calculada. A taxa oficial é outra série
+// (pfdTaxaOficial) e nunca entra aqui.
 function pfdDesmatPorAno(dados, f) {
   const porAno = {}
   const no = _pfdNoLinha(dados, f)
@@ -885,10 +892,86 @@ function pfdBarrasHTML(pontos, o) {
     // cantos arredondados só no topo (ponta do dado), base reta na linha zero
     const d = `M${cx - larg / 2},${m.t + ih} V${yy + r} Q${cx - larg / 2},${yy} ${cx - larg / 2 + r},${yy} H${cx + larg / 2 - r} Q${cx + larg / 2},${yy} ${cx + larg / 2},${yy + r} V${m.t + ih} Z`
     const valor = rotulosVisiveis ? `<text x="${cx}" y="${yy - 6}" text-anchor="middle" font-size="11" font-weight="600" fill="${PFD_COR.texto}">${_pfdCompacto(p.valor)}</text>` : ''
-    return `<path d="${d}" fill="${o.cor}"><title>${_pfdEsc(p.rotuloLongo || p.rotulo)} — ${_pfdNum(p.valor, o.casas)} ${_pfdEsc(o.unidade)}</title></path>${valor}${rot}`
+    // vazada = valor provisório (taxa estimada): tracejada, nunca a mesma
+    // cor sólida do valor consolidado.
+    const pinta = p.vazado ? `fill="#fff" stroke="${o.cor}" stroke-width="2" stroke-dasharray="4 3"` : `fill="${o.cor}"`
+    return `<path d="${d}" ${pinta}><title>${_pfdEsc(p.rotuloLongo || p.rotulo)} — ${_pfdNum(p.valor, o.casas)} ${_pfdEsc(o.unidade)}</title></path>${valor}${rot}`
   }).join('')
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${_pfdEsc(o.rotulo)}">${grade}${barras}</svg>`
   return _pfdEnvolver(svg, o.rotulo)
+}
+
+// ── Taxa oficial do INPE (migration 361) ─────────────────────────
+// Série À PARTE da área dos polígonos: só existe para o estado inteiro
+// (o INPE não publica taxa por UC nem por município) e nunca é somada
+// nem comparada barra a barra com os polígonos. Devolve null fora de
+// "Acre todo" ou sem a série carregada.
+function pfdTaxaOficial(dados, f) {
+  if (f.escopo) return null
+  const lista = (dados.prodesTaxa || []).filter(r => !r.uf || r.uf === 'AC')
+  if (!lista.length) return null
+  const por = {}
+  for (const r of lista) por[Number(r.ano)] = r
+  const serie = _pfdAnos(f).map(ano => {
+    const r = por[ano]
+    return r ? { ano, km2: Number(r.km2), tipo: r.tipo, km2_estimado: r.km2_estimado == null ? null : Number(r.km2_estimado) }
+             : { ano, km2: null, tipo: null, km2_estimado: null }
+  })
+  const com = serie.filter(p => p.km2 != null)
+  const ultimo = com.length ? com[com.length - 1] : null
+  const ant = ultimo && por[ultimo.ano - 1] ? { ano: ultimo.ano - 1, km2: Number(por[ultimo.ano - 1].km2) } : null
+  const poli = {}
+  for (const r of dados.prodesAno || []) poli[Number(r.ano)] = Number(r.area_ha) / 100
+  // Último ano do período com as DUAS medidas — para dizer, com número,
+  // que elas não são a mesma coisa.
+  const par = com.filter(p => poli[p.ano] != null).pop()
+  return {
+    serie,
+    ultimo,
+    anterior: ant,
+    variacao: ultimo && ant && ant.km2 ? ((ultimo.km2 - ant.km2) / ant.km2) * 100 : null,
+    divulgado_em: ultimo ? (por[ultimo.ano].divulgado_em || null) : null,
+    semPoligonos: com.filter(p => poli[p.ano] == null).map(p => p.ano),
+    par: par ? { ano: par.ano, taxa: par.km2, poligonos: poli[par.ano] } : null,
+  }
+}
+
+function pfdTaxaCardHTML(t) {
+  if (!t) return ''
+  const n = (v, c) => _pfdNum(v, c)
+  if (!t.ultimo) return `<div class="pfd-card largo pfd-taxa"><h3>Taxa oficial de desmatamento do INPE — Acre</h3>
+    <p class="pfd-vazio">O INPE não tem taxa publicada para os anos do período.</p></div>`
+  const u = t.ultimo
+  const est = u.tipo === 'estimada'
+  const dataBR = t.divulgado_em ? t.divulgado_em.split('-').reverse().join('/') : null
+  const varTxt = t.variacao == null ? ''
+    : ` · ${t.variacao < 0 ? 'queda' : 'alta'} de ${n(Math.abs(t.variacao), 1)}% em relação a ${t.anterior.ano} (${n(t.anterior.km2)} km²)`
+  const selo = est
+    ? '<span class="pfd-selo pfd-selo-est">Estimativa</span>'
+    : '<span class="pfd-selo pfd-selo-cons">Consolidada</span>'
+  const pontos = t.serie.map(p => ({
+    ano: p.ano, rotulo: String(p.ano), valor: p.km2, vazado: p.tipo === 'estimada',
+    rotuloLongo: p.ano + (p.tipo === 'estimada' ? ' (estimativa)' : ''),
+  }))
+  const parTxt = t.par
+    ? `<p class="pfd-taxa-nota">Por que não bate com os gráficos abaixo: em ${t.par.ano}, a taxa oficial foi ${n(t.par.taxa)} km² e os polígonos
+      mapeados somam ${n(t.par.poligonos)} km². A taxa leva correções do INPE (como a área sob nuvem); os gráficos abaixo mostram os
+      polígonos, que permitem o recorte por município e por UC.</p>` : ''
+  const falta = t.semPoligonos.length
+    ? `<p class="pfd-taxa-nota">${pfdFaixasAnos(t.semPoligonos)}: o INPE divulgou a taxa, mas ainda não publicou os polígonos —
+      os gráficos de área abaixo ficam sem esse ano até a publicação, e o sistema confere todo dia.</p>` : ''
+  return `<div class="pfd-card largo pfd-taxa"><h3>Taxa oficial de desmatamento do INPE — Acre</h3>
+    <p class="pfd-sub">Taxa anual do PRODES, em km², do jeito que o INPE divulga. Série separada da área dos polígonos — nunca somadas.</p>
+    <div class="pfd-taxa-topo">
+      <div class="pfd-taxa-num">${n(u.km2)} <small>km²</small></div>
+      <div class="pfd-taxa-ctx">${selo} <strong>PRODES ${u.ano}</strong> (ago/${u.ano - 1} a jul/${u.ano})${varTxt}.
+        ${dataBR ? `Atualizada pelo INPE em ${dataBR}.` : ''}
+        ${est ? ` Número estimado a partir das imagens prioritárias; a taxa consolidada sai no 1º semestre de ${u.ano + 1}.` : ''}
+        ${!est && u.km2_estimado != null ? ` A estimativa divulgada antes era ${n(u.km2_estimado)} km².` : ''}</div>
+    </div>
+    ${pfdBarrasHTML(pontos, { cor: PFD_COR.desmatamento, unidade: 'km²', rotulo: 'Taxa oficial de desmatamento do INPE por ano' })}
+    <p class="pfd-taxa-leg"><span class="pfd-leg-sol"></span>consolidada <span class="pfd-leg-vaz"></span>estimativa</p>
+    ${parTxt}${falta}</div>`
 }
 
 // Ranking horizontal (UCs). A UC escolhida no filtro fica destacada; as
@@ -1072,6 +1155,6 @@ if (typeof window !== 'undefined') {
     PFD_ESFERAS, PFD_TEND_MIN_ANOS, pfdCobertura, pfdEmpilhadaHTML, pfdEscopoTipo, pfdPorEsfera, pfdTendencia, pfdTendencias,
     pfdTendenciaHTML, pfdTendenciaFrase, pfdTendenciaResumoHTML,
     pfdRankingUC, pfdRankingMun, pfdDentroFora, PFD_FIRMS_VIIRS_DESDE, PFD_USO, pfdUsoSolo, pfdUsoBarraHTML, pfdMiniMapaSVG, pfdParecer, pfdParecerHTML, pfdSpearman, pfdEnsoDoAno, pfdClimaDoRecorte, pfdKpis, pfdFaixasAnos,
-    pfdLinhaHTML, pfdAreaHTML, pfdBarrasHTML, pfdRankingHTML, pfdRoscaHTML,
+    pfdLinhaHTML, pfdAreaHTML, pfdBarrasHTML, pfdRankingHTML, pfdRoscaHTML, pfdTaxaOficial, pfdTaxaCardHTML,
   })
 }

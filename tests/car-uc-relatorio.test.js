@@ -92,6 +92,30 @@ test('pontos de atenção saem de regra', () => {
   expect(za).toEqual(['CAR cancelado ou suspenso']);   // fora da UC não acusa inscrição/domínio
 });
 
+// Os 3 casos medidos em 17/10/2026 numa amostra de 3.000 cancelados do SICAR:
+// fora da planilha, na planilha como Ativo sem condição (saía "Ativo" com o
+// motivo do cancelamento ao lado) e na planilha com condição preenchida
+// (o cancelamento sumia do relatório).
+test('situação atual: o SICAR ao vivo vence a planilha e o cancelado traz a data', () => {
+  const canc = { status_imovel: 'CA', condicao: 'Cancelado por decisão administrativa', data_atualizacao: '2026-06-30T13:07:56.647Z' }
+  expect(caruc.carucSituacaoAtual(null, canc)).toEqual({ status: 'Cancelado', situacao: 'Cancelado por decisão administrativa', data_cancelamento: '2026-06-30' })
+  expect(caruc.carucSituacaoAtual({ ind_status: 'AT', condicao_i: null }, canc).status).toBe('Cancelado')
+  const comCond = caruc.carucSituacaoAtual({ ind_status: 'AT', condicao_i: 'Em análise' }, canc)
+  expect(comCond.status).toBe('Cancelado')
+  expect(comCond.situacao).toBe('Cancelado por decisão administrativa')
+  // Ativo: sem data de cancelamento, mesmo com data_atualizacao.
+  const at = caruc.carucSituacaoAtual({ ind_status: 'AT', condicao_i: 'Em análise' }, { status_imovel: 'AT', condicao: null, data_atualizacao: '2026-06-30T13:07:56Z' })
+  expect(at).toEqual({ status: 'Ativo', situacao: 'Em análise', data_cancelamento: null })
+  // Sem o WFS (CAR fora do recorte), a planilha segue valendo.
+  expect(caruc.carucSituacaoAtual({ ind_status: 'PE', condicao_i: 'Aguardando análise' }, null).status).toBe('Pendente')
+  // UTC → dia do Acre (UTC−5): 02h UTC ainda é o dia anterior.
+  expect(caruc.carucDataAcre('2026-04-23T02:00:00Z')).toBe('2026-04-22')
+  // A coluna entra na exportação.
+  const col = caruc.carucColunasExportacao({ opcoes: {} }).find(c => /^Cancelado em/.test(c.rotulo))
+  expect(col.valor({ data_cancelamento: '2026-04-22' })).toBe('22/04/2026')
+  expect(col.valor({ data_cancelamento: null })).toBe('')
+})
+
 test('focos no período somam só os anos pedidos', () => {
   expect(caruc.carucFocosNoPeriodo({ 2010: 5, 2012: 3, 2020: 4, 2024: 1 }, 2012, 2020)).toBe(7);
 });
@@ -240,6 +264,9 @@ const FORA = [
   { titular_grupo: 1, cod_imovel: 'AC-FORA-2', nom_imovel: 'Sítio Sem Mapa', nom_munici: 'Feijó', condicao_i: 'Ativo', ind_status: 'AT', num_area_i: 30 },
 ];
 const FORA_GEOM = { 'AC-FORA-1': quad(-68.6, -9.1, -68.58, -9.08) };
+// F1 está "Ativo" na planilha local, mas o SICAR ao vivo já diz cancelado —
+// o relatório tem de mostrar o SICAR, com a data no fuso do Acre.
+const FORA_PROPS = { 'AC-FORA-1': { status_imovel: 'CA', condicao: 'Cancelado por decisão administrativa', data_atualizacao: '2026-04-23T02:00:00Z' } };
 // Ladrilho de satélite falso (1×1 verde) com CORS liberado, como a Esri responde.
 const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADgQF/e4nZ2AAAAABJRU5ErkJggg==', 'base64');
 
@@ -251,7 +278,7 @@ async function abrir(page) {
     const alvo = decodeURIComponent(new URL(route.request().url()).searchParams.get('url') || '');
     if (/CQL_FILTER/.test(alvo)) {
       const feats = Object.entries(FORA_GEOM).filter(([c]) => alvo.includes(`'${c}'`))
-        .map(([c, g]) => ({ type: 'Feature', geometry: g, properties: { cod_imovel: c } }));
+        .map(([c, g]) => ({ type: 'Feature', geometry: g, properties: { cod_imovel: c, ...(FORA_PROPS[c] || {}) } }));
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ type: 'FeatureCollection', features: feats }) });
     }
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(WFS) });
@@ -291,6 +318,16 @@ async function abrir(page) {
           if (nome === 'car_relatorio_uc_cadastro') return { data: args.p_cod_imoveis.map(c => cadastro[c]).filter(Boolean), error: null };
           if (nome === 'car_relatorio_uc_fora') return { data: fora, error: null };
           if (nome === 'car_relatorio_uc_ambiental') return { data: args.p_imoveis.map(i => ({ cod_imovel: i.cod, focos_por_ano: { 2019: 9, 2023: 2, 2024: 3 }, focos_total: 14, deter_alertas: i.cod === 'AC-A' ? 1 : 0, deter_ha: i.cod === 'AC-A' ? 2.5 : 0, deter_ultimo: null })), error: null };
+          // Embargos (360b): IBAMA vigente sobre o imóvel B (só sobreposição — o
+          // IBAMA não traz o CAR) e IMAC desembargado ligado ao C pelo nº do
+          // CAR, com polígono longe dele (vínculo só pelo número).
+          if (nome === 'car_embargos_busca') return { data: [
+            { id: 1, fonte: 'ibama', num_termo: 'TAD123 E', num_auto: null, num_processo: '0200', data_embargo: '2024-05-02', situacao: 'vigente', data_desembargo: null, area_ha: 30, municipio: 'Xapuri', descricao: 'Desmatamento', cod_car: null,
+              geojson: JSON.stringify({ type: 'Polygon', coordinates: [[[-69.915, -9.985], [-69.905, -9.985], [-69.905, -9.975], [-69.915, -9.975], [-69.915, -9.985]]] }) },
+            { id: 2, fonte: 'imac', num_termo: null, num_auto: 'AI-77', num_processo: null, data_embargo: '2023-03-01', situacao: 'desembargado', data_desembargo: '2025-01-10', area_ha: 5, municipio: 'Epitaciolândia', descricao: 'Queimada', cod_car: 'AC-C',
+              geojson: JSON.stringify({ type: 'Point', coordinates: [-69.0, -9.0] }) },
+          ], error: null };
+          if (nome === 'car_embargos_atualizacao') return { data: [{ fonte: 'imac', executado_em: '2026-10-17T19:27:51Z', ok: true, linhas: 790 }], error: null };
           if (nome === 'gerar_protocolo_relatorio') return { data: 'SIGUC-2026-0001', error: null };
           if (nome === 'nivel_efetivo') return { data: 'editar', error: null };
           return { data: null, error: null };
@@ -358,6 +395,26 @@ test('lista só os imóveis que se sobrepõem à UC, com zonas e atenção', asy
   await expect(page.locator('#caruc-resultado')).toContainText('Uso sustentável');
   const ambiental = await page.evaluate(() => window.__rpc.filter(r => r.nome === 'car_relatorio_uc_ambiental').length);
   expect(ambiental).toBe(0);   // não marcado → não pedido
+});
+
+test('embargos: IBAMA por sobreposição, IMAC pelo nº do CAR, e a fonte sem carga diz isso', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  const busca = await page.evaluate(() => window.__rpc.filter(r => r.nome === 'car_embargos_busca'));
+  expect(busca).toHaveLength(1);                                   // uma consulta só, para a UC inteira
+  expect(busca[0].args.p_cods.sort()).toEqual(['AC-A', 'AC-B', 'AC-C']);
+  const b = linhaCar(page, 'AC-B');
+  await expect(b).toContainText('Embargo vigente (IBAMA)');
+  await expect(b).toContainText(/Embargo IBAMA termo TAD123 E 02\/05\/2024 · 122,\d\d ha no imóvel — vigente/);
+  await expect(b.locator('.caruc-prio')).toHaveText('Média');           // embargo vigente sobe para Média
+  const c = linhaCar(page, 'AC-C');
+  await expect(c).toContainText('pelo nº do CAR');
+  await expect(c).toContainText('desembargado');
+  await expect(c).not.toContainText('Embargo vigente');         // encerrado não vira ponto de atenção
+  await expect(linhaCar(page, 'AC-A')).not.toContainText('Embargo');
+  // De quando é cada fonte — e o IBAMA ainda sem carga é dito, nunca "sem embargo" calado.
+  await expect(page.locator('#caruc-resultado')).toContainText('IBAMA: ainda sem carga no sistema');
+  await expect(page.locator('#caruc-resultado')).toContainText('IMAC: carga de 17/10/2026');
 });
 
 test('dados ambientais entram quando marcados e respeitam o período', async ({ page }) => {
@@ -575,7 +632,17 @@ test('mapa do titular: polígonos numerados como as linhas, com satélite e cré
   await expect(mapa.locator('svg').first().locator('title')).toHaveText([/^1 · AC-[AC]$/, /^2 · AC-[AC]$/]);
   await expect.poll(() => mapa.locator('svg image').count()).toBe(2);   // satélite entrou nos dois
   expect(page.__tiles).toBeGreaterThan(0);
-  await expect(page.locator('.caruc-mapa-cred').first()).toContainText('Esri World Imagery');
+  // Rodapé único (js/mapa-moldura.js), o mesmo desenho que vai ao PDF:
+  // crédito do fundo, referência SIRGAS 2000 e a grade UTM do 1º quadro.
+  const rodape = () => page.locator('.caruc-mapa-rodape svg').first().evaluate(el => el.textContent)
+  await expect.poll(rodape).toContain('Esri World Imagery')
+  expect(await rodape()).toMatch(/Datum SIRGAS 2000 · grade UTM 19S \(EPSG:31979, km\)/)
+  expect(await rodape()).toContain('Limite da UC')
+  // grade UTM só no quadro ampliado, com rótulos em km; barra de escala nos dois
+  await expect(mapa.locator('svg').first().locator('g[aria-hidden="true"] text').first()).toBeAttached()
+  await expect(mapa.locator('svg').nth(1).locator('g[aria-hidden="true"]')).toHaveCount(0)
+  await expect(mapa.locator('svg g[aria-label^="Escala"]')).toHaveCount(2)
+  await expect(mapa.locator('svg g[aria-label="Norte"]')).toHaveCount(2)
   // o nº do polígono é o nº da linha: o 1 é o imóvel de maior área no recorte
   const pinos = await page.locator(LINHAS).evaluateAll(trs => trs.map(tr => [tr.querySelector('.caruc-pino')?.textContent, tr.querySelector('.caruc-cod')?.textContent]));
   const titulos = await mapa.locator('svg').first().locator('title').allTextContents();
@@ -595,7 +662,7 @@ test('"Sem fundo" desenha só o vetor e não baixa ladrilho nenhum', async ({ pa
   await page.waitForTimeout(300);
   await expect(mapa.locator('svg image')).toHaveCount(0);
   expect(page.__tiles).toBe(0);
-  await expect(page.locator('.caruc-mapa-cred').first()).toContainText('Sem imagem de fundo');
+  await expect.poll(() => page.locator('.caruc-mapa-rodape svg').first().evaluate(el => el.textContent)).toContain('Sem imagem de fundo');
 });
 
 test('CARs do mesmo titular fora da UC: só quando pedidos, no mapa do Acre e numa lista à parte', async ({ page }) => {
@@ -618,6 +685,9 @@ test('CARs do mesmo titular fora da UC: só quando pedidos, no mapa do Acre e nu
   await expect(page.locator('tr.caruc-fora-tr')).toContainText('2 CAR(s)');
   await expect(page.locator('tr.caruc-fora-linha')).toHaveCount(2);
   await expect(page.locator('tr.caruc-fora-linha').nth(1)).toContainText('sem polígono no SICAR');
+  await expect(page.locator('tr.caruc-fora-linha').nth(0)).toContainText('Cancelado por decisão administrativa');
+  await expect(page.locator('tr.caruc-fora-linha').nth(0)).toContainText('Cancelado em 22/04/2026');
+  await expect(page.locator('tr.caruc-fora-linha').nth(1)).not.toContainText('Cancelado em');
   // os de fora nunca entram nos totais da UC
   await expect(page.locator(LINHAS)).toHaveCount(2);
   await expect(page.locator('.caruc-kpis')).toContainText('Imóveis na UC2');
@@ -632,7 +702,7 @@ test('PDF e Excel levam o mapa do titular e os CARs de fora', async ({ page }) =
 
   const [dPdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.click('button:has-text("PDF")')]);
   const buf = fs.readFileSync(await dPdf.path());
-  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(3);   // os três quadros
+  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(4);   // os três quadros + o rodapé do mapa
   const { PDFParse } = require('pdf-parse');
   const texto = (await new PDFParse({ data: buf }).getText()).text;
   // tabela de leitura: titular/CPF só no cabeçalho do grupo; texto longo em linha própria

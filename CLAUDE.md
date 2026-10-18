@@ -580,8 +580,26 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   PRODES (mesmo WFS do `prodes_resumo_ano`) com o limite de cada UC,
   calculada no banco (`ST_MakeValid` nos dois lados — sem isso o GEOS
   lança TopologyException). Conferido: 2024 somou 41.144 ha contra
-  41.135 do INPE. **"Acre todo" usa o número OFICIAL do INPE; o recorte
-  por UC é cálculo do sistema** — a página diz isso nas notas.
+  41.135 do INPE. **"Acre todo" usa a soma dos POLÍGONOS publicada pelo
+  INPE (não é a taxa oficial — ver abaixo); o recorte por UC é cálculo do
+  sistema** — a página diz isso nas notas.
+- **Taxa oficial do INPE ≠ área dos polígonos** (migrations 361/361b,
+  `prodes_taxa_ano`): a taxa leva correção de nuvem e outros ajustes
+  (2025: 324 km² de taxa × 275 km² de polígonos; 2022: 840 × 1.006). Série
+  à parte, desde 2008, lida todo dia do arquivo do próprio painel do
+  TerraBrasilis (`app/prodes/dashboard/deforestation/files/rates<ANO>.json`,
+  ~24 KB; o nome leva o ano da última estimativa, por isso pede ano−1/ano/
+  ano+1). Acre = `loiname` 18278, com trava: 1988 ≠ 620 km² ⇒ nada gravado.
+  O ano mais recente nasce `estimada` e vira `consolidada` quando o valor
+  muda (o estimado fica em `km2_estimado`) ou a partir de 1º/ago do ano
+  seguinte. Na tela: card "Taxa oficial de desmatamento do INPE" **só em
+  "Acre todo"** (o INPE não publica taxa por UC/município), estimativa em
+  barra vazada; **nunca somada aos polígonos, nunca no gráfico de área nem
+  na tendência** (`pfdTaxaOficial`/`pfdTaxaCardHTML`). Ano com taxa e sem
+  polígonos: aviso e nota na tendência dizem onde está o número, e
+  `prodes_poligonos_verificar()` (cron diário) pede só esse ano até os
+  polígonos saírem. ⚠️ Variável de laço com o mesmo nome do apelido da
+  consulta (`r`) quebra o PL/pgSQL em toda chamada (361b).
 - ⚠️ `prodes_resumo_coletar(p_max)` processa **um ano por chamada** (342c;
   o cron 342d roda `(1)` às 10:20 e 10:40 de domingo): os 18 anos numa
   transação só estouravam o `statement_timeout` de 2 min. O pedido só é
@@ -764,7 +782,7 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   × área geodésica × depois de make_valid × união × soma das
   interseções com os 22 municípios) — é a investigação dos +1,4%, sem
   gravar nada.
-- Guarda: `tests/painel-fogo-desmatamento.test.js` (36), inclusive
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (38), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
 
@@ -972,10 +990,89 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   larga fazia a PÁGINA inteira rolar de lado no celular (1.410px em
   390px), mesmo dentro do `.table-wrap`. Corrigido com `min-width:0`
   só nesta página; a guarda de 390px pega a volta.
-- Guarda: `tests/car-uc-relatorio.test.js` (27). Página real com stub,
+- **Situação ATUAL vem do SICAR ao vivo, nunca da planilha** (17/10/2026):
+  `carucSituacaoAtual(l, p)` (e o espelho `_relSituacaoAtual` em
+  `js/relatorio-car.js`, relatório do imóvel pelo Mapa — mudou num, muda no
+  outro). `car_dados_locais` é um retrato de ago/2025 e NÃO tem nenhum
+  cancelado: numa amostra de 3.000 cancelados do WFS, 992 ainda constavam
+  "Ativo"/"Pendente" nela — o relatório mostrava "Ativo" com o motivo do
+  cancelamento ao lado, ou escondia o cancelamento. A planilha só completa o
+  que o WFS não trouxer (inclusive na lista "Fora da UC", que agora pega a
+  situação na mesma consulta que baixa os polígonos).
+- **"Cancelado em" = `data_atualizacao` do SICAR**, no fuso do Acre (UTC−5).
+  O SICAR não publica data de cancelamento (12 atributos na camada, conferido
+  por DescribeFeatureType); nos cancelados a data se concentra nos dias dos
+  lotes (542 em 22/04/2026, 444 em 17/02/2025) e os ativos quase nunca caem
+  nesses dias (7 de 3.000). Rótulo sempre "última atualização no SICAR" + nota
+  no PDF: se o registro for alterado depois, a data anda junto.
+- **Embargos ambientais (migrations 360/360b)** — mesmas fontes do Selo
+  Verde AC (CSR/UFMG, `csr.ufmg.br/mappiadb/api/run/327`). `embargos_ambientais`
+  (IBAMA + IMAC; ICMBio previsto, arquivo público não localizado), SEM nome,
+  CPF/CNPJ do embargado nem nome do imóvel — o vínculo é geométrico ou pelo
+  nº do CAR. Carga FORA do banco: `scripts/embargos_carga.py` +
+  `.github/workflows/embargos.yml` (semanal, e roda no push que muda o
+  script — é como se testa de uma branch). IBAMA = CSV nacional de ~210 MB
+  (dados abertos, sem nº do CAR → só sobreposição); IMAC = 1 ZIP de shapefile
+  por ano em `imac.ac.gov.br/fiscalizacao-autuacoes/` (traz `COD_CAR` →
+  casa também pelo número). Upsert por (fonte, chave) e limpeza só no fim:
+  fonte que falha nunca esvazia a tabela; `embargos_cargas` registra cada
+  tentativa e a tela diz de quando é cada fonte ("sem carga" nunca vira
+  "sem embargo"). ⚠️ Ler o CSV do IBAMA direto do fluxo de rede quebrou
+  ("I/O operation on closed file") — baixar para disco antes. ⚠️ Os dois
+  domínios são recusados pelo proxy das sessões de desenvolvimento (o banco
+  e o GitHub Actions alcançam). Regra igual nos dois relatórios:
+  `carucEmbargosDoImovel` (CAR na UC) e `_relEmbargos` (relatório do imóvel
+  do Mapa) — mudou num, muda no outro. Embargo VIGENTE = ponto de atenção
+  e motivo de prioridade (dano na Alta, também na Média). Consulta
+  `car_embargos_busca` (retângulo OU nº do CAR); `car_embargos_bbox` (360)
+  ficou sem chamador — `DROP` pendente no SQL Editor.
+- Selo Verde AC (`seloverde.sema.ac.gov.br/consultar-car/`): o relatório por
+  CAR é protegido por captcha (`cap.js`, `/imagery/get_by_car_unificado.php`)
+  — NÃO é fonte automatizável; usamos as fontes abertas que ele cita.
+- Guarda: `tests/car-uc-relatorio.test.js` (29). Página real com stub,
   PDF/Excel/CSV gerados de verdade, e guardas conferidas por
   contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).
+
+## Regra do sistema — relatórios do mapa: moldura e cabeçalho únicos (17/10/2026)
+Os 4 relatórios que saem do Mapa das UCs e do CAR na UC seguem um padrão só:
+relatório do imóvel CAR (`js/relatorio-car.js`), impressão do mapa
+(`CART.imprimir`, `js/mapa-cartografia.js`), desmatamento por zona de manejo
+(`_zonasImprimir`, `pages/mapa.html`) e CAR na UC (`js/car-uc-mapa.js` +
+`js/car-uc-relatorio-export.js`).
+- **Moldura cartográfica = `js/mapa-moldura.js`** (fonte única, prefixo
+  `mold`): norte, **barra de escala gráfica** (nunca "1:N" — só vale num
+  tamanho de impressão; o meio sai na mesma unidade do total), referência
+  (`moldReferencia`: Datum SIRGAS 2000, grade UTM da zona, exibição Web
+  Mercator — o PROJECAO antigo dizia WGS 84/EPSG:4326, errado), legenda
+  (`moldLegendaHTML`; linha branca ganha borda escura), rodapé em SVG
+  (`moldRodapeSVG`) e grade UTM em SVG (`moldGradeUtmSVG`, precisa do proj4
+  vendorizado; sem ele, sem grade). Mapa novo em relatório usa estas peças.
+- **Cabeçalho HTML = mesma ordem do timbre em PDF**: Secretaria (negrito) /
+  Diretoria / Departamento · módulo (`cab.linhaModulo`), Acre à esquerda,
+  SEMA à direita com protocolo acima. Departamento lido do módulo
+  `monitoramento` (`REL_CAB_MODULO`) — o campo genérico de Configurações
+  estava "Conservacao", sem acento. Sem logo = espaço vazio, nunca emoji.
+- **Fundo dos mapas**: satélite Esri (padrão, com crédito) ou "sem fundo",
+  nos dois relatórios com mapa. No satélite o contorno do CAR vira amarelo e
+  o da UC branco com traço escuro por baixo (`_relCor`) — verde-escuro some
+  na floresta.
+- **Impressão do mapa leva o mapa de verdade**: o próprio `#mapa` é movido
+  para a folha A4 deitada (`relAbrirPreview`, página nomeada `paisagem`) e
+  volta ao fechar. A versão antiga abria uma janela que não copiava o mapa e
+  imprimia um aviso no lugar. Na folha os controles de baixo do Leaflet
+  somem (a moldura da direita é a oficial).
+- **`relAbrirPreview({titulo, modo, html, aoFechar})`** é a prévia única
+  (barra Fechar/Imprimir, Esc fecha). "Abrir em nova aba" foi removido:
+  abria os mapas em branco e sem DM Sans.
+- **CAR na UC**: grade UTM só no quadro ampliado; legenda + referência +
+  fundo + data num rodapé SVG único (`carucMapaRodapeSVG`) — a tela mostra e
+  o PDF rasteriza o MESMO desenho (antes, legenda HTML na tela e uma linha de
+  texto no PDF). Módulo do timbre: "Relatório CAR na UC".
+- Guarda: `tests/relatorios-mapa-padrao.test.js` (5, harness
+  `tests/fixtures/relatorio-mapa-harness.html`) + `tests/car-uc-relatorio.test.js`
+  (29). O teste da impressão reprova a versão antiga do `CART.imprimir`.
+- Sem mudança em `pwa/sw.js` (telas de mesa).
 
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,

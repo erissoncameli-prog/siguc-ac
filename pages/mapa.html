@@ -455,6 +455,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/config-sistema.js"></script>
+<script src="../js/mapa-moldura.js"></script>
 <script src="../js/relatorio-car.js"></script>
 <link rel="stylesheet" href="../css/relatorio-print.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -8025,6 +8026,7 @@ function _abrirRelatorioZonasLote(resultados){
   const f2 = n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
   const f1 = n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
   const escopo = _zonasFiltroUC==='todas' ? 'Todas as UCs' : _zonasFiltroUC;
+  _zonasRelUltimo = { linhas, totGeral, escopo };
 
   const rows = linhas.map((l,i)=>{
     const pctZ = l.area>0 ? l.total/l.area*100 : 0;
@@ -8063,9 +8065,56 @@ function _abrirRelatorioZonasLote(resultados){
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <div style="padding:10px 18px;border-top:1px solid var(--borda);font-size:10px;color:#9ca3af;line-height:1.5">Fonte: PRODES/INPE (TerraBrasilis) · % calculado sobre a área de cada zona · Clique numa zona no mapa para o detalhamento por ano.</div>
+    <div style="padding:10px 18px;border-top:1px solid var(--borda);display:flex;align-items:center;gap:12px">
+      <span style="flex:1;font-size:10px;color:#9ca3af;line-height:1.5">Fonte: PRODES/INPE (TerraBrasilis) · % calculado sobre a área de cada zona · Clique numa zona no mapa para o detalhamento por ano.</span>
+      <button class="btn btn-primary btn-sm" onclick="_zonasImprimir()">${bico('printer')} Imprimir / PDF</button>
+    </div>
   </div>`;
   document.body.appendChild(el);
+}
+
+// Folha A4 do relatório de zonas — mesmo timbre e mesma prévia dos demais
+// relatórios do mapa (relAbrirPreview / _htmlCabecalho, js/relatorio-car.js).
+let _zonasRelUltimo = null;
+async function _zonasImprimir(){
+  const r = _zonasRelUltimo;
+  if(!r || typeof relAbrirPreview !== 'function'){ toast('Relatório indisponível.','error'); return; }
+  const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio('monitoramento'), gerarProtocolo()]);
+  cab.linhaModulo = 'Zoneamento · PRODES';
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const f2 = n=>Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const f1 = n=>Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const linhas = r.linhas.map((l,i)=>`<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td><strong>${escHtml(l.cod)}</strong> — ${escHtml(l.nome)}<div style="color:#9ca3af;font-size:8px">${escHtml(l.uc)}${l.n>1?` · ${l.n} polígonos`:''}</div></td>
+      <td style="text-align:right;white-space:nowrap">${f2(l.area)} ha</td>
+      <td style="text-align:right;white-space:nowrap;font-weight:700">${f2(l.total)} ha</td>
+      <td style="text-align:right;white-space:nowrap">${f1(l.area>0?l.total/l.area*100:0)}%</td>
+    </tr>`).join('');
+  const html = `<div class="rel-a4">
+    ${_htmlCabecalho(cab, protocolo, hoje)}
+    <div class="rel-body">
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">Desmatamento por zona de manejo — PRODES</div>
+        <table class="rel-table"><tbody>
+          <tr><td>Escopo</td><td>${escHtml(r.escopo)}</td></tr>
+          <tr><td>Zonas analisadas</td><td>${r.linhas.length}</td></tr>
+          <tr><td>Total desmatado nas zonas</td><td><strong>${f2(r.totGeral)} ha</strong></td></tr>
+        </tbody></table>
+      </div>
+      <div class="rel-secao" style="break-inside:auto;page-break-inside:auto">
+        <div class="rel-secao-titulo">Zonas, da mais desmatada para a menos</div>
+        <table class="rel-table rel-table-sm rel-table-lista" style="width:100%">
+          <thead><tr><th>#</th><th style="text-align:left">Zona / UC</th><th>Área da zona</th><th>Desmatado</th><th>% da zona</th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>
+      <div class="rel-aviso">Fonte: PRODES/INPE (TerraBrasilis), polígonos de desmatamento cruzados com o zoneamento cadastrado no sistema. O percentual é calculado sobre a área de cada zona. Uma UC pode ter mais de um polígono por zona; eles são somados.</div>
+    </div>
+    <div class="rel-pag-rodape"><span>${escHtml(cab.secretaria)} · ${escHtml(cab.siglaDiret)} · ${escHtml(cab.siglaDep)}</span><span>SIGUC-AC · Prot. ${escHtml(protocolo)} · Emitido em ${hoje}</span></div>
+  </div>`;
+  document.getElementById('zonas-relatorio-overlay')?.remove();
+  relAbrirPreview({ titulo: 'Desmatamento por zona de manejo — ' + r.escopo, modo: 'ZONEAMENTO', html });
 }
 
 // ── Resize do painel de zona (espelha o do CAR) ───────────────────────────

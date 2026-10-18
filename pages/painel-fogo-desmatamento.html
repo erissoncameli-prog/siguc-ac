@@ -79,6 +79,22 @@
 .pfd-notas { font-size:12px; color:var(--cinza-600); background:var(--cinza-50); border:1px solid var(--borda);
   border-radius:10px; padding:12px 14px; line-height:1.55; }
 .pfd-notas ul { margin:6px 0 0; padding-left:18px; }
+/* ── taxa oficial do INPE (migration 361) ── */
+.pfd-taxa-topo { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
+.pfd-taxa-num { font-family:var(--font-sans, 'DM Sans', sans-serif); font-size:30px; font-weight:800; color:#111827;
+  line-height:1.1; font-variant-numeric:tabular-nums; }
+.pfd-taxa-num small { font-size:14px; font-weight:600; color:var(--cinza-500); }
+.pfd-taxa-ctx { flex:1; min-width:220px; font-size:13px; color:#374151; line-height:1.5; }
+.pfd-selo { display:inline-block; font-size:11px; font-weight:700; border-radius:999px; padding:1px 8px; margin-right:4px;
+  text-transform:uppercase; letter-spacing:.03em; }
+.pfd-selo-est { color:#166534; background:#fff; border:1.5px dashed #166534; }
+.pfd-selo-cons { color:#fff; background:#166534; border:1.5px solid #166534; }
+.pfd-taxa-leg { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--cinza-500); margin:4px 0 0; }
+.pfd-leg-sol, .pfd-leg-vaz { display:inline-block; width:12px; height:12px; border-radius:3px; margin-left:8px; }
+.pfd-leg-sol { background:#166534; margin-left:0; }
+.pfd-leg-vaz { background:#fff; border:1.5px dashed #166534; }
+.pfd-taxa-nota { font-size:12px; color:var(--cinza-600); background:var(--cinza-50); border:1px solid var(--borda);
+  border-radius:8px; padding:8px 12px; margin:8px 0 0; line-height:1.5; }
 .pfd-aviso { font-size:12px; color:#92400E; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:8px 12px; }
 /* ── tendência ── */
 .pfd-card.largo { grid-column:1 / -1; }
@@ -187,7 +203,7 @@ async function _pfdTudo(montar) {
 
 async function pfdCarregar() {
   const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-         municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses, terraclassUc] = await Promise.all([
+         municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses, terraclassUc, prodesTaxa] = await Promise.all([
     _pfdTudo(() => db.from('unidades_conservacao').select('id,nome,sigla,categoria,grupo,esfera').eq('ativo', true).order('nome')),
     _pfdTudo(() => db.from('focos_uc_mes').select('ano,mes,uc_id,focos,origem').order('ano')),
     _pfdTudo(() => db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim').order('ano')),
@@ -209,9 +225,12 @@ async function pfdCarregar() {
     _pfdTudo(() => db.from('terraclass_mun').select('ano,cd_ibge,classe,area_ha').order('ano')).catch(() => []),
     _pfdTudo(() => db.from('terraclass_classes').select('codigo,nome,grupo').order('codigo')).catch(() => []),
     _pfdTudo(() => db.from('terraclass_uc').select('ano,uc_id,classe,area_ha').order('ano')).catch(() => []),
+    // Taxa oficial do INPE (migration 361): só o card próprio; falhou, o
+    // card some e o resto do painel segue.
+    _pfdTudo(() => db.from('prodes_taxa_ano').select('uf,ano,km2,tipo,km2_estimado,divulgado_em').eq('uf', 'AC').order('ano')).catch(() => []),
   ])
   return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-           municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses, terraclassUc }
+           municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses, terraclassUc, prodesTaxa }
 }
 
 function pfdSincEscopo() {
@@ -414,7 +433,7 @@ function pfdRender() {
   }
   if (mostraDesm) {
     kpis.push(`<div class="pfd-kpi desm"><div class="pfd-kpi-val">${n(k.areaHa)} <small>ha</small></div><div class="pfd-kpi-lbl">Área desmatada</div>
-      <div class="pfd-kpi-sub">${k.anosDesm} ano(s) PRODES no período</div></div>`)
+      <div class="pfd-kpi-sub">polígonos PRODES · ${k.anosDesm} ano(s) no período</div></div>`)
     kpis.push(`<div class="pfd-kpi desm"><div class="pfd-kpi-val">${n(k.poligonos)}</div><div class="pfd-kpi-lbl">Polígonos de desmatamento</div>
       <div class="pfd-kpi-sub">${k.anoPicoDesm ? `pico em ${k.anoPicoDesm.ano}: ${n(k.anoPicoDesm.ha)} ha` : 'sem registro no período'}</div></div>`)
   }
@@ -429,7 +448,15 @@ function pfdRender() {
   }
   if (mostraFogo && !bdq && f.anoIni < PFD_FIRMS_VIIRS_DESDE && f.anoFim >= PFD_FIRMS_VIIRS_DESDE)
     avisos.push(`FIRMS: a alta de 2011 para ${PFD_FIRMS_VIIRS_DESDE} é do satélite, não do fogo — o VIIRS entra na série em ${PFD_FIRMS_VIIRS_DESDE} e detecta muito mais focos pequenos. A tendência dos focos começa em ${PFD_FIRMS_VIIRS_DESDE}; para comparar anos anteriores, use a fonte BDQueimadas.`)
-  if (mostraDesm && k.anosSemDesm.length) avisos.push(`PRODES ainda não publicado pelo INPE (ou anterior a 2008) para: ${pfdFaixasAnos(k.anosSemDesm)}.`)
+  const taxa = mostraDesm ? pfdTaxaOficial(d, f) : null
+  if (mostraDesm && k.anosSemDesm.length) {
+    // Ano com taxa divulgada e sem polígonos: dizer onde está o número,
+    // em vez de "não publicado" (o INPE publicou — só não os polígonos).
+    const comTaxa = taxa ? k.anosSemDesm.filter(a => taxa.semPoligonos.includes(a)) : []
+    const resto = k.anosSemDesm.filter(a => !comTaxa.includes(a))
+    if (resto.length) avisos.push(`PRODES ainda não publicado pelo INPE (ou anterior a 2008) para: ${pfdFaixasAnos(resto)}.`)
+    if (comTaxa.length) avisos.push(`PRODES ${pfdFaixasAnos(comTaxa)}: o INPE divulgou a taxa (card "Taxa oficial de desmatamento do INPE"), mas ainda não os polígonos — os gráficos de área ficam sem esse ano até a publicação.`)
+  }
   if (tEscopo === 'esfera' && f.escopo === 'esf:municipal') avisos.push('A esfera municipal tem uma única UC no cadastro, com números pequenos — os gráficos ficam quase vazios por isso, não por falha.')
 
   const destaque = tEscopo === 'uc' ? f.escopo : null
@@ -452,11 +479,12 @@ function pfdRender() {
     <p class="pfd-sub">O que subiu ou caiu, e o que o clima e o desmatamento dizem sobre isso.</p>
     ${pfdParecerHTML(pfdParecer(d, f))}</section>`
 
-  const cardTendencia = (pontos, cor, unidade, rotulo, sub) => {
+  const cardTendencia = (pontos, cor, unidade, rotulo, sub, nota) => {
     const tt = pfdTendencias(pontos)
     return `<div class="pfd-card largo"><h3>${rotulo}</h3><p class="pfd-sub">${sub}</p>
       ${pfdTendenciaResumoHTML(tt, unidade)}
-      ${pfdTendenciaHTML(pontos, tt, { cor, unidade, rotulo })}</div>`
+      ${pfdTendenciaHTML(pontos, tt, { cor, unidade, rotulo })}
+      ${nota ? `<p class="pfd-taxa-nota">${nota}</p>` : ''}</div>`
   }
   const subTend = `Barras = cada ano. Linha contínua = tendência do período; tracejada = últimos ${PFD_TEND_MIN_ANOS} anos.
     Teste de Mann-Kendall com inclinação de Sen: só diz "subindo" ou "caindo" quando a direção é estatisticamente clara (p &lt; 0,05). Descreve o passado, não é previsão.`
@@ -490,12 +518,16 @@ function pfdRender() {
     const acum = pfdAcumulado(desm, 'ha').map(p => ({ rotulo: String(p.ano), valor: p.acumulado }))
     html += `<h2 class="pfd-secao-titulo"><span class="pfd-dot" style="background:${PFD_COR.desmatamento}"></span>Desmatamento — ${esc(onde)}, ${esc(periodo)}</h2>
     <div class="pfd-grade">
+      ${pfdTaxaCardHTML(taxa)}
       ${pfdCardsCobertura(d, f, onde)}
-      <div class="pfd-card"><h3>Área desmatada por ano</h3><p class="pfd-sub">PRODES/INPE, em hectares (ano-PRODES: ago do ano anterior a jul).</p>
+      <div class="pfd-card"><h3>Área desmatada por ano</h3><p class="pfd-sub">Área dos polígonos do PRODES/INPE, em hectares (ano-PRODES: ago do ano anterior a jul).</p>
         ${pfdBarrasHTML(barras, { cor: PFD_COR.desmatamento, unidade: 'ha', rotulo: 'Área desmatada por ano' })}</div>
       <div class="pfd-card"><h3>Desmatamento acumulado</h3><p class="pfd-sub">Soma da área desmatada desde ${f.anoIni}, em hectares.</p>
         ${pfdAreaHTML(acum, { cor: PFD_COR.desmatamento, unidade: 'ha acumulados', rotulo: 'Desmatamento acumulado' })}</div>
-      ${cardTendencia(barras, PFD_COR.desmatamento, 'ha', 'Tendência do desmatamento', subTend)}
+      ${cardTendencia(barras, PFD_COR.desmatamento, 'ha', 'Tendência do desmatamento', subTend,
+          taxa && taxa.semPoligonos.length
+            ? `${esc(pfdFaixasAnos(taxa.semPoligonos))} sem barra: o INPE ainda não publicou os polígonos. A taxa já divulgada está no card "Taxa oficial de desmatamento do INPE" e não entra nesta tendência — é outra medida.`
+            : '')}
       <div class="pfd-card"><h3>${recorte ? `Área: ${esc(nesta)} × restante do Acre` : 'Área dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período, em hectares.</p>
         ${pfdRoscaHTML(pfdDentroFora(d, f, 'desmatamento'), { unidade: 'ha', rotulo: 'Área desmatada dentro e fora do recorte' })}</div>
       ${porEsfera ? `<div class="pfd-card"><h3>Área desmatada em UCs por esfera</h3><p class="pfd-sub">Federal × estadual × municipal, em hectares.</p>
@@ -514,8 +546,14 @@ function pfdRender() {
       inteiro, de ${_pfdBdqPrimeiro()} em diante. Um satélite só é o que mantém os anos comparáveis entre si. O número é menor que o do
       FIRMS porque conta um satélite, não três. O ano entra quando o INPE publica o arquivo anual.</li>
     <li>As duas séries de focos <strong>nunca são somadas</strong>: satélites e janelas diferentes contariam o mesmo fogo duas vezes.</li>
-    <li><strong>Desmatamento</strong>: PRODES/INPE, disponível a partir de 2008. O total do Acre é o número oficial do
-      INPE; a área por UC e por município é o cruzamento dos polígonos do PRODES com o limite de cada um, calculado no sistema.</li>
+    <li><strong>Desmatamento</strong>: PRODES/INPE, disponível a partir de 2008. Os gráficos de área usam os <strong>polígonos</strong>
+      do PRODES: o total do Acre é a soma dos polígonos publicados pelo INPE; a área por UC e por município é o cruzamento desses
+      polígonos com o limite de cada um, calculado no sistema.</li>
+    <li><strong>Taxa oficial do INPE</strong>: é o número que o INPE divulga (em km²), com correções como a da área sob nuvem — por
+      isso não bate com a soma dos polígonos (2025: 324 km² de taxa × 275 km² de polígonos). Existe só para o estado inteiro, aparece
+      só em "Acre todo", num card próprio, e nunca é somada aos polígonos nem entra na tendência. O ano mais recente sai primeiro como
+      <strong>estimativa</strong> (out/nov) e é trocado pela taxa consolidada no 1º semestre seguinte. Lida todo dia do painel do
+      TerraBrasilis/INPE.</li>
     <li><strong>Municípios</strong>: limites da malha municipal do IBGE. Cada foco e cada polígono do PRODES é atribuído ao
       município onde cai; a soma dos 22 municípios bate com o total do Acre. Uma UC pode atravessar a divisa de municípios,
       por isso o ranking de UCs não aparece quando um município está escolhido.</li>
@@ -525,7 +563,7 @@ function pfdRender() {
       publica uma camada de floresta, então é uma subtração. Área que foi desmatada e depois regenerou continua contando
       como desmatada: o que resta é floresta primária, não toda a cobertura vegetal.</li>
     <li><strong>Território e uso do solo</strong>: área total e desmatado vêm da mesma base do PRODES dos gráficos
-      (área oficial do INPE para o Acre; limite do IBGE para municípios; limite cadastrado para UCs). O que a área desmatada
+      (área total do Acre segundo o INPE; limite do IBGE para municípios; limite cadastrado para UCs). O que a área desmatada
       virou vem do <strong>TerraClass</strong> (INPE/Embrapa), que qualifica exatamente a área que o PRODES marcou como
       desmatada: pastagem, vegetação secundária (capoeira), agricultura, área urbana e outros usos, a cada 2 anos desde 2008.
       Capoeira continua contando como desmatada no PRODES — regenerar não devolve a floresta primária. Por município, é a
