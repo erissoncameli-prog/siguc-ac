@@ -211,6 +211,8 @@ function _fichaRender() {
 
   const alertas = (f.alertas || []).map(a => `<li>${esc(SocioRegras.descreverAlerta(a, est))}</li>`).join('')
   const comNova = d.pode_gerir && f.comunidade_nova && !f.comunidade_id && f.status !== 'descartada'
+  const apagada = f.identificacao_apagada_em
+    ? `<div class="soc-aviso">${bico('clock')}<div><strong>Identificação e fotos apagadas em ${fmtDia(f.identificacao_apagada_em)}.</strong>Prazo de guarda do ROPA (TRAT-021) vencido; as respostas continuam para a série histórica.</div></div>` : ''
   const ident = d.identificacao
     ? `<section class="soc-fd-bloco"><h4>Identificação</h4><dl class="soc-fd-resp">
         <div class="soc-fd-linha"><dt>Entrevistado</dt><dd>${esc(d.identificacao.entrevistado_nome || '—')}</dd></div>
@@ -235,7 +237,7 @@ function _fichaRender() {
         <button class="btn btn-secondary btn-sm" type="button" id="fd-vinc" onclick="fichaVincular()">Ligar</button>
         <button class="btn btn-ghost btn-sm" type="button" onclick="fichaCadastrarComunidade()">Cadastrar “${esc(f.comunidade_nova)}”</button></div></div></div>` : ''}
     ${alertas ? `<section class="soc-fd-bloco"><h4>Para conferir</h4><ul class="soc-fd-alertas">${alertas}</ul></section>` : ''}
-    ${ident}${_respostasHTML(d)}${fotos}${hist}`
+    ${apagada || ident}${_respostasHTML(d)}${apagada ? '' : fotos}${hist}`
   if (d.fotos && d.fotos.length && typeof assinarFotos === 'function') assinarFotos(document.getElementById('fd-corpo'))
 
   const ac = [`<button class="btn btn-secondary" type="button" onclick="socFechar('ficha')">Fechar</button>`]

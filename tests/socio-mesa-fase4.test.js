@@ -106,6 +106,25 @@ async function abrir(page, gestor = true) {
       socio_definir_aplicador: (a) => { const p = est.equipe.find(x => x.usuario_id === a.p_usuario); p.na_equipe = a.p_incluir; return null },
       socio_mudar_status: (a) => { det.ficha.status = a.p_status; est.fichas[0].status = a.p_status; return null },
       socio_vincular_comunidade: (a) => { det.ficha.comunidade_id = a.p_comunidade; det.comunidade_nome = 'Vila Assis'; return null },
+      socio_indicadores: (a) => (a.p_cd_mun
+        ? { minimo: 5, suprimido: true, n_fichas: 2, n_recusas: 0, n_aguardando: 0, versao_referencia: 1, por_municipio: [], perguntas: null, lista: null }
+        : { minimo: 5, suprimido: false, n_fichas: 6, n_recusas: 1, n_aguardando: 2, versao_referencia: 1,
+            por_municipio: [{ cd_mun: '1200203', nome: 'Cruzeiro do Sul', n: 6 }],
+            perguntas: [
+              { bloco: 'Água', chave: 'agua_fonte', n: 1, texto: 'De onde vem a água?', tipo: 'unica', n_respostas: 5, n_nr: 1,
+                opcoes: [{ v: 'rio', r: 'Rio', n: 3 }, { v: 'poco', r: 'Poço', n: 2 }, { v: 'outro', r: 'Outro', n: 0 }] },
+              { bloco: 'Água', chave: 'renda', n: 3, texto: 'Renda mensal?', tipo: 'inteiro', n_respostas: 6, n_nr: 0,
+                estat: { n: 6, media: 1200.5, q1: 800, mediana: 1100, q3: 1500 } },
+              { bloco: 'Água', chave: 'obs', n: 5, texto: 'Observações', tipo: 'texto_longo', n_respostas: 4, n_nr: 0 }],
+            lista: { titulo: 'Moradores', n_linhas: 14, colunas: [{ chave: 'idade', rotulo: 'Idade', tipo: 'inteiro',
+              estat: { n: 14, media: 30, q1: 12, mediana: 28, q3: 45 } }] } }),
+      socio_exportar: (a) => ({ exportacao_id: 'exp-1', gerado_em: '2026-10-18T12:00:00Z', identificada: !!a.p_identificada,
+        sem_texto: !est.gestor, n_fichas: 1, estrutura: est.versoes[0].estrutura, colunas_omitidas: est.gestor ? [] : ['obs'],
+        fichas: [{ codigo: 'DSA-261015-AB12-01', campanha: 'Campanha Juruá', versao: 1, dt_entrevista: '2026-10-15', municipio: 'Cruzeiro do Sul',
+          uc: null, comunidade: 'Vila Assis', entrevistador: est.gestor ? 'Aplicadora' : null, aceitou_participar: true,
+          validado_em: '2026-10-16T12:00:00Z', respostas: { agua_fonte: 'rio', agua_trata: 'sim', renda: '_nr' },
+          entrevistado_nome: a.p_identificada ? 'Maria Entrevistada' : null, lat: null, lon: null }],
+        linhas: [{ codigo: 'DSA-261015-AB12-01', ordem: 1, idade: 41, e_entrevistado: true }] }),
     };
     window.supabase = {
       createClient: () => ({
@@ -248,4 +267,71 @@ test('celular (390px): ficha aberta não faz a página rolar de lado', async ({ 
   await page.locator('#fi-corpo tr', { hasText: 'DSA-261015-AB12-01' }).getByRole('button', { name: 'Abrir' }).click();
   await expect(page.locator('#fd-corpo')).toContainText('Maria Entrevistada');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+
+// ── Fase 5: indicadores e exportação ──
+async function xlsxTexto(download) {
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(fs.readFileSync(await download.path()));
+  const partes = await Promise.all(Object.keys(zip.files).filter(n => /sharedStrings|sheet\d/.test(n)).map(n => zip.file(n).async('string')));
+  return partes.join('\n');
+}
+
+test('indicadores: barras com <title> e teclado, KPI sem Fraunces, texto livre nunca exibido', async ({ page }) => {
+  await abrir(page);
+  await page.click('#sub-indicadores');
+  const sub = page.locator('#soc-sub');
+  await expect(sub.locator('.soc-kpi-num').first()).toHaveText('6');
+  expect(await sub.locator('.soc-kpi-num').first().evaluate(e => getComputedStyle(e).fontFamily)).not.toMatch(/Fraunces/i);
+  const agua = sub.locator('.soc-ind-perg', { hasText: 'De onde vem a água?' });
+  await expect(agua.locator('svg title').first()).toHaveText('Rio: 3 (60%)');
+  await expect(agua.locator('.gt-svg[tabindex="0"]')).toHaveCount(1);      // uma parada de Tab por gráfico
+  await expect(sub.locator('.soc-ind-perg', { hasText: 'Renda mensal?' })).toContainText('1.100');
+  await expect(sub.locator('.soc-ind-perg', { hasText: 'Observações' })).toContainText('não aparece nos indicadores');
+});
+
+test('indicadores: recorte com menos de 5 fichas mostra só a contagem', async ({ page }) => {
+  await abrir(page);
+  await page.click('#sub-indicadores');
+  await page.selectOption('#in-mun', '1200401');
+  await expect(page.locator('#soc-sub .soc-aviso')).toContainText('Menos de 5 fichas');
+  await expect(page.locator('#soc-sub .soc-ind-perg')).toHaveCount(0);
+  const ult = (await chamadas(page, 'socio_indicadores')).pop();
+  expect(ult.args).toMatchObject({ p_instrumento: 'i-dsa', p_cd_mun: '1200401' });
+});
+
+test('exportação do leitor: sem identificação, planilha com rótulos e "Não respondeu"', async ({ page }) => {
+  await abrir(page, false);
+  await page.click('#sub-indicadores');
+  await expect(page.locator('#in-ident')).toHaveCount(0);
+  await page.click('#in-exportar');
+  const espera = page.waitForEvent('download');
+  await page.click('#cf-ok');
+  const dl = await espera;
+  expect(dl.suggestedFilename()).toBe('DSA_fichas.xlsx');
+  const [x] = await chamadas(page, 'socio_exportar');
+  expect(x.args).toMatchObject({ p_instrumento: 'i-dsa', p_identificada: false });
+  const txt = await xlsxTexto(dl);
+  expect(txt).toContain('Rio');                    // rótulo da opção, não o código
+  expect(txt).toContain('Não respondeu');
+  expect(txt).not.toMatch(/>_nr</);            // o código interno nunca vai para a célula
+  expect(txt).not.toMatch(/>rio</);             // nem o código da opção
+  expect(txt).not.toContain('Entrevistado');
+  expect(txt).not.toContain('Aplicadora');
+});
+
+test('exportação identificada: só o gestor, marcando a caixa, e o arquivo diz isso no nome', async ({ page }) => {
+  await abrir(page, true);
+  await page.click('#sub-indicadores');
+  await page.check('#in-ident');
+  await page.click('#in-exportar');
+  await expect(page.locator('#cf-texto')).toContainText('nome e localização');
+  const espera = page.waitForEvent('download');
+  await page.click('#cf-ok');
+  const dl = await espera;
+  expect(dl.suggestedFilename()).toBe('DSA_fichas_IDENTIFICADA.xlsx');
+  const [x] = await chamadas(page, 'socio_exportar');
+  expect(x.args.p_identificada).toBe(true);
+  expect(await xlsxTexto(dl)).toContain('Maria Entrevistada');
 });

@@ -4916,11 +4916,26 @@ retenção são as Fases 2–5. Nada veio do DIMA (nem fichas, nem estrutura).
   z-index): `socAbrir` empilha pelo z-index na ordem de abertura.
   Guarda: `tests/socio-mesa-fase4.test.js` (7; contrafactual conferido) e o
   bloco 9b do `10_testes.sql`. Sem mudança em `pwa/sw.js` (tela de mesa).
+- **Fase 5** (migration 365 + Edge Function `socio-expurgo`; detalhe em §10 do
+  plano): aba Indicadores (`js/socio-indicadores.js`) lê `socio_indicadores` —
+  só validadas, sem treino, **nada por pergunta abaixo de 5 fichas** no recorte,
+  número sem mínimo/máximo, texto livre nunca. Exportação por `socio_exportar`
+  (ExcelJS, carregado no clique), registrada em `socio_exportacoes` na mesma
+  transação; leitor sem texto livre; identificação só para o gestor que pedir.
+  Retenção diária `fn_socio_aplicar_retencao` (prazo do TRAT-021; treino 30 dias)
+  limpa os campos, nunca apaga linha; arquivo vai para `socio_expurgo_arquivos`
+  e a Edge Function remove do Storage. ⚠️ `socAbrir` só puxa o foco se ele ainda
+  não estiver dentro da janela (senão o texto digitado ia para outro campo).
+  Guarda: +4 em `tests/socio-mesa-fase4.test.js` (11; planilha aberta e
+  conferida; contrafactual conferido) e bloco 9c do `10_testes.sql`.
 
 ## Próxima tarefa
-**Diagnóstico Socioeconômico** — Fases 1 a 4 entregues; próxima é a Fase 5
-(indicadores com supressão abaixo de 5 fichas, exportação registrada em ExcelJS e
-retenção de identificação/fotos por cron), em `docs/socioeconomico/plano.md` §5.
+**Diagnóstico Socioeconômico** — as 5 fases do plano estão entregues. O que fica
+para depois (§5 do plano, linha "depois"): áudio + transcrição local, editor
+visual de questionário, APK do app de campo, visita com vários instrumentos no
+mesmo domicílio. Antes da 1ª campanha real: cadastrar a lotação de quem vai usar
+(sem lotação não há departamento) e o aviso de campo (`lgpd_documentos`,
+`app = 'socio'`).
 
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).

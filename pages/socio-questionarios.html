@@ -15,6 +15,8 @@
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/socio-campanhas.js"></script>
 <script src="../js/socio-fichas.js"></script>
+<script src="../js/grafico-teclado.js"></script>
+<script src="../js/socio-indicadores.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -225,7 +227,9 @@ function socAbrir(qual) {
   el.style.zIndex = 200 + _pilha.length
   el.classList.add('aberto')
   const alvo = el.querySelector('input:not([type=hidden]):not([disabled]), textarea:not([readonly]), select, button:not(.modal-close)')
-  setTimeout(() => alvo && alvo.focus(), 30)
+  // só puxa o foco se ninguém já entrou na janela (senão o texto digitado
+  // logo depois de abrir cairia em outro campo)
+  setTimeout(() => { if (alvo && !el.contains(document.activeElement)) alvo.focus() }, 30)
 }
 function socFechar(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
@@ -474,7 +478,7 @@ async function abrirInstrumento(id, manterSub) {
       <p class="soc-det-fin">${esc(c.finalidade)}</p></div>
       <div class="soc-papeis">${seuAcessoHTML(c)}</div></div></div>
     <div class="soc-topo"><div class="soc-abas" role="tablist" aria-label="Partes do questionário">
-      ${[['versoes', 'Versões'], ['campanhas', 'Campanhas'],
+      ${[['versoes', 'Versões'], ['campanhas', 'Campanhas'], ['indicadores', 'Indicadores'],
         ...((c.pode_ler_fichas || c.pode_gerir || c.pode_aplicar) ? [['fichas', 'Fichas']] : []),
         ...((c.pode_gerir || _admin) ? [['equipe', 'Equipe'], ['acessos', 'Acessos'], ['cadastro', 'Cadastro']] : [])]
         .map(([k, t]) => {
@@ -493,6 +497,7 @@ async function renderSub() {
     if (_subAba === 'versoes') el.innerHTML = await versoesHTML()
     else if (_subAba === 'campanhas') el.innerHTML = await campanhasHTML()
     else if (_subAba === 'fichas') el.innerHTML = await fichasHTML()
+    else if (_subAba === 'indicadores') el.innerHTML = await indicadoresHTML()
     else if (_subAba === 'equipe') el.innerHTML = await equipeHTML()
     else if (_subAba === 'acessos') el.innerHTML = acessosHTML()
     else el.innerHTML = cadastroHTML()

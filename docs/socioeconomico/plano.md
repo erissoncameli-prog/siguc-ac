@@ -8,7 +8,9 @@
 > migration 363 (bucket `socio-fotos` + `socio_app_pacote()`).
 > Fase 4 ENTREGUE (18/10/2026) — abas Campanhas e Fichas em
 > `pages/socio-questionarios.html` (`js/socio-campanhas.js`, `js/socio-fichas.js`),
-> migration 364 (leituras da mesa + ligar ficha a comunidade). Fase 5 a fazer.
+> migration 364 (leituras da mesa + ligar ficha a comunidade).
+> Fase 5 ENTREGUE (18/10/2026) — aba Indicadores (`js/socio-indicadores.js`), exportação
+> registrada, retenção diária; migration 365 + Edge Function `socio-expurgo`.
 > **Origem:** o Diagnóstico Socioambiental do dima-plataforma (`diag_*`,
 > migrations `20260926_diag_01` a `20261009_diag_20`). O desenho e as regras
 > vêm de lá. O código é portado e adaptado ao SIGUC, não copiado às cegas.
@@ -214,7 +216,7 @@ todos (sem `modulo:` de gate). As páginas são:
 | **2** | `socio-instrumentos.html` (catálogo, editor, membros, pedidos) | Playwright com stub |
 | **3** | App de campo offline + envio + treino | Playwright: salvar offline, reenviar sem duplicar, treino isolado |
 | **4** | Campanhas + validação (abas, não páginas — ver §9) | `tests/socio-mesa-fase4.test.js` + bloco 9b do `10_testes.sql` |
-| **5** | Indicadores + exportação + retenção | — |
+| **5** | Indicadores + exportação + retenção (§10) | `tests/socio-mesa-fase4.test.js` + bloco 9c do `10_testes.sql` |
 | depois | áudio + transcrição local, editor visual, APK, visita com vários instrumentos no mesmo domicílio | — |
 
 ---
@@ -316,4 +318,44 @@ pela página e usando os utilitários dela (`rpc`, `socAbrir`, `confirmar`…).
   `<body>`, depois da de confirmação, e com o mesmo `z-index` ficavam POR CIMA
   dela (o clique em "Validar" da confirmação não chegava). `socAbrir` agora põe
   cada janela acima da anterior pela ordem de abertura.
+
+## 10. Fase 5 — indicadores, exportação e retenção (18/10/2026)
+
+- **Indicadores** (aba Indicadores do questionário, para todo mundo que VÊ o
+  instrumento — inclusive chefia acima e quem tem acesso só a números):
+  `socio_indicadores(instrumento, campanha?, município?, UC?)` monta tudo no
+  banco a partir da estrutura. Só fichas **validadas** e fora do treino.
+  **Supressão abaixo de 5 fichas** no recorte (vale também para o filtro por
+  município/UC): sobra só a contagem. Município com menos de 5 fichas vai para
+  "Outros municípios". Escolha única/múltipla = contagem por opção (base = quem
+  respondeu; "Não respondeu" à parte); número = média, mediana e quartis —
+  **nunca mínimo e máximo** (o extremo costuma ser uma casa). Texto livre só
+  conta quantos responderam. Lista: só colunas que não são de identificação nem
+  texto. Estrutura de referência = versão mais nova entre as fichas do recorte
+  (mesma chave = mesma pergunta).
+- Gráficos em SVG de uma série (barras horizontais, um tom, valor e % ao lado),
+  cada barra com `<title>` e `graficoTecladoEnvolver` (uma parada de Tab). KPI em
+  DM Sans.
+- **Exportação** (`socio_exportar`, planilha ExcelJS montada no navegador): quem
+  lê fichas; o **leitor** recebe sem texto livre nem "especifique" (podem trazer
+  nome) e sem o nome do entrevistador; **identificação** (nome do entrevistado,
+  GPS, colunas restritas da lista) só para o gestor que marcar a caixa, com aviso
+  e `_IDENTIFICADA` no nome do arquivo. Cada chamada grava `socio_exportacoes`
+  na mesma transação (a pessoa vê as dela, o gestor todas do instrumento).
+  Células com o RÓTULO da opção, nunca o código; `_nr` vira "Não respondeu".
+- **Retenção** (`fn_socio_aplicar_retencao`, cron `socio-retencao-diaria`
+  09:10 UTC; só o dono postgres executa): N meses após a validação ou o descarte
+  (N = `retencao_meses` do TRAT-021, 24), e 30 dias após o envio no treino.
+  Limpa os campos de `socio_fichas_identificacao`, marca as fotos
+  (`arquivo_apagado_em`, sem legenda nem GPS) e grava
+  `identificacao_apagada_em` — nenhuma linha some. O arquivo entra em
+  `socio_expurgo_arquivos`, drenada pela Edge Function `socio-expurgo` (cron
+  09:25 UTC; só remove o que o banco enfileirou, chamar de novo é inofensivo).
+  A ficha aberta diz quando a identificação foi apagada; respostas ficam.
+- ROPA TRAT-021 cita as duas tabelas novas (`365b_socio_ropa_sql_editor.sql`,
+  aplicado em 18/10/2026).
+- ⚠️ Bug real achado ao rodar a suíte inteira: `socAbrir` puxava o foco para o
+  1º campo 30 ms depois de abrir a janela — se a pessoa já tivesse clicado num
+  campo, o que ela digitasse ia para outro. Agora só puxa se o foco ainda não
+  está dentro da janela.
 

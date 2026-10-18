@@ -487,6 +487,87 @@ select pg_temp.raiz();
 select pg_temp.ok((select comunidade_id = pg_temp.id('com_cz') and comunidade_nova is null and not (alertas @> '[{"tipo":"comunidade_nova"}]')
                      from socio_fichas where id = pg_temp.id('f2')), 'vincular troca a comunidade nova pela cadastrada e tira o alerta');
 
+-- ── 9c. Indicadores, exportação e retenção (365) ────────────────────────
+-- com 1 ficha validada: só a contagem (supressão abaixo de 5)
+select pg_temp.ok((select (d->>'suprimido')::boolean and d->'perguntas' = 'null'::jsonb and (d->>'n_fichas')::int = 1
+                     from pg_temp.q('dir', format($$select socio_indicadores(%L)$$, pg_temp.id('dsa'))) d),
+                  'abaixo de 5 fichas: indicador suprimido, só a contagem');
+select pg_temp.erro('sem', format($$select socio_indicadores(%L)$$, pg_temp.id('dsa')), 'socio:nao_autorizado');
+-- 5 cópias validadas da f1 (uma com identificação e foto, para a retenção)
+insert into socio_fichas (uuid_cliente, codigo, instrumento_id, questionario_id, campanha_id, treino, cd_mun, uc_id,
+  dt_entrevista, finalizada_em, entrevistador_id, aviso_lido, aceitou_participar, fotos_autorizadas, respostas, linhas,
+  alertas, status, validado_por, validado_em)
+select gen_random_uuid(), 'DSA-CLONE-' || g, instrumento_id, questionario_id, campanha_id, false, cd_mun, uc_id,
+  dt_entrevista, finalizada_em, entrevistador_id, true, true, true,
+  respostas || jsonb_build_object('qtd_moradores', g + 1), linhas, '[]', 'validada', validado_por, now()
+  from socio_fichas, generate_series(1, 5) g where id = pg_temp.id('f1');
+select pg_temp.guarda('clone1', (select id from socio_fichas where codigo = 'DSA-CLONE-1'));
+insert into socio_fichas_identificacao (ficha_id, entrevistado_nome, lat, lon, linhas)
+values (pg_temp.id('clone1'), 'José Clone', -7.6, -72.6, '[{"ordem":1,"nome":"José Clone"}]');
+insert into socio_fotos (ficha_id, uuid_cliente, tema, arquivo_url, criado_por)
+values (pg_temp.id('clone1'), gen_random_uuid(), 'moradia',
+        'https://x.supabase.co/storage/v1/object/public/socio-fotos/abc/def.jpg?t=1', pg_temp.u('tdeuc'));
+
+select pg_temp.ok((select not (d->>'suprimido')::boolean and (d->>'n_fichas')::int = 6
+                          and jsonb_array_length(d->'perguntas') > 0
+                          and (select (p->'estat'->>'mediana')::numeric from jsonb_array_elements(d->'perguntas') p where p->>'chave' = 'qtd_moradores') = 3.5
+                          and (select bool_and((m->>'n')::int >= 5) from jsonb_array_elements(d->'por_municipio') m)
+                          and not (d::text like '%Maria%') and not (d::text like '%Corrigido%')
+                     from pg_temp.q('dir', format($$select socio_indicadores(%L)$$, pg_temp.id('dsa'))) d),
+                  'com 6 fichas: indicadores por pergunta, sem nome nem texto livre');
+select pg_temp.ok((select (p->'estat') ? 'mediana' and not ((p->'estat') ? 'min') and not ((p->'estat') ? 'max')
+                     from pg_temp.q('dir', format($$select socio_indicadores(%L)$$, pg_temp.id('dsa'))) d, jsonb_array_elements(d->'perguntas') p
+                    where p->>'chave' = 'qtd_moradores'), 'número: média/mediana/quartis, nunca mínimo e máximo');
+select pg_temp.ok((select (p->'opcoes'->0->>'n')::int >= 0
+                     from pg_temp.q('chefe', format($$select socio_indicadores(%L)$$, pg_temp.id('dsa'))) d, jsonb_array_elements(d->'perguntas') p
+                    where p->>'tipo' = 'unica' limit 1), 'escolha única conta por opção');
+select pg_temp.ok((select (d->>'suprimido')::boolean
+                     from pg_temp.q('chefe', format($$select socio_indicadores(%L, null, '1200302')$$, pg_temp.id('dsa'))) d),
+                  'recorte por município também é suprimido abaixo de 5');
+
+-- exportação
+select pg_temp.erro('tdebio', format($$select socio_exportar(%L, null, true)$$, pg_temp.id('dsa')), 'socio:nao_autorizado');
+select pg_temp.erro('dir', format($$select socio_exportar(%L)$$, pg_temp.id('dsa')), 'socio:nao_autorizado');
+select pg_temp.erro('admin', format($$select socio_exportar(%L)$$, pg_temp.id('dsa')), 'socio:nao_autorizado');
+select pg_temp.ok((select (d->>'sem_texto')::boolean and (d->>'n_fichas')::int = 6
+                          and not (d::text like '%Maria%') and not (d::text like '%José Clone%') and not (d::text like '%Corrigido%')
+                          and d->'fichas'->0->'entrevistador' = 'null'::jsonb
+                     from pg_temp.q('tdebio', format($$select socio_exportar(%L)$$, pg_temp.id('dsa'))) d),
+                  'leitor exporta sem identificação, sem texto livre e sem o nome do servidor');
+select pg_temp.ok((select count(*) from socio_exportacoes where usuario_id = pg_temp.u('tdebio') and not identificada and sem_texto) = 1,
+                  'exportação registrada na mesma chamada');
+select pg_temp.ok((select (d->>'identificada')::boolean and d::text like '%José Clone%' and d::text like '%Corrigido%'
+                     from pg_temp.q('chefe', format($$select socio_exportar(%L, null, true)$$, pg_temp.id('dsa'))) d),
+                  'gestor exporta identificada (nome e lista de identificação)');
+select pg_temp.ok((select not (d::text like '%José Clone%')
+                     from pg_temp.q('chefe', format($$select socio_exportar(%L)$$, pg_temp.id('dsa'))) d),
+                  'gestor sem pedir identificação não recebe nome');
+select pg_temp.ok(pg_temp.conta('tdebio', 'socio_exportacoes') = 1 and pg_temp.conta('chefe', 'socio_exportacoes') = 3
+                  and pg_temp.conta('sem', 'socio_exportacoes') = 0, 'registro de exportação: a própria pessoa e o gestor');
+
+-- retenção
+select pg_temp.erro('chefe', 'select fn_socio_aplicar_retencao()', 'permission denied');
+select pg_temp.ok(((fn_socio_aplicar_retencao())->>'fichas')::int = 0, 'nada vence antes do prazo');
+update socio_fichas set validado_em = now() - interval '25 months' where id = pg_temp.id('clone1');
+select pg_temp.ok((select (r->>'fichas')::int = 1 and (r->>'fotos')::int = 1 and (r->>'meses')::int = 24
+                     from fn_socio_aplicar_retencao() r), 'retenção pega a ficha vencida pelo prazo do ROPA');
+select pg_temp.ok((select entrevistado_nome is null and lat is null and linhas = '[]'::jsonb
+                     from socio_fichas_identificacao where ficha_id = pg_temp.id('clone1')), 'identificação limpa');
+select pg_temp.ok((select identificacao_apagada_em is not null and respostas ? 'qtd_moradores'
+                     from socio_fichas where id = pg_temp.id('clone1')), 'respostas ficam (série histórica)');
+select pg_temp.ok((select caminho = 'abc/def.jpg' and removido_em is null from socio_expurgo_arquivos), 'arquivo da foto na fila do Storage');
+select pg_temp.ok((select jsonb_array_length(d->'fotos') = 0 and d->'ficha'->>'identificacao_apagada_em' is not null
+                     from pg_temp.q('chefe', format($$select socio_ficha_detalhe(%L)$$, pg_temp.id('clone1'))) d),
+                  'detalhe não mostra foto apagada');
+select pg_temp.ok(((fn_socio_aplicar_retencao())->>'fichas')::int = 0, 'retenção é idempotente');
+select pg_temp.erro('chefe', 'select count(*) from socio_expurgo_arquivos', 'permission denied');   -- fila fechada ao cliente
+-- as cópias saem para não mexer nos testes seguintes
+delete from socio_fotos where ficha_id in (select id from socio_fichas where codigo like 'DSA-CLONE-%');
+delete from socio_fichas_identificacao where ficha_id in (select id from socio_fichas where codigo like 'DSA-CLONE-%');
+delete from socio_fichas_historico where ficha_id in (select id from socio_fichas where codigo like 'DSA-CLONE-%');
+delete from socio_expurgo_arquivos;
+delete from socio_fichas where codigo like 'DSA-CLONE-%';
+
 -- ── 10. Revogação e carência ────────────────────────────────────────────
 select pg_temp.erro('tdebio', format($$select socio_encerrar_acesso(%L, 'Não preciso mais.')$$, pg_temp.id('ped2')), 'socio:nao_autorizado');
 select pg_temp.erro('tduc',   format($$select socio_encerrar_acesso(%L, '')$$, pg_temp.id('ped2')), 'socio:parecer_obrigatorio');

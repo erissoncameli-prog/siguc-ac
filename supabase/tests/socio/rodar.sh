@@ -24,7 +24,8 @@ for f in "$RAIZ"/supabase/migrations/362_socio_estrutura.sql \
          "$RAIZ"/supabase/migrations/362b_socio_interpretador.sql \
          "$RAIZ"/supabase/migrations/362c_socio_rpcs.sql \
          "$RAIZ"/supabase/migrations/363_socio_app_campo.sql \
-         "$RAIZ"/supabase/migrations/364_socio_mesa_campanhas_validacao.sql; do
+         "$RAIZ"/supabase/migrations/364_socio_mesa_campanhas_validacao.sql \
+         "$RAIZ"/supabase/migrations/365_socio_indicadores_exportacao_retencao.sql; do
   echo "· aplicando $(basename "$f")"
   "${PSQL[@]}" -f "$f"
 done
@@ -32,7 +33,8 @@ done
 for f in "$RAIZ"/supabase/migrations/362b_socio_interpretador.sql \
          "$RAIZ"/supabase/migrations/362c_socio_rpcs.sql \
          "$RAIZ"/supabase/migrations/363_socio_app_campo.sql \
-         "$RAIZ"/supabase/migrations/364_socio_mesa_campanhas_validacao.sql; do
+         "$RAIZ"/supabase/migrations/364_socio_mesa_campanhas_validacao.sql \
+         "$RAIZ"/supabase/migrations/365_socio_indicadores_exportacao_retencao.sql; do
   "${PSQL[@]}" -f "$f"
 done
 
