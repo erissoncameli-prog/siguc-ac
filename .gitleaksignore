@@ -1,0 +1,5 @@
+# Achados do gitleaks revisados e aceitos (impressão digital = commit:arquivo:regra:linha).
+# Só entra aqui chave PÚBLICA, nunca segredo: a anon key do Supabase já está em
+# js/config.js e é a que os crons do pg_net usam para acionar Edge Functions
+# idempotentes (mesmo padrão das migrations 027, 307 e 314).
+e8f4f21a0cb19970dc6614699ca068f9eaa8b68c:supabase/migrations/365_socio_indicadores_exportacao_retencao.sql:jwt:464
