@@ -1,0 +1,75 @@
+{
+  "identificacao": {"nome": "opcional", "gps": "opcional"},
+  "texto_max_len": 400,
+  "outro_max_len": 60,
+  "lista": {
+    "titulo": "Quem mora no domicílio",
+    "max_linhas": 12,
+    "minimo": 1,
+    "marca_entrevistado": true,
+    "colunas": [
+      {"chave": "nome", "rotulo": "Nome ou iniciais", "tipo": "texto", "max_len": 40, "identificacao": true},
+      {"chave": "idade", "rotulo": "Idade", "tipo": "inteiro", "min": 0, "max": 120},
+      {"chave": "sexo", "rotulo": "Sexo", "tipo": "unica", "opcoes": [
+        {"v": "mulher", "r": "Mulher"}, {"v": "homem", "r": "Homem"}, {"v": "outro", "r": "Outro"}]},
+      {"chave": "escolaridade", "rotulo": "Escolaridade", "tipo": "unica", "opcoes": [
+        {"v": "nenhuma", "r": "Nenhuma", "nivel": "sem"},
+        {"v": "fund_inc", "r": "Fundamental incompleto", "nivel": "fund"},
+        {"v": "fund_comp", "r": "Fundamental completo", "nivel": "fund"},
+        {"v": "medio", "r": "Médio", "nivel": "medio"},
+        {"v": "superior", "r": "Superior", "nivel": "superior"},
+        {"v": "nao_sabe", "r": "Não sabe"}]},
+      {"chave": "trabalha", "rotulo": "Trabalha?", "tipo": "booleano"}
+    ]
+  },
+  "coerencia": [
+    {"tipo": "igual_total_linhas", "chave": "qtd_moradores"},
+    {"tipo": "nega_linha", "chave": "atividades_mulheres", "valor": "nao_ha_mulheres",
+     "onde": {"coluna": "sexo", "op": "=", "valor": "mulher"}}
+  ],
+  "blocos": [
+    {"id": "domicilio", "titulo": "Domicílio", "perguntas": [
+      {"n": 1, "chave": "qtd_moradores", "tipo": "inteiro", "texto": "Quantas pessoas moram aqui?", "min": 1, "max": 40, "aviso_max": 15},
+      {"n": 2, "chave": "moradores", "tipo": "tabela", "texto": "Quem mora no domicílio"},
+      {"n": 3, "chave": "qtd_listada", "tipo": "inteiro", "texto": "Pessoas listadas", "derivada": {"tipo": "total_linhas"}},
+      {"n": 4, "chave": "tem_crianca", "tipo": "unica", "texto": "Há criança de até 11 anos?",
+       "opcoes": [{"v": "sim", "r": "Sim"}, {"v": "nao", "r": "Não"}],
+       "derivada": {"tipo": "existe_linha", "onde": {"coluna": "idade", "op": "entre", "valor": [0, 11]}}},
+      {"n": 5, "chave": "maior_esc", "tipo": "unica", "texto": "Maior escolaridade",
+       "opcoes": [{"v": "sem", "r": "Sem"}, {"v": "fund", "r": "Fundamental"}, {"v": "medio", "r": "Médio"}, {"v": "superior", "r": "Superior"}],
+       "derivada": {"tipo": "maior_nivel", "coluna": "escolaridade"}},
+      {"n": 6, "chave": "creche", "tipo": "unica", "texto": "As crianças frequentam creche ou escola?",
+       "opcoes": [{"v": "sim", "r": "Sim"}, {"v": "nao", "r": "Não"}],
+       "mostrar_se": {"se": "tem_crianca", "op": "=", "valor": "sim"}},
+      {"n": 7, "chave": "idade_entrevistado", "tipo": "inteiro", "texto": "Idade do entrevistado", "min": 10, "max": 110, "aviso_min": 18}
+    ]},
+    {"id": "agua", "titulo": "Água", "perguntas": [
+      {"n": 8, "chave": "agua_fonte", "tipo": "unica", "texto": "De onde vem a água?",
+       "opcoes": [{"v": "rio", "r": "Rio"}, {"v": "poco", "r": "Poço"}, {"v": "rede", "r": "Rede"}, {"v": "outro", "r": "Outro", "especificar": true}]},
+      {"n": 9, "chave": "agua_trata", "tipo": "unica", "texto": "A água é tratada?",
+       "opcoes": [{"v": "sim", "r": "Sim"}, {"v": "nao", "r": "Não"}],
+       "mostrar_se": {"se": "agua_fonte", "op": "!=", "valor": "rede"}},
+      {"n": 10, "chave": "agua_tratamento", "tipo": "multipla", "texto": "Como trata?", "max_marcar": 2,
+       "opcoes": [{"v": "filtro", "r": "Filtro"}, {"v": "cloro", "r": "Cloro"}, {"v": "ferve", "r": "Fervura"},
+                  {"v": "outro", "r": "Outro", "especificar": true}],
+       "mostrar_se": {"todas": [{"se": "agua_trata", "op": "=", "valor": "sim"}, {"se": "agua_fonte", "op": "in", "valor": ["rio", "poco", "outro"]}]}}
+    ]},
+    {"id": "renda", "titulo": "Renda e trabalho", "perguntas": [
+      {"n": 11, "chave": "renda_fontes", "tipo": "multipla", "texto": "Fontes de renda",
+       "opcoes": [{"v": "pesca", "r": "Pesca"}, {"v": "agricultura", "r": "Agricultura"}, {"v": "extrativismo", "r": "Extrativismo"},
+                  {"v": "beneficio", "r": "Benefício social"}, {"v": "nenhuma", "r": "Nenhuma", "exclusiva": true},
+                  {"v": "outro", "r": "Outro", "especificar": true}]},
+      {"n": 12, "chave": "pesca_kg", "tipo": "decimal", "texto": "Quilos de peixe por semana", "min": 0, "max": 500,
+       "mostrar_se": {"se": "renda_fontes", "op": "contem", "valor": "pesca"}},
+      {"n": 13, "chave": "beneficio_qual", "tipo": "texto", "texto": "Qual benefício?", "max_len": 80, "opcional": true,
+       "mostrar_se": {"se": "renda_fontes", "op": "contem", "valor": "beneficio"}},
+      {"n": 14, "chave": "busca_trabalho", "tipo": "unica", "texto": "Alguém busca trabalho fora?",
+       "opcoes": [{"v": "sim", "r": "Sim"}, {"v": "nao", "r": "Não"}],
+       "mostrar_se": {"se": "renda_fontes", "op": "nao_contem", "valor": "nenhuma"}},
+      {"n": 15, "chave": "atividades_mulheres", "tipo": "multipla", "texto": "Atividades das mulheres",
+       "opcoes": [{"v": "roca", "r": "Roça"}, {"v": "casa", "r": "Casa"}, {"v": "artesanato", "r": "Artesanato"},
+                  {"v": "nao_ha_mulheres", "r": "Não há mulheres no domicílio", "exclusiva": true}]},
+      {"n": 16, "chave": "observacoes", "tipo": "texto_longo", "texto": "Observações"}
+    ]}
+  ]
+}

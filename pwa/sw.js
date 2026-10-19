@@ -1,5 +1,5 @@
-// ── SIGUC — Service Worker (compartilhado por Brigadas, Biomonitor e
-// Frota) ─────────────────────────────────────────────────────────
+// ── SIGUC — Service Worker (compartilhado por Brigadas, Biomonitor,
+// Frota, Água e Diagnóstico Socioeconômico) ─────────────────────────────────────────────────────────
 // Um único arquivo, mas cache e versão isolados por app: cada página
 // registra este script com um `scope` próprio (ver registerServiceWorker
 // em cada .html), e o SW usa esse scope para decidir de qual app se
@@ -10,12 +10,13 @@ const SCOPE = self.registration.scope
 const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
   : SCOPE.includes('/pages/frota-app.html') ? 'frota'
   : SCOPE.includes('/pages/agua-app.html') ? 'agua'
+  : SCOPE.includes('/pages/socio-app.html') ? 'socio'
   : 'brigadas'
 
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 275, biomonitor: 74, frota: 113, agua: 43 }
+const VERSOES = { brigadas: 275, biomonitor: 74, frota: 114, agua: 43, socio: 1 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -155,6 +156,29 @@ const SHELLS = {
     '/js/compartilhar-arquivo.js',
     '/js/vendor/jspdf-2.5.2.umd.min.js',
     '/js/vendor/jspdf-autotable-3.8.4.min.js',
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  ],
+  // Diagnóstico Socioeconômico (Fase 3). Ainda sem APK: o
+  // apk-auto-trigger.yml só avisa e pula app sem workflow mapeado.
+  socio: [
+    '/pages/socio-app.html',
+    '/css/socio-app.css',
+    '/css/pin-baralho.css',
+    '/css/luz-nav.css',
+    '/js/config.js',
+    '/js/fotos-privadas.js',
+    '/js/lgpd.js',
+    '/js/lgpd-campo.js',
+    '/js/foto-otimizar.js',
+    '/js/brigada-captura.js',
+    '/js/pin-baralho.js',
+    '/js/luz-nav.js',
+    '/js/socio-regras.js',
+    '/js/socio-form.js',
+    '/js/socio-offline.js',
+    '/js/socio-sync.js',
+    '/pwa/manifest-socio.json',
+    '/pwa/icons/icon-socio-192.png',
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   ],
 }

@@ -87,8 +87,11 @@ test('superbloco "Administrativo" cerca só o grupo Frota; "Diretoria Técnica" 
   expect(supers.map(s => s.texto)).toEqual(['Diretoria Técnica', 'Administrativo']);
 
   const ordem = rotulos.map(r => r.tipo === 'super' ? `super:${r.texto}` : r.tipo);
+  // 'socio' (Diagnóstico Socioeconômico, 362*) é transversal — cada
+  // questionário é de um departamento de qualquer diretoria —, então fica
+  // fora dos dois superblocos, logo abaixo de Principal.
   expect(ordem).toEqual([
-    'principal',
+    'principal', 'socio',
     'super:Diretoria Técnica', 'gestao', 'brigadas', 'biomonitor', 'derhqa',
     'super:Administrativo', 'frota',
     'sistema',

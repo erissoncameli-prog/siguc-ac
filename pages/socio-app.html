@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A1A0F">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SIGUC Diagnóstico Socioeconômico</title>
+  <link rel="manifest" href="/pwa/manifest-socio.json">
+  <link rel="apple-touch-icon" href="/pwa/icons/icon-socio-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/socio-app.css">
+  <link rel="stylesheet" href="/css/pin-baralho.css">
+  <link rel="stylesheet" href="/css/luz-nav.css">
+</head>
+<body class="socio-app">
+
+<!-- ══ LOGIN ═════════════════════════════════════════════════════ -->
+<main id="tela-login" class="tela lock" hidden>
+  <div class="lock-marca">
+    <img class="lock-img" src="/pwa/icons/icon-socio-192.png" alt="">
+    <h1 class="lock-titulo">Diagnóstico Socioeconômico</h1>
+    <p class="lock-sub">App de campo · SEMA-AC</p>
+  </div>
+  <p class="lock-dica">Entre com a sua conta do SIGUC</p>
+  <form class="login-form" id="form-login" novalidate>
+    <label class="sr-only" for="login-email">E-mail</label>
+    <input type="email" id="login-email" class="login-input" placeholder="E-mail" autocomplete="username" required>
+    <label class="sr-only" for="login-senha">Senha</label>
+    <input type="password" id="login-senha" class="login-input" placeholder="Senha" autocomplete="current-password" required>
+    <button type="submit" id="btn-login" class="btn-lock">Entrar</button>
+  </form>
+  <p class="lock-erro" id="login-erro" role="alert"></p>
+</main>
+
+<!-- ══ TROCAR SENHA (1º acesso) ═════════════════════════════════ -->
+<main id="tela-senha" class="tela lock" hidden>
+  <div class="lock-marca">
+    <img class="lock-img" src="/pwa/icons/icon-socio-192.png" alt="">
+    <h1 class="lock-titulo">Criar nova senha</h1>
+  </div>
+  <p class="lock-dica">Você entrou com uma senha provisória. Crie a sua para continuar.</p>
+  <form class="login-form" id="form-senha" novalidate>
+    <label class="sr-only" for="senha1">Nova senha</label>
+    <input type="password" id="senha1" class="login-input" placeholder="Nova senha (mín. 8 caracteres)" autocomplete="new-password">
+    <label class="sr-only" for="senha2">Repita a nova senha</label>
+    <input type="password" id="senha2" class="login-input" placeholder="Repita a nova senha" autocomplete="new-password">
+    <button type="submit" id="btn-senha" class="btn-lock">Salvar e continuar</button>
+  </form>
+  <p class="lock-erro" id="senha-erro" role="alert"></p>
+</main>
+
+<!-- ══ PIN (desbloquear ou criar) ═══════════════════════════════ -->
+<main id="tela-pin" class="tela lock" hidden>
+  <div class="lock-marca">
+    <img class="lock-img" src="/pwa/icons/icon-socio-192.png" alt="">
+    <p class="lock-nome" id="pin-nome"></p>
+  </div>
+  <p class="lock-off" id="pin-off" hidden>Sem internet — usando os dados do aparelho</p>
+  <p class="lock-dica" id="pin-dica">Digite seu PIN de campo</p>
+  <div class="pin-display" id="pin-display" aria-live="polite">
+    <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+  </div>
+  <div class="pin-keypad" id="pin-keypad">
+    <button class="pin-key" type="button" data-v="1">1</button><button class="pin-key" type="button" data-v="2">2</button><button class="pin-key" type="button" data-v="3">3</button>
+    <button class="pin-key" type="button" data-v="4">4</button><button class="pin-key" type="button" data-v="5">5</button><button class="pin-key" type="button" data-v="6">6</button>
+    <button class="pin-key" type="button" data-v="7">7</button><button class="pin-key" type="button" data-v="8">8</button><button class="pin-key" type="button" data-v="9">9</button>
+    <button class="pin-key" type="button" id="pin-apagar" data-icon="backspace" aria-label="Apagar"></button>
+    <button class="pin-key" type="button" data-v="0">0</button>
+    <button class="pin-key" type="button" id="pin-ok" data-icon="check" aria-label="Confirmar"></button>
+  </div>
+  <button type="button" class="btn-link-lock" id="btn-esqueci-pin">Esqueci o PIN — entrar com a senha</button>
+  <p class="lock-erro" id="pin-erro" role="alert"></p>
+</main>
+
+<!-- ══ INÍCIO ════════════════════════════════════════════════════ -->
+<main id="tela-home" class="tela tela-trab" hidden>
+  <div class="topo">
+    <div><h1 id="home-ola">Olá</h1><p id="home-sub">Diagnóstico Socioeconômico</p></div>
+    <span class="chip-con off" id="chip-con">Offline</span>
+  </div>
+  <div id="home-avisos"></div>
+  <h2 class="secao-tit">Campanhas em que você aplica</h2>
+  <div id="home-campanhas"></div>
+  <div id="home-treino-sec" hidden>
+    <h2 class="secao-tit">Treinar</h2>
+    <p class="card-sub">Fichas de treino não entram nos números e servem para praticar — inclusive versões ainda em rascunho.</p>
+    <div id="home-treino"></div>
+  </div>
+</main>
+
+<!-- ══ FICHA (assistente por etapas) ════════════════════════════ -->
+<div id="tela-ficha" class="tela" hidden>
+  <header class="ficha-barra">
+    <div class="ficha-barra-l">
+      <div class="ficha-passo" id="ficha-passo" aria-live="polite"></div>
+      <button type="button" class="btn" id="btn-ficha-sair">Sair e guardar</button>
+    </div>
+    <div class="ficha-prog" aria-hidden="true"><span id="ficha-prog"></span></div>
+  </header>
+  <main class="ficha-corpo" id="ficha-corpo"></main>
+  <div class="ficha-rodape">
+    <button type="button" class="btn" id="btn-ficha-voltar">Voltar</button>
+    <button type="button" class="btn btn-prim" id="btn-ficha-avancar">Avançar</button>
+  </div>
+</div>
+
+<!-- ══ FILA ══════════════════════════════════════════════════════ -->
+<main id="tela-fila" class="tela tela-trab" hidden>
+  <div class="topo">
+    <div><h1>Fichas no aparelho</h1><p id="fila-sub"></p></div>
+    <button type="button" class="btn btn-prim" id="btn-enviar-agora" data-icon="upload">Enviar</button>
+  </div>
+  <div id="fila-lista"></div>
+</main>
+
+<!-- ══ CONFIGURAÇÕES ════════════════════════════════════════════ -->
+<main id="tela-config" class="tela tela-trab" hidden>
+  <div class="topo"><div><h1>Configurações</h1><p id="cfg-nome"></p></div></div>
+  <div class="card">
+    <h2>Dados de trabalho</h2>
+    <p class="card-sub" id="cfg-pacote"></p>
+    <button type="button" class="btn btn-larg" id="btn-atualizar-pacote" data-icon="refresh-cw">Atualizar campanhas e questionários</button>
+  </div>
+  <div class="card">
+    <h2>Este aparelho</h2>
+    <p class="card-sub" id="cfg-aparelho"></p>
+    <div class="btn-linha">
+      <button type="button" class="btn" id="btn-trocar-pin" data-icon="key">Trocar PIN</button>
+      <button type="button" class="btn" id="btn-privacidade" data-icon="shield">Aviso de privacidade</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Conta</h2>
+    <p class="card-sub">Sair desconecta a conta neste aparelho. Fichas que ainda não foram enviadas continuam guardadas e sobem quando você entrar de novo.</p>
+    <button type="button" class="btn btn-perigo btn-larg" id="btn-sair" data-icon="logout">Sair da conta</button>
+  </div>
+</main>
+
+<!-- ══ barra inferior ════════════════════════════════════════════ -->
+<nav class="pill-nav" id="pill-nav" aria-label="Seções do app" hidden>
+  <button type="button" class="pill-btn" data-tela="tela-home"><span data-icon="home" aria-hidden="true"></span>Início</button>
+  <button type="button" class="pill-btn" data-tela="tela-fila"><span data-icon="list" aria-hidden="true"></span>Fichas<span class="pill-badge" id="badge-fila" hidden></span></button>
+  <button type="button" class="pill-btn" data-tela="tela-config"><span data-icon="sliders" aria-hidden="true"></span>Ajustes</button>
+</nav>
+
+<input type="file" id="in-camera" accept="image/*" capture="environment" hidden>
+<input type="file" id="in-galeria" accept="image/*" hidden>
+
+<!-- ── Scripts ─────────────────────────────────────────────── -->
+<script>
+window.supabase = window.supabase || { createClient: () => null }
+window.__API_MONITOR_OFF = true
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        onerror="console.warn('[socio-app] Supabase CDN indisponível — modo offline')"></script>
+<script src="/js/config.js"></script>
+<script src="/js/fotos-privadas.js"></script>
+<script src="/js/lgpd.js"></script>
+<script>window.LGPD_CAMPO_APP = 'socio'</script>
+<script src="/js/lgpd-campo.js"></script>
+<script>
+// Cliente Supabase ISOLADO do app de campo — sessão persistente em
+// localStorage com chave própria (mesmo padrão de agua-app/brigada).
+// O PIN protege a reabertura; a senha só é pedida no primeiro acesso.
+const _socioReady = _dbReady.then(function () {
+  if (!window.supabase || typeof window.supabase.createClient !== 'function') return
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return
+  try {
+    const c = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { storageKey: 'siguc-socio-session', storage: window.localStorage, persistSession: true,
+              autoRefreshToken: true, detectSessionInUrl: false },
+    })
+    if (c) { db = c; window.db = c }
+  } catch (e) { console.error('[socio-app] cliente isolado falhou:', e) }
+})
+</script>
+<script src="/js/foto-otimizar.js"></script>
+<script src="/js/brigada-captura.js"></script>
+<script src="/js/pin-baralho.js"></script>
+<script src="/js/luz-nav.js"></script>
+<script src="/js/socio-regras.js"></script>
+<script src="/js/socio-form.js"></script>
+<script src="/js/socio-offline.js"></script>
+<script src="/js/socio-sync.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+// Diagnóstico Socioeconômico — app de campo
+// Plano: docs/socioeconomico/plano.md (Fase 3).
+// REGRA QUE MANDA AQUI: nada impede o trabalho de campo. Toda ficha é
+// guardada no aparelho a cada toque; enviar é tarefa da fila, que tenta
+// de novo sozinha. O questionário chega pronto do servidor
+// (socio_app_pacote) e fica guardado para abrir sem rede.
+// ════════════════════════════════════════════════════════════════
+const SOCIO_APP_VERSAO = '1.0.0'
+const App = { usuario: null, pacote: null, ficha: null, passos: [], passo: 0, pinModo: 'abrir', desbloqueado: false, esqueceuPin: false }
+
+const $ = id => document.getElementById(id)
+function h(s) { return typeof esc === 'function' ? esc(s) : String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
+function ic(n) { return typeof bico === 'function' ? bico(n) : '' }
+function icones(root) { if (typeof bIconsAplicar === 'function') bIconsAplicar(root || document) }
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16)); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128
+  const x = Array.from(b, v => v.toString(16).padStart(2, '0')).join('')
+  return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`
+}
+function hojeLocal() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+function dataBR(s) { if (!s) return '—'; const [a, m, d] = String(s).slice(0, 10).split('-'); return `${d}/${m}/${a}` }
+function dataHoraBR(s) { if (!s) return '—'; const d = new Date(s); return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }
+
+let _toastT = null
+function aviso(msg) {
+  let t = $('toast-s')
+  if (!t) { t = document.createElement('div'); t.id = 'toast-s'; t.className = 'toast-s'; t.setAttribute('role', 'status'); document.body.appendChild(t) }
+  t.textContent = msg; t.hidden = false
+  clearTimeout(_toastT); _toastT = setTimeout(() => { t.hidden = true }, 3800)
+}
+
+// diálogo de confirmação próprio (confirm() não combina com o app instalado)
+function confirmar({ titulo, texto, ok = 'Confirmar', perigo = false }) {
+  return new Promise(res => {
+    const f = document.createElement('div')
+    f.className = 'dlg-fundo'
+    f.innerHTML = `<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><h2 id="dlg-t">${h(titulo)}</h2><p>${h(texto)}</p>
+      <div class="btn-linha"><button type="button" class="btn" data-r="0">Cancelar</button>
+      <button type="button" class="btn ${perigo ? 'btn-perigo' : 'btn-prim'}" data-r="1">${h(ok)}</button></div></div>`
+    const origem = document.activeElement
+    const fim = r => { f.remove(); document.removeEventListener('keydown', tecla); if (origem && origem.focus) origem.focus(); res(r) }
+    const tecla = ev => { if (ev.key === 'Escape') fim(false) }
+    f.addEventListener('click', ev => { const b = ev.target.closest('[data-r]'); if (b) fim(b.dataset.r === '1'); else if (ev.target === f) fim(false) })
+    document.addEventListener('keydown', tecla)
+    document.body.appendChild(f)
+    f.querySelector('[data-r="0"]').focus()
+  })
+}
+
+// ════════════════════════════════════════════════════════════════
+// Navegação
+// ════════════════════════════════════════════════════════════════
+const TELAS_COM_NAV = ['tela-home', 'tela-fila', 'tela-config']
+function mostrarTela(id) {
+  document.querySelectorAll('.tela').forEach(t => { t.hidden = t.id !== id })
+  const nav = TELAS_COM_NAV.includes(id)
+  $('pill-nav').hidden = !nav
+  document.body.classList.toggle('com-nav', nav)
+  document.querySelectorAll('.pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tela === id))
+  if (nav && typeof luzNavMontar === 'function') luzNavMontar('.pill-nav')
+  window.scrollTo(0, 0)
+  if (id === 'tela-home') renderHome()
+  if (id === 'tela-fila') renderFila()
+  if (id === 'tela-config') renderConfig()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Entrada: sessão → PIN
+// ════════════════════════════════════════════════════════════════
+async function pinHash(pin, uid) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin + uid))
+  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function boot() {
+  try { await _socioReady } catch (e) { console.warn('[socio] ambiente:', e && e.message) }
+  if ('serviceWorker' in navigator && !window.Capacitor) {
+    navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/socio-app.html' }).catch(console.warn)
+  }
+  await sOfflineInit()
+  sOfflinePersistir()
+  sOfflineLimpar().catch(() => {})
+  icones()
+  App.pacote = await sOfflineGetConfig('pacote') || null
+
+  const cache = await sOfflineGetConfig('usuario')
+  const pin = await sOfflineGetConfig('pin_hash')
+  const dono = await sOfflineGetConfig('pin_dono')
+
+  // com PIN já criado: o PIN abre o app (sem rede também)
+  if (cache && pin && dono === cache.id) {
+    App.usuario = cache
+    abrirPin('abrir')
+    return
+  }
+  if (db) {
+    try {
+      const { data: { session } } = await db.auth.getSession()
+      if (session) { await aposAutenticar(session); return }
+    } catch (e) { console.warn('[socio] sessão:', e && e.message) }
+  }
+  mostrarTela('tela-login')
+}
+
+async function entrar(ev) {
+  ev.preventDefault()
+  const email = $('login-email').value.trim(), senha = $('login-senha').value
+  const erro = $('login-erro'); erro.textContent = ''
+  try { await _socioReady } catch (_) {}
+  if (!db) { erro.textContent = 'Sem conexão. O primeiro acesso precisa de internet.'; return }
+  if (!email || !senha) { erro.textContent = 'Preencha e-mail e senha.'; return }
+  const restaura = typeof btnEspera === 'function' ? btnEspera($('btn-login')) : () => {}
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
+    if (error) { erro.textContent = error.status === 400 ? 'E-mail ou senha incorretos.' : 'Não foi possível entrar agora. Tente de novo.'; return }
+    $('login-senha').value = ''
+    await aposAutenticar(data.session, true)
+  } catch (e) {
+    erro.textContent = 'Não foi possível entrar: ' + (e.message || 'tente de novo.')
+  } finally { restaura() }
+}
+
+async function aposAutenticar(session, viaSenha = false) {
+  const { data: u } = await db.from('usuarios').select('id, nome_completo, ativo, deve_trocar_senha').eq('id', session.user.id).maybeSingle()
+  if (!u || u.ativo !== true) {
+    await db.auth.signOut().catch(() => {})
+    $('login-erro').textContent = 'Conta inativa ou não encontrada. Fale com a gestão do seu setor.'
+    mostrarTela('tela-login')
+    return
+  }
+  App.usuario = { id: u.id, nome: u.nome_completo }
+  await sOfflineSetConfig('usuario', App.usuario)
+  await baixarPacote()
+  if (u.deve_trocar_senha) { mostrarTela('tela-senha'); $('senha1').focus(); return }
+  const pin = await sOfflineGetConfig('pin_hash')
+  const dono = await sOfflineGetConfig('pin_dono')
+  if (!pin || dono !== u.id || App.esqueceuPin) { App.esqueceuPin = false; await sOfflineSetConfig('pin_hash', null); abrirPin('criar'); return }
+  if (viaSenha) entrarHome(); else abrirPin('abrir')
+}
+
+async function trocarSenha(ev) {
+  ev.preventDefault()
+  const s1 = $('senha1').value, s2 = $('senha2').value, erro = $('senha-erro')
+  erro.textContent = ''
+  if (s1.length < 8) { erro.textContent = 'A senha precisa de pelo menos 8 caracteres.'; return }
+  if (s1 !== s2) { erro.textContent = 'As senhas não são iguais.'; return }
+  const restaura = typeof btnEspera === 'function' ? btnEspera($('btn-senha')) : () => {}
+  try {
+    const { error } = await db.auth.updateUser({ password: s1 })
+    if (error) throw error
+    await db.from('usuarios').update({ deve_trocar_senha: false }).eq('id', App.usuario.id)
+    const pin = await sOfflineGetConfig('pin_hash'), dono = await sOfflineGetConfig('pin_dono')
+    if (!pin || dono !== App.usuario.id) abrirPin('criar'); else entrarHome()
+  } catch (e) {
+    erro.textContent = 'Não foi possível trocar a senha: ' + (e.message || 'tente de novo.')
+  } finally { restaura() }
+}
+
+// ── PIN ─────────────────────────────────────────────────────────
+let _pin = '', _pinPrimeiro = null
+function abrirPin(modo) {
+  App.pinModo = modo; _pin = ''; _pinPrimeiro = null
+  $('pin-nome').textContent = (App.usuario?.nome || '').split(' ')[0] || 'Olá'
+  $('pin-dica').textContent = modo === 'criar' ? 'Crie um PIN de 4 dígitos para abrir o app' : 'Digite seu PIN de campo'
+  $('btn-esqueci-pin').hidden = modo === 'criar'
+  $('pin-erro').textContent = ''
+  $('pin-off').hidden = navigator.onLine
+  pintarPin()
+  mostrarTela('tela-pin')
+}
+function pintarPin() {
+  const d = $('pin-display')
+  if (typeof pinBaralhoPintar === 'function' && pinBaralhoPintar(d, _pin)) return
+  d.querySelectorAll('.pin-dot').forEach((x, i) => x.classList.toggle('ativo', i < _pin.length))
+}
+async function pinResultado(ok) {
+  const d = $('pin-display')
+  if (typeof pinBaralhoAprovar === 'function') await (ok ? pinBaralhoAprovar(d) : pinBaralhoRecusar(d))
+  _pin = ''; pintarPin()
+}
+async function pinConferir() {
+  const d = $('pin-display')
+  if (App.pinModo === 'criar' && _pinPrimeiro === null) {
+    _pinPrimeiro = _pin; _pin = ''; pintarPin()
+    $('pin-dica').textContent = 'Digite o mesmo PIN de novo para confirmar'
+    return
+  }
+  if (typeof pinBaralhoFechar === 'function') await pinBaralhoFechar(d)
+  try {
+    if (App.pinModo === 'criar') {
+      if (_pin !== _pinPrimeiro) {
+        $('pin-erro').textContent = 'Os PINs não são iguais. Comece de novo.'
+        _pinPrimeiro = null; $('pin-dica').textContent = 'Crie um PIN de 4 dígitos para abrir o app'
+        await pinResultado(false); return
+      }
+      await sOfflineSetConfig('pin_hash', await pinHash(_pin, App.usuario.id))
+      await sOfflineSetConfig('pin_dono', App.usuario.id)
+      await pinResultado(true)
+      entrarHome()
+      return
+    }
+    const ok = (await pinHash(_pin, App.usuario.id)) === (await sOfflineGetConfig('pin_hash'))
+    if (!ok) { $('pin-erro').textContent = 'PIN incorreto.'; await pinResultado(false); return }
+    await pinResultado(true)
+    entrarHome()
+  } catch (e) {
+    $('pin-erro').textContent = 'Não foi possível conferir o PIN.'
+    await pinResultado(false)
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Pacote do servidor (campanhas, questionários, territórios)
+// ════════════════════════════════════════════════════════════════
+async function baixarPacote() {
+  if (!db) return false
+  try {
+    const { data, error } = await db.rpc('socio_app_pacote')
+    if (error || !data) return false
+    App.pacote = Object.assign({}, data, { baixado_em: new Date().toISOString() })
+    await sOfflineSetConfig('pacote', App.pacote)
+    await conciliarMinhasFichas(data.minhas_fichas || [])
+    return true
+  } catch (_) { return false }
+}
+
+// o servidor diz o que aconteceu com cada ficha enviada (validada, devolvida…)
+async function conciliarMinhasFichas(lista) {
+  for (const s of lista) {
+    const f = await sOfflineFicha(s.uuid_cliente)
+    if (!f || f.estado !== 'enviada') continue
+    const atual = f.servidor || {}
+    if (atual.status === s.status && atual.motivo_devolucao === s.motivo_devolucao) continue
+    f.servidor = Object.assign({}, atual, { status: s.status, motivo_devolucao: s.motivo_devolucao, codigo: s.codigo })
+    await sOfflineSalvarFicha(f)
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Início
+// ════════════════════════════════════════════════════════════════
+async function entrarHome() {
+  App.desbloqueado = true
+  mostrarTela('tela-home')
+  atualizarConexao()
+  if (typeof lgpdCampoIniciar === 'function') lgpdCampoIniciar()
+  if (await sSyncTemConexao()) {
+    if (await baixarPacote()) renderHome()
+    rodarFila()
+  }
+}
+
+async function atualizarConexao() {
+  const on = await sSyncTemConexao()
+  const c = $('chip-con')
+  c.textContent = on ? 'Online' : 'Offline'
+  c.classList.toggle('on', on); c.classList.toggle('off', !on)
+  return on
+}
+
+async function atualizarBadge() {
+  const fichas = await sOfflineListarFichas()
+  const n = fichas.filter(f => ['pendente', 'enviando', 'erro'].includes(f.estado)).length
+  const b = $('badge-fila'); b.textContent = n; b.hidden = !n
+}
+
+function periodoTxt(c) { return `${dataBR(c.inicio)} a ${dataBR(c.fim)}` }
+
+async function renderHome() {
+  const p = App.pacote
+  $('home-ola').textContent = `Olá, ${(App.usuario?.nome || '').split(' ')[0] || ''}`.trim()
+  $('home-sub').textContent = p?.baixado_em ? `Dados de ${dataHoraBR(p.baixado_em)}` : 'Ainda sem dados de trabalho no aparelho'
+  const fichas = await sOfflineListarFichas()
+  const rascunhos = fichas.filter(f => f.estado === 'rascunho')
+  const problemas = fichas.filter(f => f.estado === 'erro' || (f.estado === 'enviada' && f.servidor?.status === 'devolvida'))
+  const pend = fichas.filter(f => f.estado === 'pendente' || f.estado === 'enviando')
+  let av = ''
+  if (!p) av += `<div class="faixa faixa-aviso">${ic('alert-triangle')}<span>Conecte-se à internet uma vez para baixar as campanhas e os questionários. Depois o app funciona sem rede.</span></div>`
+  if (problemas.length) av += `<div class="faixa faixa-erro">${ic('alert-triangle')}<span>${problemas.length} ficha(s) precisam de correção. <button type="button" class="btn" data-ir="tela-fila">Ver</button></span></div>`
+  if (rascunhos.length) av += `<div class="faixa faixa-aviso">${ic('edit')}<span>${rascunhos.length} entrevista(s) em andamento neste aparelho. <button type="button" class="btn" data-ir="tela-fila">Continuar</button></span></div>`
+  if (pend.length) av += `<div class="faixa faixa-ok">${ic('upload')}<span>${pend.length} ficha(s) aguardando envio — sobem sozinhas quando houver internet.</span></div>`
+  $('home-avisos').innerHTML = av
+
+  const camps = p?.campanhas || []
+  $('home-campanhas').innerHTML = camps.length ? camps.map((c, i) => `
+    <article class="card">
+      <div class="camp-cab"><div><span class="camp-cod">${h(c.instrumento.codigo)}</span><h2>${h(c.instrumento.titulo)}</h2></div>
+        ${c.aceita_nova ? '<span class="selo selo-ok">Aberta</span>' : '<span class="selo selo-aviso">Só envio</span>'}</div>
+      <p class="card-sub">${h(c.nome)} · ${periodoTxt(c)} · versão ${h(c.questionario.versao)}</p>
+      ${c.aceita_nova
+        ? `<button type="button" class="btn btn-prim btn-larg" data-nova="${i}">${ic('plus')} Nova entrevista</button>`
+        : '<p class="card-sub">O período de entrevistas terminou. Fichas concluídas a tempo ainda podem ser enviadas por até 15 dias.</p>'}
+    </article>`).join('')
+    : '<p class="vazio">Nenhuma campanha com você na equipe. O gestor do questionário inclui os aplicadores em cada campanha.</p>'
+
+  const tr = p?.treino || []
+  $('home-treino-sec').hidden = !tr.length
+  $('home-treino').innerHTML = tr.map((t, i) => `
+    <article class="card">
+      <div class="camp-cab"><div><span class="camp-cod">${h(t.instrumento.codigo)}</span><h2>${h(t.instrumento.titulo)}</h2></div>
+        <span class="selo selo-treino">Treino</span></div>
+      <p class="card-sub">Versão ${h(t.questionario.versao)}${t.questionario.status === 'rascunho' ? ' (rascunho)' : ''}</p>
+      <button type="button" class="btn btn-larg" data-treino="${i}">Praticar uma entrevista</button>
+    </article>`).join('')
+  icones($('tela-home'))
+  atualizarBadge()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Ficha — criar, etapas, guardar
+// ════════════════════════════════════════════════════════════════
+async function novaFicha(origem, treino) {
+  const f = {
+    uuid_cliente: uuid(), estado: 'rascunho', treino: !!treino, criada_em: new Date().toISOString(),
+    instrumento: origem.instrumento, questionario: origem.questionario,
+    campanha: treino ? null : { id: origem.id, nome: origem.nome, inicio: origem.inicio, fim: origem.fim,
+      exige_municipio: origem.exige_municipio, exige_uc: origem.exige_uc, municipios: origem.municipios || [], ucs: origem.ucs || [] },
+    iniciada_em: new Date().toISOString(), dt_entrevista: hojeLocal(),
+    cd_mun: '', uc_id: '', comunidade_id: '', comunidade_nova: '',
+    aviso_lido: false, aceitou_participar: null, fotos_autorizadas: null,
+    resp: {}, linhas: [], bruto: {}, entrevistado_nome: '', gps: null, obs_localizacao: '',
+    app_versao: SOCIO_APP_VERSAO, dispositivo_id: await sOfflineDispositivo(),
+  }
+  await sOfflineSalvarFicha(f)
+  abrirFicha(f, 0)
+}
+
+function calcularPassos(f) {
+  const est = f.questionario.estrutura || {}
+  const p = ['local', 'aviso']
+  if (f.aceitou_participar) {
+    ;(est.blocos || []).forEach(b => p.push('b:' + b.id))
+    const id = est.identificacao || {}
+    if (id.nome === 'opcional' || id.gps === 'opcional') p.push('ident')
+    if (f.fotos_autorizadas === true) p.push('fotos')
+  }
+  p.push('revisao')
+  return p
+}
+
+function abrirFicha(f, passo) {
+  App.ficha = f
+  App.passos = calcularPassos(f)
+  App.passo = Math.max(0, Math.min(passo || 0, App.passos.length - 1))
+  mostrarTela('tela-ficha')
+  renderPasso()
+}
+
+let _guardarT = null
+function guardar(agora) {
+  clearTimeout(_guardarT)
+  const f = App.ficha
+  if (!f) return Promise.resolve()
+  if (agora) return sOfflineSalvarFicha(f)
+  _guardarT = setTimeout(() => sOfflineSalvarFicha(f), 350)
+  return Promise.resolve()
+}
+
+const TITULO_PASSO = { local: 'Onde e quando', aviso: 'Aviso e consentimento', ident: 'Identificação', fotos: 'Fotos', revisao: 'Revisão e envio' }
+function tituloPasso(id) {
+  if (id.startsWith('b:')) {
+    const b = (App.ficha.questionario.estrutura.blocos || []).find(x => 'b:' + x.id === id)
+    return b ? b.titulo : 'Bloco'
+  }
+  return TITULO_PASSO[id] || id
+}
+
+function renderPasso() {
+  const f = App.ficha, id = App.passos[App.passo]
+  const total = App.passos.length
+  $('ficha-passo').innerHTML = `${f.treino ? '<span class="selo selo-treino">Treino</span> ' : ''}Etapa ${App.passo + 1} de ${total}<strong>${h(tituloPasso(id))}</strong>`
+  $('ficha-prog').style.width = Math.round(((App.passo + 1) / total) * 100) + '%'
+  $('btn-ficha-voltar').disabled = App.passo === 0
+  const av = $('btn-ficha-avancar')
+  av.textContent = id === 'revisao' ? (f.aceitou_participar ? 'Concluir e enviar' : 'Registrar recusa') : 'Avançar'
+  av.classList.toggle('btn-ouro', id === 'revisao'); av.classList.toggle('btn-prim', id !== 'revisao')
+  const corpo = $('ficha-corpo')
+  if (id === 'local') corpo.innerHTML = passoLocal(f)
+  else if (id === 'aviso') corpo.innerHTML = passoAviso(f)
+  else if (id === 'ident') corpo.innerHTML = passoIdent(f)
+  else if (id === 'fotos') { corpo.innerHTML = passoFotosHTML(f); pintarFotos() }
+  else if (id === 'revisao') corpo.innerHTML = passoRevisao(f)
+  else {
+    const b = (f.questionario.estrutura.blocos || []).find(x => 'b:' + x.id === id)
+    corpo.innerHTML = `<h2 class="bloco-tit">${h(b.titulo)}</h2>` + SocioForm.blocoHTML(f.questionario.estrutura, b, f)
+  }
+  icones(corpo)
+  window.scrollTo(0, 0)
+}
+
+function opcoesMun(f) {
+  const lista = App.pacote?.municipios || []
+  const perm = f.campanha?.municipios?.length && !f.treino ? new Set(f.campanha.municipios) : null
+  return lista.filter(m => !perm || perm.has(m.cd_ibge))
+}
+function opcoesUc(f) {
+  const lista = App.pacote?.ucs || []
+  const perm = f.campanha?.ucs?.length && !f.treino ? new Set(f.campanha.ucs) : null
+  return lista.filter(u => !perm || perm.has(u.id))
+}
+
+function passoLocal(f) {
+  const exMun = f.campanha ? f.campanha.exige_municipio : false
+  const exUc = f.campanha ? f.campanha.exige_uc : false
+  const coms = (App.pacote?.comunidades || []).filter(c => f.cd_mun && c.cd_mun === f.cd_mun)
+  const outra = !f.comunidade_id && !!f.comunidade_nova
+  const foraPeriodo = f.campanha && (f.dt_entrevista < f.campanha.inicio || f.dt_entrevista > f.campanha.fim)
+  return `
+    ${f.treino ? '<div class="faixa faixa-treino"><span>Ficha de treino: fica separada e não entra nos números.</span></div>' : `<p class="card-sub">${h(f.campanha.nome)} · ${periodoTxt(f.campanha)}</p>`}
+    <label class="campo"><span>Data da entrevista</span><input type="date" data-f="dt_entrevista" value="${h(f.dt_entrevista)}"></label>
+    ${foraPeriodo ? '<p class="campo-msg">A data está fora do período da campanha.</p>' : ''}
+    <label class="campo"><span>Município${exMun ? '' : ' (opcional)'}</span>
+      <select data-f="cd_mun"><option value="">Escolha…</option>${opcoesMun(f).map(m => `<option value="${h(m.cd_ibge)}"${m.cd_ibge === f.cd_mun ? ' selected' : ''}>${h(m.nome)}</option>`).join('')}</select></label>
+    <label class="campo"><span>Unidade de conservação${exUc ? '' : ' (opcional)'}</span>
+      <select data-f="uc_id"><option value="">${exUc ? 'Escolha…' : 'Fora de UC / não se aplica'}</option>${opcoesUc(f).map(u => `<option value="${h(u.id)}"${u.id === f.uc_id ? ' selected' : ''}>${h(u.nome)}</option>`).join('')}</select></label>
+    <label class="campo"><span>Comunidade (opcional)</span>
+      <select data-f="comunidade_id"${f.cd_mun ? '' : ' disabled'}>
+        <option value="">${f.cd_mun ? 'Escolha…' : 'Escolha o município primeiro'}</option>
+        ${coms.map(c => `<option value="${h(c.id)}"${c.id === f.comunidade_id ? ' selected' : ''}>${h(c.nome)}</option>`).join('')}
+        ${f.cd_mun ? `<option value="__nova"${outra ? ' selected' : ''}>Outra — não está na lista</option>` : ''}
+      </select></label>
+    ${outra || f.comunidade_id === '__nova' ? `<label class="campo"><span>Nome da comunidade</span><input type="text" maxlength="150" data-f="comunidade_nova" value="${h(f.comunidade_nova)}"></label>
+      <p class="card-sub">O gestor confere e cadastra a comunidade nova.</p>` : ''}
+    <p class="campo-msg" id="local-msg" role="alert"></p>`
+}
+
+function passoAviso(f) {
+  const q = f.questionario
+  const sn = (campo, val) => `<div class="par-sn" role="group">
+      <button type="button" data-sn="${campo}" data-v="1" aria-pressed="${val === true}">Sim</button>
+      <button type="button" data-sn="${campo}" data-v="0" aria-pressed="${val === false}">Não</button></div>`
+  return `
+    <p class="card-sub">Leia o aviso em voz alta antes de começar.</p>
+    <div class="aviso-texto">${h(q.aviso)}</div>
+    <label class="check-grande"><input type="checkbox" data-f="aviso_lido"${f.aviso_lido ? ' checked' : ''}><span>Li o aviso para a pessoa entrevistada.</span></label>
+    <p class="campo"><span>A pessoa aceita participar?</span></p>${sn('aceitou_participar', f.aceitou_participar)}
+    ${f.aceitou_participar ? `<p class="campo"><span>Autoriza fotos da moradia e do entorno (nunca de pessoas)?</span></p>${sn('fotos_autorizadas', f.fotos_autorizadas)}` : ''}
+    ${f.aceitou_participar === false ? '<div class="faixa faixa-aviso"><span>A recusa também é registrada, sem nenhuma resposta. Agradeça e siga para a revisão.</span></div>' : ''}
+    <p class="campo-msg" id="aviso-msg" role="alert"></p>`
+}
+
+function passoIdent(f) {
+  const id = f.questionario.estrutura.identificacao || {}
+  const g = f.gps
+  return `
+    <div class="faixa faixa-aviso">${ic('shield')}<span>Identificação fica separada das respostas: só o gestor do questionário e você veem.</span></div>
+    ${id.nome === 'opcional' ? `<label class="campo"><span>Nome da pessoa entrevistada (opcional)</span><input type="text" maxlength="150" autocomplete="off" data-f="entrevistado_nome" value="${h(f.entrevistado_nome)}"></label>` : ''}
+    ${id.gps === 'opcional' ? `<div class="campo"><span>Localização do domicílio (opcional)</span>
+        <p class="card-sub" id="gps-txt">${g ? `Registrada: ${g.lat.toFixed(5)}, ${g.lon.toFixed(5)} (±${Math.round(g.acc || 0)} m)` : 'Ainda não registrada.'}</p>
+        <div class="btn-linha"><button type="button" class="btn" id="btn-gps">${ic('pin')} ${g ? 'Registrar de novo' : 'Registrar localização'}</button>
+        ${g ? '<button type="button" class="btn btn-perigo" id="btn-gps-limpar">Apagar</button>' : ''}</div></div>` : ''}
+    <label class="campo"><span>Observação sobre o local (opcional)</span><textarea rows="3" maxlength="500" data-f="obs_localizacao">${h(f.obs_localizacao)}</textarea></label>`
+}
+
+const TEMAS_FOTO = [['moradia', 'Moradia'], ['infraestrutura', 'Infraestrutura'], ['entorno', 'Entorno'], ['producao', 'Produção'], ['outro', 'Outro']]
+function passoFotosHTML() {
+  return `
+    <div class="faixa faixa-aviso">${ic('camera')}<span>Fotografe a moradia, a infraestrutura e o entorno. Nunca pessoas. Até 8 fotos.</span></div>
+    <div class="btn-linha" style="margin-bottom:14px">
+      <button type="button" class="btn btn-prim" id="btn-foto-camera">${ic('camera')} Tirar foto</button>
+      <button type="button" class="btn" id="btn-foto-galeria">${ic('image')} Da galeria</button>
+    </div>
+    <div class="fotos" id="fotos-lista"></div>`
+}
+const _fotoUrls = []
+async function pintarFotos() {
+  const el = $('fotos-lista'); if (!el) return
+  _fotoUrls.splice(0).forEach(u => URL.revokeObjectURL(u))
+  const fotos = await sOfflineFotosDaFicha(App.ficha.uuid_cliente)
+  el.innerHTML = fotos.length ? fotos.map(ft => {
+    const url = URL.createObjectURL(sOfflineFotoBlob(ft)); _fotoUrls.push(url)
+    return `<div class="foto-item" data-foto="${h(ft.uuid_cliente)}">
+      <img src="${url}" alt="Foto ${h(ft.tema)}">
+      <div>
+        <label class="campo"><span>Tema</span><select data-foto-tema="${h(ft.uuid_cliente)}">${TEMAS_FOTO.map(([v, r]) => `<option value="${v}"${ft.tema === v ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
+        <label class="campo"><span>Legenda (opcional)</span><input type="text" maxlength="300" data-foto-leg="${h(ft.uuid_cliente)}" value="${h(ft.legenda || '')}"></label>
+        <button type="button" class="btn btn-perigo" data-foto-rem="${h(ft.uuid_cliente)}"${ft.enviada ? ' disabled' : ''}>Remover</button>
+      </div></div>`
+  }).join('') : '<p class="vazio">Nenhuma foto ainda.</p>'
+  const n = fotos.length
+  ;['btn-foto-camera', 'btn-foto-galeria'].forEach(i => { if ($(i)) $(i).disabled = n >= 8 })
+}
+
+async function receberFotos(files) {
+  const f = App.ficha
+  const ja = (await sOfflineFotosDaFicha(f.uuid_cliente)).length
+  let gps = null
+  try { if (typeof bGpsUmaLeitura === 'function') gps = await Promise.race([bGpsUmaLeitura(), new Promise(r => setTimeout(() => r(null), 6000))]) } catch (_) {}
+  let n = 0
+  for (const arq of Array.from(files || []).slice(0, Math.max(0, 8 - ja))) {
+    let blob = arq
+    try { if (typeof otimizarFoto === 'function') blob = await otimizarFoto(arq) } catch (_) { blob = arq }
+    await sOfflineSalvarFoto({
+      uuid_cliente: uuid(), ficha_uuid: f.uuid_cliente, bytes: await blob.arrayBuffer(), tipo: blob.type || 'image/jpeg',
+      tema: 'moradia', legenda: '', tirada_em: new Date().toISOString(),
+      lat: gps ? gps.lat : null, lon: gps ? gps.lng : null, acc: gps ? gps.acc : null, enviada: false,
+    })
+    n++
+  }
+  if (n) aviso(n === 1 ? 'Foto guardada.' : `${n} fotos guardadas.`)
+  pintarFotos()
+}
+
+function conferirFicha(f) {
+  return SocioForm.conferir(f.questionario.estrutura, f, { comunidade_nova: !f.comunidade_id && !!f.comunidade_nova })
+}
+
+function passoRevisao(f) {
+  if (!f.aceitou_participar) {
+    return `<div class="faixa faixa-aviso"><span>Recusa: a ficha vai sem nenhuma resposta, só com o local, a data e o aviso lido.</span></div>
+      <p class="card-sub">Toque em "Registrar recusa" para guardar e enviar.</p>`
+  }
+  const c = conferirFicha(f)
+  if (c.erro) return `<div class="faixa faixa-erro">${ic('alert-triangle')}<span>Há um valor que o questionário não aceita: <strong>${h(c.erro)}</strong>. Volte à etapa e corrija.</span></div>`
+  const est = f.questionario.estrutura
+  const pend = c.alertas.filter(a => a.tipo === 'pendente')
+  const outros = c.alertas.filter(a => a.tipo !== 'pendente')
+  return `
+    ${f.treino ? '<div class="faixa faixa-treino"><span>Ficha de treino.</span></div>' : ''}
+    <p class="card-sub">${Object.keys(c.resp).length} resposta(s) · ${c.linhas.length} pessoa(s) na lista</p>
+    ${pend.length ? `<h2 class="secao-tit">Em branco (${pend.length})</h2><ul class="rev-lista">${pend.map(a => `<li class="pend">${h(SocioRegras.descreverAlerta(a, est))}</li>`).join('')}</ul>
+      <p class="card-sub">Pode enviar assim — o gestor verá o que ficou em branco. Se a pessoa não quis responder, marque "Não respondeu" na pergunta.</p>` : ''}
+    ${outros.length ? `<h2 class="secao-tit">Para conferir (${outros.length})</h2><ul class="rev-lista">${outros.map(a => `<li class="coer">${h(SocioRegras.descreverAlerta(a, est))}</li>`).join('')}</ul>` : ''}
+    ${!pend.length && !outros.length ? `<div class="faixa faixa-ok">${ic('check')}<span>Tudo respondido.</span></div>` : ''}`
+}
+
+// validação que impede só o que o banco recusaria de qualquer jeito
+function validarPasso(id) {
+  const f = App.ficha
+  if (id === 'local') {
+    const m = $('local-msg')
+    if (f.campanha && f.campanha.exige_municipio && !f.cd_mun) { m.textContent = 'Esta campanha pede o município.'; return false }
+    if (f.campanha && f.campanha.exige_uc && !f.uc_id) { m.textContent = 'Esta campanha pede a unidade de conservação.'; return false }
+    if (f.comunidade_id === '__nova' && !f.comunidade_nova.trim()) { m.textContent = 'Escreva o nome da comunidade.'; return false }
+    if (!f.dt_entrevista) { m.textContent = 'Informe a data.'; return false }
+  }
+  if (id === 'aviso') {
+    const m = $('aviso-msg')
+    if (!f.aviso_lido) { m.textContent = 'Marque que o aviso foi lido.'; return false }
+    if (f.aceitou_participar === null) { m.textContent = 'Diga se a pessoa aceita participar.'; return false }
+    if (f.aceitou_participar && f.fotos_autorizadas === null) { m.textContent = 'Diga se a pessoa autoriza fotos.'; return false }
+  }
+  return true
+}
+
+async function avancar() {
+  const id = App.passos[App.passo]
+  if (!validarPasso(id)) return
+  if (id === 'revisao') return concluir()
+  App.passos = calcularPassos(App.ficha)
+  App.passo = Math.min(App.passo + 1, App.passos.length - 1)
+  await guardar(true)
+  renderPasso()
+}
+async function voltar() {
+  if (App.passo === 0) return
+  App.passo--
+  await guardar(true)
+  renderPasso()
+}
+
+async function concluir() {
+  const f = App.ficha
+  if (f.aceitou_participar) {
+    const c = conferirFicha(f)
+    if (c.erro) { aviso('Corrija o valor indicado antes de concluir.'); return }
+    f.respostas_norm = c.resp
+    f.linhas = c.linhas
+  } else {
+    f.respostas_norm = {}; f.linhas = []; f.resp = {}
+    f.entrevistado_nome = ''; f.gps = null; f.fotos_autorizadas = null
+  }
+  if (f.comunidade_id === '__nova') f.comunidade_id = ''
+  // ficha devolvida/corrigida mantém a hora em que a entrevista terminou
+  // (o banco confere o período por ela) e o código que já tinha
+  if (!f.finalizada_em) f.finalizada_em = new Date().toISOString()
+  if (!f.codigo) {
+    const d = new Date(f.finalizada_em)
+    const aammdd = String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0')
+    f.codigo = SocioRegras.gerarCodigo(f.treino ? 'TRE' : f.instrumento.codigo, d, f.dispositivo_id, await sOfflineProximoSeq(aammdd))
+  }
+  f.estado = 'pendente'; f.ultimo_erro = null; f.erro_codigo = null
+  await guardar(true)
+  App.ficha = null
+  aviso(`Ficha ${f.codigo} guardada. Ela sobe sozinha quando houver internet.`)
+  mostrarTela('tela-fila')
+  rodarFila()
+}
+
+async function sairFicha() {
+  await guardar(true)
+  App.ficha = null
+  aviso('Entrevista guardada no aparelho. Continue pela aba Fichas.')
+  mostrarTela('tela-home')
+}
+
+// eventos dentro da ficha
+function aoMudarFicha(ev) {
+  const f = App.ficha; if (!f) return
+  const alvo = ev.target
+  const idPasso = App.passos[App.passo]
+
+  if (alvo.dataset.f) {
+    const campo = alvo.dataset.f
+    if (alvo.type === 'checkbox') f[campo] = alvo.checked
+    else f[campo] = alvo.value
+    if (campo === 'cd_mun') { f.comunidade_id = ''; f.comunidade_nova = '' }
+    if (campo === 'comunidade_id' && alvo.value !== '__nova') f.comunidade_nova = ''
+    guardar()
+    if (ev.type === 'change' && ['cd_mun', 'comunidade_id', 'dt_entrevista'].includes(campo)) renderPasso()
+    return
+  }
+  if (alvo.dataset.fotoTema) { atualizarFoto(alvo.dataset.fotoTema, { tema: alvo.value }); return }
+  if (alvo.dataset.fotoLeg !== undefined && alvo.dataset.fotoLeg) { atualizarFoto(alvo.dataset.fotoLeg, { legenda: alvo.value }); return }
+  if (alvo.dataset.acao && idPasso.startsWith('b:')) {
+    const tipoTexto = alvo.tagName === 'INPUT' && alvo.type === 'text'
+    if (ev.type === 'input' && !tipoTexto && alvo.tagName !== 'TEXTAREA') return
+    if (ev.type === 'change' && (tipoTexto || alvo.tagName === 'TEXTAREA') && alvo.dataset.acao !== 'celula') return
+    const redesenhar = SocioForm.aplicar(f.questionario.estrutura, f, alvo)
+    guardar()
+    // sair de uma célula da lista pode mudar derivadas e saltos: redesenha
+    // depois que o foco já foi para o próximo campo
+    if (ev.type === 'change' && alvo.dataset.acao === 'celula' && alvo.tagName !== 'SELECT') setTimeout(redesenharBloco, 0)
+    else if (redesenhar) redesenharBloco()
+  }
+}
+async function atualizarFoto(uuidFoto, mudanca) {
+  const ft = await sOfflineFoto(uuidFoto); if (!ft) return
+  Object.assign(ft, mudanca); await sOfflineSalvarFoto(ft)
+}
+function chaveEl(el) {
+  if (!el || !el.dataset) return ''
+  const v = el.type === 'radio' || el.type === 'checkbox' ? el.value : ''
+  return [el.dataset.acao, el.dataset.k, v, el.dataset.i, el.dataset.col, el.id].join('|')
+}
+// redesenha o bloco e devolve o foco ao mesmo controle (teclado e leitor
+// de tela não se perdem); depois de Tab, o foco já está no próximo campo
+function redesenharBloco() {
+  const f = App.ficha
+  const id = App.passos[App.passo]
+  const b = (f.questionario.estrutura.blocos || []).find(x => 'b:' + x.id === id)
+  if (!b) return
+  const corpo = $('ficha-corpo')
+  const chave = corpo.contains(document.activeElement) ? chaveEl(document.activeElement) : ''
+  const y = window.scrollY
+  corpo.innerHTML = `<h2 class="bloco-tit">${h(b.titulo)}</h2>` + SocioForm.blocoHTML(f.questionario.estrutura, b, f)
+  window.scrollTo(0, y)
+  if (chave) {
+    const novo = Array.from(corpo.querySelectorAll('[data-acao], input, select, textarea')).find(el => chaveEl(el) === chave)
+    if (novo) novo.focus({ preventScroll: true })
+  }
+}
+
+async function aoClicarFicha(ev) {
+  const f = App.ficha; if (!f) return
+  const sn = ev.target.closest('[data-sn]')
+  if (sn) {
+    f[sn.dataset.sn] = sn.dataset.v === '1'
+    if (sn.dataset.sn === 'aceitou_participar' && !f.aceitou_participar) f.fotos_autorizadas = null
+    App.passos = calcularPassos(f)
+    await guardar(true); renderPasso()
+    return
+  }
+  const b = ev.target.closest('button[data-acao]')
+  if (b) {
+    const redesenhar = SocioForm.aplicar(f.questionario.estrutura, f, b)
+    guardar()
+    if (redesenhar) {
+      redesenharBloco()
+      if (b.dataset.acao === 'adicionar-linha') {
+        const ultima = $('ficha-corpo').querySelector('.sl-linha:last-of-type input, .sl-linha:last-of-type select')
+        if (ultima) ultima.focus()
+      }
+    }
+    return
+  }
+  if (ev.target.closest('#btn-gps')) {
+    const bt = $('btn-gps'); const restaura = typeof btnEspera === 'function' ? btnEspera(bt) : () => {}
+    try {
+      const g = await bGpsUmaLeitura()
+      f.gps = { lat: g.lat, lon: g.lng, acc: g.acc, em: new Date(g.ts || Date.now()).toISOString() }
+      await guardar(true)
+    } catch (_) { aviso('Não foi possível ler o GPS agora. Você pode seguir sem a localização.') }
+    finally { restaura() }
+    renderPasso(); return
+  }
+  if (ev.target.closest('#btn-gps-limpar')) { f.gps = null; await guardar(true); renderPasso(); return }
+  if (ev.target.closest('#btn-foto-camera')) { $('in-camera').click(); return }
+  if (ev.target.closest('#btn-foto-galeria')) { $('in-galeria').click(); return }
+  const rem = ev.target.closest('[data-foto-rem]')
+  if (rem) {
+    if (await confirmar({ titulo: 'Remover foto?', texto: 'A foto sai desta ficha.', ok: 'Remover', perigo: true })) {
+      await sOfflineRemoverFoto(rem.dataset.fotoRem); pintarFotos()
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Fila
+// ════════════════════════════════════════════════════════════════
+const SITUACAO_SERV = { enviada: ['Recebida', 'selo-ok'], validada: ['Validada', 'selo-ok'], devolvida: ['Devolvida', 'selo-erro'], descartada: ['Descartada', 'selo-cinza'] }
+async function renderFila() {
+  const fichas = await sOfflineListarFichas()
+  const grupos = [
+    ['Em andamento', fichas.filter(f => f.estado === 'rascunho')],
+    ['Com problema', fichas.filter(f => f.estado === 'erro' || (f.estado === 'enviada' && f.servidor?.status === 'devolvida'))],
+    ['Aguardando envio', fichas.filter(f => f.estado === 'pendente' || f.estado === 'enviando')],
+    ['Enviadas', fichas.filter(f => f.estado === 'enviada' && f.servidor?.status !== 'devolvida').slice(0, 40)],
+  ]
+  const pend = grupos[2][1].length
+  $('fila-sub').textContent = pend ? `${pend} aguardando envio` : 'Nada aguardando envio'
+  $('btn-enviar-agora').disabled = !pend
+  $('fila-lista').innerHTML = grupos.filter(g => g[1].length).map(([tit, l]) =>
+    `<h2 class="secao-tit">${tit} (${l.length})</h2>` + l.map(itemFila).join('')).join('') ||
+    '<p class="vazio">Nenhuma ficha neste aparelho ainda.</p>'
+  icones($('tela-fila'))
+  atualizarBadge()
+}
+function itemFila(f) {
+  const titulo = f.codigo || (f.treino ? 'Treino em andamento' : 'Entrevista em andamento')
+  const sel = []
+  if (f.treino) sel.push('<span class="selo selo-treino">Treino</span>')
+  if (f.aceitou_participar === false) sel.push('<span class="selo selo-cinza">Recusa</span>')
+  if (f.estado === 'pendente' || f.estado === 'enviando') sel.push('<span class="selo selo-aviso">Aguardando envio</span>')
+  if (f.estado === 'erro') sel.push('<span class="selo selo-erro">Não foi aceita</span>')
+  if (f.estado === 'enviada') { const s = SITUACAO_SERV[f.servidor?.status] || SITUACAO_SERV.enviada; sel.push(`<span class="selo ${s[1]}">${s[0]}</span>`) }
+  const acoes = []
+  if (f.estado === 'rascunho') {
+    acoes.push(`<button type="button" class="btn btn-prim" data-continuar="${h(f.uuid_cliente)}">Continuar</button>`)
+    if (!f.codigo) acoes.push(`<button type="button" class="btn btn-perigo" data-descartar="${h(f.uuid_cliente)}">Descartar</button>`)
+  }
+  if (f.estado === 'erro') {
+    acoes.push(`<button type="button" class="btn btn-prim" data-corrigir="${h(f.uuid_cliente)}">Corrigir</button>`)
+    acoes.push(`<button type="button" class="btn" data-tentar="${h(f.uuid_cliente)}">Tentar de novo</button>`)
+  }
+  if (f.estado === 'enviada' && f.servidor?.status === 'devolvida') acoes.push(`<button type="button" class="btn btn-prim" data-corrigir="${h(f.uuid_cliente)}">Corrigir e reenviar</button>`)
+  const erro = f.estado === 'erro' ? f.ultimo_erro : (f.estado === 'pendente' && f.ultimo_erro ? 'Última tentativa: ' + f.ultimo_erro : '')
+  const motivo = f.estado === 'enviada' && f.servidor?.status === 'devolvida' ? 'Motivo da devolução: ' + (f.servidor.motivo_devolucao || '—') : ''
+  return `<article class="card fila-item">
+    <div class="fila-cab"><span class="fila-cod">${h(titulo)}</span><span>${sel.join(' ')}</span></div>
+    <p class="fila-meta">${h(f.instrumento?.titulo || '')}${f.campanha ? ' · ' + h(f.campanha.nome) : ''} · entrevista de ${dataBR(f.dt_entrevista)}</p>
+    ${erro ? `<p class="fila-erro">${h(erro)}</p>` : ''}${motivo ? `<p class="fila-erro">${h(motivo)}</p>` : ''}
+    ${acoes.length ? `<div class="btn-linha">${acoes.join('')}</div>` : ''}
+  </article>`
+}
+
+async function aoClicarFila(ev) {
+  const b = ev.target.closest('button'); if (!b) return
+  if (b.dataset.continuar) { const f = await sOfflineFicha(b.dataset.continuar); if (f) abrirFicha(f, 0) }
+  if (b.dataset.descartar) {
+    if (await confirmar({ titulo: 'Descartar entrevista?', texto: 'As respostas e fotos desta entrevista serão apagadas do aparelho. Não dá para desfazer.', ok: 'Descartar', perigo: true })) {
+      await sOfflineDescartarRascunho(b.dataset.descartar); renderFila()
+    }
+  }
+  if (b.dataset.tentar) { await sSyncReenfileirar(b.dataset.tentar); renderFila(); rodarFila() }
+  if (b.dataset.corrigir) {
+    const f = await sOfflineFicha(b.dataset.corrigir); if (!f) return
+    f.estado = 'rascunho'; f.ultimo_erro = null
+    await sOfflineSalvarFicha(f)
+    abrirFicha(f, f.aceitou_participar ? 2 : 0)
+  }
+}
+
+let _filaRodando = false
+async function rodarFila(manual) {
+  if (_filaRodando) return
+  _filaRodando = true
+  try {
+    const r = await sSyncRodar()
+    if (manual && r === 'sem_conexao') aviso('Sem internet agora. As fichas continuam guardadas e sobem depois.')
+    if (r === 'sem_sessao') aviso('Sua sessão expirou. Entre com a senha para voltar a enviar.')
+    if (r && typeof r === 'object') {
+      if (r.ok) aviso(`${r.ok} ficha(s) enviada(s).`)
+      if (r.erros) aviso(`${r.erros} ficha(s) não foram aceitas ou não subiram. Veja a aba Fichas.`)
+      await baixarPacote()
+    }
+  } finally {
+    _filaRodando = false
+    if (!$('tela-fila').hidden) renderFila(); else atualizarBadge()
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Configurações
+// ════════════════════════════════════════════════════════════════
+async function renderConfig() {
+  $('cfg-nome').textContent = App.usuario?.nome || ''
+  const p = App.pacote
+  $('cfg-pacote').textContent = p?.baixado_em
+    ? `Atualizados em ${dataHoraBR(p.baixado_em)}: ${(p.campanhas || []).length} campanha(s), ${(p.treino || []).length} questionário(s) para treino.`
+    : 'Ainda não baixados — precisa de internet.'
+  $('cfg-aparelho').textContent = `Código do aparelho: ${await sOfflineDispositivo()} · app ${SOCIO_APP_VERSAO}`
+  $('btn-privacidade').hidden = typeof lgpdCampoAbrir !== 'function'
+}
+
+async function atualizarPacoteManual() {
+  const restaura = typeof btnEspera === 'function' ? btnEspera($('btn-atualizar-pacote')) : () => {}
+  try {
+    if (!await sSyncTemConexao()) { aviso('Sem internet agora.'); return }
+    aviso(await baixarPacote() ? 'Campanhas e questionários atualizados.' : 'Não foi possível atualizar agora.')
+  } finally { restaura(); renderConfig() }
+}
+
+async function sair() {
+  const pend = (await sOfflineListarFichas()).filter(f => ['pendente', 'enviando', 'erro', 'rascunho'].includes(f.estado)).length
+  const ok = await confirmar({
+    titulo: 'Sair da conta?',
+    texto: pend ? `${pend} ficha(s) ainda não foram enviadas. Elas continuam no aparelho e sobem quando você entrar de novo.` : 'Para voltar, entre com e-mail e senha.',
+    ok: 'Sair', perigo: true,
+  })
+  if (!ok) return
+  try { await db?.auth.signOut() } catch (_) {}
+  App.desbloqueado = false
+  await sOfflineSetConfig('pin_hash', null)
+  await sOfflineSetConfig('pin_dono', null)
+  mostrarTela('tela-login')
+}
+
+// ════════════════════════════════════════════════════════════════
+// Ligações
+// ════════════════════════════════════════════════════════════════
+$('form-login').addEventListener('submit', entrar)
+$('form-senha').addEventListener('submit', trocarSenha)
+if (typeof pinBaralhoMontar === 'function') pinBaralhoMontar($('pin-display'))
+$('pin-keypad').addEventListener('click', ev => {
+  const k = ev.target.closest('.pin-key'); if (!k) return
+  $('pin-erro').textContent = ''
+  if (k.id === 'pin-apagar') { _pin = _pin.slice(0, -1); pintarPin(); return }
+  if (k.id === 'pin-ok') { if (_pin.length === 4) pinConferir(); return }
+  if (_pin.length < 4) { _pin += k.dataset.v; pintarPin(); if (_pin.length === 4) pinConferir() }
+})
+document.addEventListener('keydown', ev => {
+  if ($('tela-pin').hidden) return
+  if (/^[0-9]$/.test(ev.key) && _pin.length < 4) { _pin += ev.key; pintarPin(); if (_pin.length === 4) pinConferir() }
+  if (ev.key === 'Backspace') { _pin = _pin.slice(0, -1); pintarPin() }
+})
+$('btn-esqueci-pin').addEventListener('click', () => { App.esqueceuPin = true; App.desbloqueado = false; $('login-erro').textContent = ''; mostrarTela('tela-login') })
+document.querySelectorAll('.pill-btn').forEach(b => b.addEventListener('click', () => mostrarTela(b.dataset.tela)))
+$('tela-home').addEventListener('click', ev => {
+  const ir = ev.target.closest('[data-ir]'); if (ir) { mostrarTela(ir.dataset.ir); return }
+  const n = ev.target.closest('[data-nova]'); if (n) { novaFicha(App.pacote.campanhas[Number(n.dataset.nova)], false); return }
+  const t = ev.target.closest('[data-treino]'); if (t) novaFicha(App.pacote.treino[Number(t.dataset.treino)], true)
+})
+$('ficha-corpo').addEventListener('input', aoMudarFicha)
+$('ficha-corpo').addEventListener('change', aoMudarFicha)
+$('ficha-corpo').addEventListener('click', aoClicarFicha)
+$('btn-ficha-avancar').addEventListener('click', avancar)
+$('btn-ficha-voltar').addEventListener('click', voltar)
+$('btn-ficha-sair').addEventListener('click', sairFicha)
+// copia a lista ANTES de limpar o campo: FileList é viva e esvazia junto
+$('in-camera').addEventListener('change', ev => { const l = Array.from(ev.target.files || []); ev.target.value = ''; receberFotos(l) })
+$('in-galeria').addEventListener('change', ev => { const l = Array.from(ev.target.files || []); ev.target.value = ''; receberFotos(l) })
+$('fila-lista').addEventListener('click', aoClicarFila)
+$('btn-enviar-agora').addEventListener('click', () => rodarFila(true))
+$('btn-atualizar-pacote').addEventListener('click', atualizarPacoteManual)
+$('btn-trocar-pin').addEventListener('click', () => abrirPin('criar'))
+$('btn-privacidade').addEventListener('click', () => { if (typeof lgpdCampoAbrir === 'function') lgpdCampoAbrir() })
+$('btn-sair').addEventListener('click', sair)
+window.addEventListener('online', () => { atualizarConexao(); if (App.desbloqueado) rodarFila() })
+window.addEventListener('offline', () => atualizarConexao())
+document.addEventListener('visibilitychange', () => { if (!document.hidden && App.desbloqueado) rodarFila() })
+setInterval(() => { if (App.desbloqueado && !document.hidden) rodarFila() }, 60000)
+
+boot()
+</script>
+</body>
+</html>

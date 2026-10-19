@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Diagnóstico Socioeconômico</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/socio.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/socio-regras.js"></script>
+<script src="../js/socio-previa.js"></script>
+<script src="../js/fotos-privadas.js"></script>
+<script src="../js/socio-campanhas.js"></script>
+<script src="../js/socio-fichas.js"></script>
+<script src="../js/grafico-teclado.js"></script>
+<script src="../js/socio-indicadores.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ── Novo questionário ── -->
+<div class="modal-overlay" id="modal-novo" role="dialog" aria-modal="true" aria-labelledby="novo-titulo">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="novo-titulo">Novo questionário</div>
+      <button class="modal-close" type="button" aria-label="Fechar" onclick="socFechar('novo')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label" for="nv-dep">Departamento dono <span class="obrig">*</span></label>
+        <select class="form-control" id="nv-dep"></select>
+        <div class="form-hint">Só quem é deste departamento (ou de uma divisão dele) vê o questionário. Outros departamentos pedem acesso.</div></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label" for="nv-codigo">Código <span class="obrig">*</span></label>
+          <input class="form-control" id="nv-codigo" maxlength="10" autocomplete="off" placeholder="Ex.: PESCA"
+                 oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
+          <div class="form-hint">2 a 10 letras. Vira o começo do código de cada ficha (PESCA-…).</div></div>
+        <div class="form-group"><label class="form-label" for="nv-unidade">O que é entrevistado <span class="obrig">*</span></label>
+          <select class="form-control" id="nv-unidade">
+            <option value="domicilio">Domicílio (família)</option><option value="pessoa">Pessoa</option>
+            <option value="comunidade">Comunidade</option><option value="estabelecimento">Estabelecimento</option>
+          </select></div>
+      </div>
+      <div class="form-group"><label class="form-label" for="nv-titulo">Título <span class="obrig">*</span></label>
+        <input class="form-control" id="nv-titulo" maxlength="200"></div>
+      <div class="form-group"><label class="form-label" for="nv-finalidade">Para que serve <span class="obrig">*</span></label>
+        <textarea class="form-control" id="nv-finalidade" rows="3" maxlength="2000"></textarea>
+        <div class="form-hint">Aparece no catálogo para os outros departamentos saberem do que se trata.</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" onclick="socFechar('novo')">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="nv-salvar" onclick="criarInstrumento()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Editor de versão ── -->
+<div class="modal-overlay" id="modal-editor" role="dialog" aria-modal="true" aria-labelledby="ed-titulo">
+  <div class="modal soc-editor-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="ed-titulo">Versão</div>
+      <button class="modal-close" type="button" aria-label="Fechar" onclick="fecharEditor()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="soc-editor">
+        <div class="soc-editor-col">
+          <div class="form-group"><label class="form-label" for="ed-aviso">Aviso lido ao entrevistado <span class="obrig">*</span></label>
+            <textarea class="form-control" id="ed-aviso" rows="4" oninput="edMudou()"></textarea>
+            <div class="form-hint">Diz quem pergunta, para quê, que a pessoa pode recusar e o que é guardado. Mínimo de 20 caracteres.</div></div>
+          <label class="form-label" for="ed-json">Estrutura do questionário (JSON) <span class="obrig">*</span></label>
+          <div class="soc-editor-ferr" id="ed-ferr">
+            <button class="btn btn-secondary btn-xs" type="button" onclick="edFormatar()">Formatar</button>
+            <button class="btn btn-secondary btn-xs" type="button" onclick="edUsarModelo()">Usar modelo</button>
+          </div>
+          <textarea class="form-control mono soc-editor-json" id="ed-json" spellcheck="false" oninput="edMudou()"></textarea>
+          <div class="soc-estado" id="ed-estado" aria-live="polite"></div>
+        </div>
+        <div class="soc-editor-col">
+          <div class="form-label">Conferência</div>
+          <div id="ed-erros" aria-live="polite"></div>
+          <div class="form-label">Como o entrevistador vai ver</div>
+          <div class="soc-previa-caixa" id="ed-previa"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="ed-rodape"></div>
+  </div>
+</div>
+
+<!-- ── Pedir acesso ── -->
+<div class="modal-overlay" id="modal-pedir" role="dialog" aria-modal="true" aria-labelledby="pd-titulo">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="pd-titulo">Pedir acesso</div>
+      <button class="modal-close" type="button" aria-label="Fechar" onclick="socFechar('pedir')">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="soc-intro" id="pd-quest"></p>
+      <fieldset class="form-group" style="border:none;padding:0;margin:0 0 12px">
+        <legend class="form-label">O que você precisa <span class="obrig">*</span></legend>
+        <label class="soc-papel" style="display:flex;align-items:flex-start"><input type="radio" name="pd-nivel" value="agregados" checked>
+          <span><strong>Números</strong> — estrutura do questionário e indicadores, sem fichas.</span></label>
+        <label class="soc-papel" style="display:flex;align-items:flex-start"><input type="radio" name="pd-nivel" value="leitor">
+          <span><strong>Ler fichas</strong> — respostas sem nome nem localização das famílias.</span></label>
+        <label class="soc-papel" style="display:flex;align-items:flex-start"><input type="radio" name="pd-nivel" value="aplicador">
+          <span><strong>Aplicar</strong> — entrevistar em campo (o gestor ainda escala você numa campanha).</span></label>
+      </fieldset>
+      <div class="form-group"><label class="form-label" for="pd-just">Para que precisa <span class="obrig">*</span></label>
+        <textarea class="form-control" id="pd-just" rows="3" maxlength="1000" oninput="socContar('pd-just','pd-cont',20)"></textarea>
+        <div class="soc-cont falta" id="pd-cont">mínimo de 20 caracteres</div></div>
+      <div class="form-group"><label class="form-label" for="pd-fim">Até quando <span class="obrig">*</span></label>
+        <input class="form-control" id="pd-fim" type="date" style="max-width:200px">
+        <div class="form-hint">No máximo 1 ano. Vencido o prazo, o acesso cai sozinho.</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" onclick="socFechar('pedir')">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="pd-enviar" onclick="enviarPedido()">Enviar pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Decidir pedido ── -->
+<div class="modal-overlay" id="modal-decidir" role="dialog" aria-modal="true" aria-labelledby="dc-titulo">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="dc-titulo">Decidir pedido de acesso</div>
+      <button class="modal-close" type="button" aria-label="Fechar" onclick="socFechar('decidir')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="dc-resumo" class="soc-intro"></div>
+      <fieldset class="form-group" style="border:none;padding:0;margin:0 0 12px">
+        <legend class="form-label">Decisão <span class="obrig">*</span></legend>
+        <label class="soc-papel"><input type="radio" name="dc-dec" value="sim" checked onchange="dcMudou()"><span>Aprovar</span></label>
+        <label class="soc-papel"><input type="radio" name="dc-dec" value="nao" onchange="dcMudou()"><span>Recusar</span></label>
+      </fieldset>
+      <div class="form-group" id="dc-fim-grupo"><label class="form-label" for="dc-fim">Vale até</label>
+        <input class="form-control" id="dc-fim" type="date" style="max-width:200px">
+        <div class="form-hint">Pode encurtar o prazo pedido, nunca estender.</div></div>
+      <div class="form-group"><label class="form-label" for="dc-parecer">Parecer <span class="obrig" id="dc-obrig" hidden>*</span></label>
+        <textarea class="form-control" id="dc-parecer" rows="3" maxlength="1000"></textarea>
+        <div class="form-hint" id="dc-hint">Opcional na aprovação. Na recusa, quem pediu recebe este texto.</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" onclick="socFechar('decidir')">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="dc-confirmar" onclick="confirmarDecisao()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirmação genérica (com texto obrigatório opcional) ── -->
+<div class="modal-overlay" id="modal-confirmar" role="dialog" aria-modal="true" aria-labelledby="cf-titulo">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="cf-titulo">Confirmar</div>
+      <button class="modal-close" type="button" aria-label="Fechar" onclick="cfResponder(null)">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="cf-texto" class="soc-intro" style="margin:0"></div>
+      <div class="form-group" id="cf-campo-grupo" hidden style="margin-top:12px">
+        <label class="form-label" for="cf-campo" id="cf-campo-rotulo">Justificativa</label>
+        <textarea class="form-control" id="cf-campo" rows="3" maxlength="1000" oninput="cfContar()"></textarea>
+        <div class="soc-cont" id="cf-cont"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" onclick="cfResponder(null)">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="cf-ok" onclick="cfResponder(true)">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Diagnóstico Socioeconômico · mesa: questionários (Fase 2) ──────────
+// Plano: docs/socioeconomico/plano.md. Toda escrita é por RPC socio_*
+// (migration 362c) e TODO acesso é decidido no banco por fn_socio_pode_de()
+// — a tela só esconde botão; se esconder errado, o banco recusa.
+//
+// O que a pessoa vê:
+//   · Do meu departamento — instrumentos do(s) departamento(s) dela, ou com
+//     acesso concedido;
+//   · Catálogo — TODOS os instrumentos (título, dono, finalidade), para
+//     poder pedir acesso. Perguntas e números só com acesso;
+//   · Pedidos — os que ela recebeu (se é gestor) e os que fez.
+
+let _usuario = null
+let _cat = [], _deps = [], _acessos = [], _admin = false
+let _aba = 'meus', _sel = null, _subAba = 'versoes'
+let _versoes = [], _pessoas = []
+let _ed = null, _pedirId = null, _decidirId = null
+let _buscaT = null
+
+const NIVEL_ROTULO = { agregados: 'Números', leitor: 'Ler fichas', aplicador: 'Aplicar' }
+const STATUS_PEDIDO = {
+  pendente: ['badge-ouro', 'Aguardando'], aprovado: ['badge-verde', 'Aprovado'], recusado: ['badge-erro', 'Recusado'],
+  revogado: ['badge-cinza', 'Revogado'], cancelado: ['badge-cinza', 'Cancelado'],
+}
+const STATUS_VERSAO = { rascunho: ['badge-ouro', 'Rascunho'], publicado: ['badge-verde', 'Publicada'], arquivado: ['badge-cinza', 'Arquivada'] }
+
+// ── utilitários ──
+function hojeAcre() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Rio_Branco' }).format(new Date()) }
+function somarDias(iso, n) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+function fmtDia(s) { if (!s) return '—'; const [a, m, d] = String(s).slice(0, 10).split('-'); return `${d}/${m}/${a}` }
+function fmtMomento(s) { return s ? new Date(s).toLocaleString('pt-BR', { timeZone: 'America/Rio_Branco', dateStyle: 'short', timeStyle: 'short' }) : '—' }
+function badge(cls, txt) { return `<span class="badge ${cls}">${esc(txt)}</span>` }
+// erro do banco: 'socio:<codigo>: <texto>' → só o texto
+function msgErro(e) {
+  const m = String((e && (e.message || e.details)) || e || 'Erro inesperado')
+  const r = /socio:[a-z_]+:\s*(.*)$/s.exec(m)
+  return r ? r[1] : m
+}
+async function rpc(nome, args) {
+  const { data, error } = await db.rpc(nome, args || {})
+  if (error) throw error
+  return data
+}
+function catPorId(id) { return _cat.find(c => c.id === id) }
+
+// ── janelas: abrir/fechar, Esc fecha a de cima, foco volta ──
+const _pilha = []
+function socAbrir(qual) {
+  const el = document.getElementById(`modal-${qual}`)
+  _pilha.push({ qual, origem: document.activeElement })
+  // a de cima fica por cima, qualquer que seja a ordem no DOM (as janelas
+  // da Fase 4 são injetadas no fim do <body>, depois da de confirmação)
+  el.style.zIndex = 200 + _pilha.length
+  el.classList.add('aberto')
+  const alvo = el.querySelector('input:not([type=hidden]):not([disabled]), textarea:not([readonly]), select, button:not(.modal-close)')
+  // só puxa o foco se ninguém já entrou na janela (senão o texto digitado
+  // logo depois de abrir cairia em outro campo)
+  setTimeout(() => { if (alvo && !el.contains(document.activeElement)) alvo.focus() }, 30)
+}
+function socFechar(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  const i = _pilha.map(p => p.qual).lastIndexOf(qual)
+  if (i >= 0) { const [p] = _pilha.splice(i, 1); if (p.origem && p.origem.focus) p.origem.focus() }
+}
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape' || !_pilha.length) return
+  const topo = _pilha[_pilha.length - 1].qual
+  ev.preventDefault()
+  if (topo === 'editor') fecharEditor()
+  else if (topo === 'confirmar') cfResponder(null)
+  else socFechar(topo)
+})
+
+// confirmação genérica → Promise (true | texto | null)
+let _cfResolve = null, _cfMin = 0
+function confirmar({ titulo, texto, ok = 'Confirmar', perigo = false, campo = null, minimo = 0 }) {
+  document.getElementById('cf-titulo').textContent = titulo
+  document.getElementById('cf-texto').innerHTML = texto
+  const btn = document.getElementById('cf-ok')
+  btn.textContent = ok
+  btn.className = 'btn ' + (perigo ? 'btn-danger' : 'btn-primary')
+  const grupo = document.getElementById('cf-campo-grupo')
+  grupo.hidden = !campo
+  _cfMin = campo ? minimo : 0
+  if (campo) {
+    document.getElementById('cf-campo-rotulo').textContent = campo
+    document.getElementById('cf-campo').value = ''
+    cfContar()
+  } else btn.disabled = false
+  socAbrir('confirmar')
+  return new Promise(res => { _cfResolve = res })
+}
+function cfContar() {
+  const n = document.getElementById('cf-campo').value.trim().length
+  const c = document.getElementById('cf-cont')
+  c.textContent = _cfMin ? (n >= _cfMin ? `${n} caracteres` : `faltam ${_cfMin - n} caracteres`) : ''
+  c.classList.toggle('falta', n < _cfMin)
+  document.getElementById('cf-ok').disabled = n < _cfMin
+}
+function cfResponder(sim) {
+  socFechar('confirmar')
+  const r = _cfResolve; _cfResolve = null
+  if (!r) return
+  if (!sim) return r(null)
+  r(document.getElementById('cf-campo-grupo').hidden ? true : document.getElementById('cf-campo').value.trim())
+}
+function socContar(idCampo, idCont, min) {
+  const n = document.getElementById(idCampo).value.trim().length
+  const c = document.getElementById(idCont)
+  c.textContent = n >= min ? `${n} caracteres` : `faltam ${min - n} caracteres`
+  c.classList.toggle('falta', n < min)
+}
+
+// ── carga ──
+;(async function () {
+  _usuario = await carregarUsuario()
+  if (!_usuario) { window.location.href = '../index.html'; return }
+  document.getElementById('app').innerHTML =
+    gerarLayout('Diagnóstico Socioeconômico — Questionários', 'socio-questionarios') +
+    `<div class="fade-in" id="soc-raiz">${skeletonBlocoHTML(5)}</div>` + '</div></div></div>'
+  await recarregar()
+})()
+
+async function recarregar() {
+  try {
+    const [cat, deps, acessos] = await Promise.all([
+      rpc('socio_catalogo'),
+      rpc('socio_meus_departamentos'),
+      db.from('socio_acessos')
+        .select('id,instrumento_id,usuario_id,nivel,justificativa,data_fim,status,parecer,criado_em,decidido_em,solicitante:usuarios!socio_acessos_usuario_id_fkey(nome_completo,email)')
+        .order('criado_em', { ascending: false }),
+    ])
+    if (acessos.error) throw acessos.error
+    _cat = cat || []
+    _deps = deps || []
+    _acessos = acessos.data || []
+    _admin = _cat.some(c => c.sou_admin) || _deps.some(d => d.origem === 'admin')
+  } catch (e) {
+    document.getElementById('soc-raiz').innerHTML =
+      `<div class="soc-aviso" role="alert">${bico('alert-triangle')}<div><strong>Não foi possível carregar.</strong>${esc(msgErro(e))}</div></div>`
+    return
+  }
+  if (_sel && !catPorId(_sel)) _sel = null
+  if (_sel) await abrirInstrumento(_sel, true)
+  else renderLista()
+}
+
+function pedidosRecebidos() {
+  return _acessos.filter(a => a.status === 'pendente' && a.usuario_id !== _usuario.id && (catPorId(a.instrumento_id) || {}).pode_gerir)
+}
+function meusPedidos() { return _acessos.filter(a => a.usuario_id === _usuario.id) }
+function ehMeu(c) { return c.do_meu_departamento || c.pode_gerir || c.pode_aplicar || c.pode_ler_fichas || (c.acessos_vigentes || []).length > 0 }
+
+// ── lista (abas) ──
+function renderLista() {
+  _sel = null
+  const recebidos = pedidosRecebidos().length
+  const semDep = !_admin && !_deps.length
+  const raiz = document.getElementById('soc-raiz')
+  raiz.innerHTML = `
+    ${semDep ? `<div class="soc-aviso" role="note">${bico('alert-triangle')}<div><strong>Você não está lotado em nenhum departamento.</strong>
+      Por isso não pode criar questionário nem entra na equipe de nenhum. Ainda pode consultar o catálogo e pedir acesso.
+      Para entrar no seu departamento, peça à administração o cadastro da lotação (Sistema › Estrutura Org. › Lotações).</div></div>` : ''}
+    <div class="soc-topo">
+      <div class="soc-abas" role="tablist" aria-label="Questionários">
+        <button class="soc-aba" role="tab" id="aba-meus" aria-selected="${_aba === 'meus'}" onclick="mudarAba('meus')">Do meu departamento</button>
+        <button class="soc-aba" role="tab" id="aba-catalogo" aria-selected="${_aba === 'catalogo'}" onclick="mudarAba('catalogo')">Catálogo</button>
+        <button class="soc-aba" role="tab" id="aba-pedidos" aria-selected="${_aba === 'pedidos'}" onclick="mudarAba('pedidos')">Pedidos
+          ${recebidos ? `<span class="soc-contador" aria-label="${recebidos} aguardando sua decisão">${recebidos}</span>` : ''}</button>
+      </div>
+      <div class="soc-acoes">
+        <a class="btn btn-secondary" href="socio-app.html" target="_blank" rel="noopener">${bico('smartphone')} App de campo</a>
+        ${(_deps.length) ? `<button class="btn btn-primary" type="button" onclick="abrirNovo()">${bico('plus')} Novo questionário</button>` : ''}
+      </div>
+    </div>
+    <div id="soc-conteudo"></div>`
+  renderAba()
+}
+function mudarAba(a) { _aba = a; renderLista(); document.getElementById('aba-' + a).focus() }
+
+function renderAba() {
+  const el = document.getElementById('soc-conteudo')
+  if (_aba === 'pedidos') { el.innerHTML = pedidosHTML(); return }
+  const intro = _aba === 'meus'
+    ? 'Questionários do seu departamento e os de outros departamentos a que você tem acesso.'
+    : 'Todos os questionários da SEMA. Perguntas, fichas e números de outro departamento só com acesso pedido e aprovado pelo gestor dele.'
+  el.innerHTML = `<p class="soc-intro">${intro}</p>
+    <div class="filter-bar"><input class="form-control search-input" id="soc-busca" placeholder="Buscar código, título, departamento..."
+      aria-label="Buscar questionário" oninput="clearTimeout(_buscaT);_buscaT=setTimeout(renderTabela,150)"></div>
+    <div class="card"><div class="table-wrap"><table class="soc-tab">
+      <thead><tr><th>Código</th><th>Questionário</th><th>Departamento</th><th>Versão</th><th>Seu acesso</th><th><span class="sr-only">Ações</span></th></tr></thead>
+      <tbody id="soc-tbody"></tbody></table></div></div>`
+  renderTabela()
+}
+
+function seuAcessoHTML(c) {
+  const b = []
+  if (c.pode_gerir) b.push(badge('badge-verde', 'Gestor'))
+  if (c.pode_aplicar) b.push(badge('badge-blue', 'Aplicador'))
+  if (c.pode_ler_fichas && !c.pode_gerir) b.push(badge('badge-teal', 'Lê fichas'))
+  ;(c.acessos_vigentes || []).forEach(a => b.push(badge('badge-outline', `${NIVEL_ROTULO[a.nivel]} até ${fmtDia(a.data_fim)}`)))
+  if (!b.length && c.do_meu_departamento) b.push(badge('badge-cinza', 'Do departamento'))
+  if (!b.length && c.pode_ver) b.push(badge('badge-cinza', c.sou_admin ? 'Administração' : 'Só números'))
+  ;(c.pedidos_pendentes || []).forEach(n => b.push(badge('badge-ouro', `Pedido (${NIVEL_ROTULO[n]}) aguardando`)))
+  return b.join(' ') || '<span class="soc-sub">Sem acesso</span>'
+}
+
+function renderTabela() {
+  const tb = document.getElementById('soc-tbody')
+  if (!tb) return
+  const q = ((document.getElementById('soc-busca') || {}).value || '').trim().toLowerCase()
+  let rows = _aba === 'meus' ? _cat.filter(ehMeu) : _cat.slice()
+  if (q) rows = rows.filter(c => [c.codigo, c.titulo, c.finalidade, c.departamento_sigla, c.departamento_nome]
+    .some(v => String(v || '').toLowerCase().includes(q)))
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="6"><div class="empty-state">${
+      q ? 'Nenhum questionário com esse termo.'
+        : _aba === 'meus' ? (_deps.length ? 'Seu departamento ainda não tem questionário. Use “Novo questionário”.' : 'Nenhum questionário ainda. Consulte o catálogo.')
+        : 'Nenhum questionário cadastrado na SEMA ainda.'}</div></td></tr>`
+    return
+  }
+  tb.innerHTML = rows.map(c => {
+    let acao
+    if (c.pode_ver) acao = `<button class="btn btn-secondary btn-sm" type="button" onclick="abrirInstrumento('${c.id}')">Abrir</button>`
+    else if ((c.pedidos_pendentes || []).length) acao = ''
+    else acao = `<button class="btn btn-primary btn-sm" type="button" onclick="abrirPedir('${c.id}')">Pedir acesso</button>`
+    if (c.pode_ver && !c.do_meu_departamento && !c.sou_admin && !(c.acessos_vigentes || []).length)
+      acao += ` <button class="btn btn-ghost btn-sm" type="button" onclick="abrirPedir('${c.id}')">Pedir mais acesso</button>`
+    return `<tr>
+      <td><span class="soc-cod">${esc(c.codigo)}</span>${c.ativo ? '' : ' ' + badge('badge-cinza', 'Arquivado')}</td>
+      <td><div class="soc-tit">${esc(c.titulo)}</div><div class="soc-sub">${esc((c.finalidade || '').slice(0, 140))}${(c.finalidade || '').length > 140 ? '…' : ''}</div></td>
+      <td title="${esc(c.departamento_nome)}">${esc(c.departamento_sigla)}</td>
+      <td class="soc-num">${c.versao_publicada ? 'v' + c.versao_publicada : '<span class="soc-sub">sem versão publicada</span>'}</td>
+      <td>${seuAcessoHTML(c)}</td>
+      <td><div class="soc-acoes">${acao}</div></td></tr>`
+  }).join('')
+}
+
+// ── aba Pedidos ──
+function pedidosHTML() {
+  const rec = pedidosRecebidos(), meus = meusPedidos()
+  const nomeQ = id => { const c = catPorId(id); return c ? `<span class="soc-cod">${esc(c.codigo)}</span> ${esc(c.titulo)}` : '—' }
+  return `
+    <div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">Aguardando sua decisão</div></div>
+      <div class="table-wrap"><table class="soc-tab"><thead><tr><th>Quem pede</th><th>Questionário</th><th>Precisa de</th><th>Para quê</th><th>Até</th><th><span class="sr-only">Ações</span></th></tr></thead>
+      <tbody>${rec.length ? rec.map(a => `<tr>
+        <td><div class="soc-tit">${esc(a.solicitante?.nome_completo || '—')}</div><div class="soc-sub">${esc(a.solicitante?.email || '')}</div></td>
+        <td>${nomeQ(a.instrumento_id)}</td><td>${esc(NIVEL_ROTULO[a.nivel])}</td>
+        <td style="max-width:320px">${esc(a.justificativa)}</td><td class="soc-num">${fmtDia(a.data_fim)}</td>
+        <td><div class="soc-acoes"><button class="btn btn-primary btn-sm" type="button" onclick="abrirDecidir('${a.id}')">Decidir</button></div></td></tr>`).join('')
+        : `<tr><td colspan="6"><div class="empty-state">Nenhum pedido aguardando você.</div></td></tr>`}</tbody></table></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Meus pedidos</div></div>
+      <div class="table-wrap"><table class="soc-tab"><thead><tr><th>Questionário</th><th>Precisa de</th><th>Situação</th><th>Até</th><th>Parecer</th><th><span class="sr-only">Ações</span></th></tr></thead>
+      <tbody>${meus.length ? meus.map(a => {
+        const [cls, txt] = STATUS_PEDIDO[a.status] || ['badge-cinza', a.status]
+        const vencido = a.status === 'aprovado' && a.data_fim < hojeAcre()
+        return `<tr><td>${nomeQ(a.instrumento_id)}</td><td>${esc(NIVEL_ROTULO[a.nivel])}</td>
+          <td>${vencido ? badge('badge-cinza', 'Vencido') : badge(cls, txt)}</td><td class="soc-num">${fmtDia(a.data_fim)}</td>
+          <td style="max-width:300px">${esc(a.parecer || '')}</td>
+          <td><div class="soc-acoes">${a.status === 'pendente' ? `<button class="btn btn-secondary btn-sm" type="button" onclick="cancelarPedido('${a.id}')">Cancelar</button>` : ''}</div></td></tr>`
+      }).join('') : `<tr><td colspan="6"><div class="empty-state">Você não fez nenhum pedido.</div></td></tr>`}</tbody></table></div></div>`
+}
+
+// ── novo questionário ──
+function abrirNovo() {
+  const sel = document.getElementById('nv-dep')
+  sel.innerHTML = _deps.map(d => `<option value="${d.unidade_org_id}">${esc(d.sigla)} — ${esc(d.nome)}</option>`).join('')
+  ;['nv-codigo', 'nv-titulo', 'nv-finalidade'].forEach(id => { document.getElementById(id).value = '' })
+  socAbrir('novo')
+}
+async function criarInstrumento() {
+  const dados = {
+    p_codigo: document.getElementById('nv-codigo').value.trim(),
+    p_titulo: document.getElementById('nv-titulo').value.trim(),
+    p_finalidade: document.getElementById('nv-finalidade').value.trim(),
+    p_unidade_analise: document.getElementById('nv-unidade').value,
+    p_unidade_org_id: document.getElementById('nv-dep').value,
+  }
+  if (!/^[A-Z]{2,10}$/.test(dados.p_codigo)) return toast('O código tem de 2 a 10 letras.', 'warning')
+  if (dados.p_titulo.length < 3) return toast('Escreva o título.', 'warning')
+  if (dados.p_finalidade.length < 10) return toast('Explique para que serve (mínimo de 10 caracteres).', 'warning')
+  const pronto = btnEspera(document.getElementById('nv-salvar'))
+  try {
+    const id = await rpc('socio_criar_instrumento', dados)
+    socFechar('novo')
+    toast('Questionário criado. Escreva a primeira versão.', 'success')
+    _sel = id
+    await recarregar()
+    abrirEditor(null, { modelo: true })
+  } catch (e) { toast(msgErro(e), 'error') } finally { pronto() }
+}
+
+// ── detalhe do instrumento ──
+async function abrirInstrumento(id, manterSub) {
+  _sel = id
+  if (!manterSub) _subAba = 'versoes'
+  const c = catPorId(id)
+  const raiz = document.getElementById('soc-raiz')
+  raiz.innerHTML = `<button class="btn btn-ghost btn-sm soc-voltar" type="button" onclick="voltarLista()">← Voltar aos questionários</button>
+    <div class="card" style="margin-bottom:16px"><div class="soc-det-cab"><div>
+      <span class="soc-cod">${esc(c.codigo)}</span> ${c.ativo ? '' : badge('badge-cinza', 'Arquivado')}
+      <h2 class="soc-det-titulo">${esc(c.titulo)}</h2>
+      <div class="soc-sub">${esc(c.departamento_sigla)} — ${esc(c.departamento_nome)} · ${esc(SocioPrevia.UNIDADE[c.unidade_analise] || c.unidade_analise)}</div>
+      <p class="soc-det-fin">${esc(c.finalidade)}</p></div>
+      <div class="soc-papeis">${seuAcessoHTML(c)}</div></div></div>
+    <div class="soc-topo"><div class="soc-abas" role="tablist" aria-label="Partes do questionário">
+      ${[['versoes', 'Versões'], ['campanhas', 'Campanhas'], ['indicadores', 'Indicadores'],
+        ...((c.pode_ler_fichas || c.pode_gerir || c.pode_aplicar) ? [['fichas', 'Fichas']] : []),
+        ...((c.pode_gerir || _admin) ? [['equipe', 'Equipe'], ['acessos', 'Acessos'], ['cadastro', 'Cadastro']] : [])]
+        .map(([k, t]) => {
+          const n = k === 'acessos' ? _acessos.filter(a => a.instrumento_id === id && a.status === 'pendente').length : 0
+          return `<button class="soc-aba" role="tab" id="sub-${k}" aria-selected="${_subAba === k}" onclick="mudarSub('${k}')">${t}${n ? ` <span class="soc-contador">${n}</span>` : ''}</button>`
+        }).join('')}</div></div>
+    <div id="soc-sub">${skeletonBlocoHTML(4)}</div>`
+  await renderSub()
+}
+function voltarLista() { _sel = null; renderLista() }
+async function mudarSub(k) { _subAba = k; await abrirInstrumento(_sel, true); document.getElementById('sub-' + k).focus() }
+
+async function renderSub() {
+  const el = document.getElementById('soc-sub')
+  try {
+    if (_subAba === 'versoes') el.innerHTML = await versoesHTML()
+    else if (_subAba === 'campanhas') el.innerHTML = await campanhasHTML()
+    else if (_subAba === 'fichas') el.innerHTML = await fichasHTML()
+    else if (_subAba === 'indicadores') el.innerHTML = await indicadoresHTML()
+    else if (_subAba === 'equipe') el.innerHTML = await equipeHTML()
+    else if (_subAba === 'acessos') el.innerHTML = acessosHTML()
+    else el.innerHTML = cadastroHTML()
+  } catch (e) {
+    el.innerHTML = `<div class="soc-aviso" role="alert">${bico('alert-triangle')}<div><strong>Não foi possível carregar.</strong>${esc(msgErro(e))}</div></div>`
+  }
+}
+
+// versões
+async function carregarVersoes() {
+  const { data, error } = await db.from('socio_questionarios')
+    .select('id,versao,status,publicado_em,hash_sha256,criado_em,atualizado_em,estrutura,aviso_entrevistado')
+    .eq('instrumento_id', _sel).order('versao', { ascending: false })
+  if (error) throw error
+  _versoes = data || []
+}
+async function versoesHTML() {
+  await carregarVersoes()
+  const c = catPorId(_sel)
+  const g = c.pode_gerir
+  const temRascunho = _versoes.some(v => v.status === 'rascunho')
+  const topo = g ? `<div class="filter-bar" style="justify-content:flex-end">
+      ${temRascunho ? '<span class="soc-sub">Já existe um rascunho — continue nele.</span>'
+        : `<button class="btn btn-primary" type="button" onclick="novaVersao()">${bico('plus')} Nova versão</button>`}</div>` : ''
+  if (!_versoes.length) {
+    return topo + `<div class="card"><div class="empty-state">${g ? 'Este questionário ainda não tem versão. Use “Nova versão”.'
+      : 'Nenhuma versão publicada ainda.'}</div></div>`
+  }
+  return topo + `<div class="card"><div class="table-wrap"><table class="soc-tab"><thead><tr>
+      <th>Versão</th><th>Situação</th><th>Perguntas</th><th>Publicada em</th><th>Prova (SHA-256)</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody>
+    ${_versoes.map(v => {
+      const [cls, txt] = STATUS_VERSAO[v.status] || ['badge-cinza', v.status]
+      const n = SocioPrevia.contar(v.estrutura)
+      const ac = [`<button class="btn btn-secondary btn-sm" type="button" onclick="abrirEditor('${v.id}')">${v.status === 'rascunho' && g ? 'Editar' : 'Ver'}</button>`]
+      if (g && v.status === 'rascunho') ac.push(`<button class="btn btn-primary btn-sm" type="button" onclick="publicar('${v.id}')">Publicar</button>`)
+      if (g && v.status === 'publicado') ac.push(`<button class="btn btn-ghost btn-sm" type="button" onclick="arquivar('${v.id}')">Arquivar</button>`)
+      return `<tr><td class="soc-num"><strong>v${v.versao}</strong></td><td>${badge(cls, txt)}</td>
+        <td class="soc-num">${n.perguntas}${n.temLista ? ' + lista' : ''}</td><td class="soc-num">${fmtMomento(v.publicado_em)}</td>
+        <td><code title="${esc(v.hash_sha256)}">${esc((v.hash_sha256 || '').slice(0, 12))}…</code></td>
+        <td><div class="soc-acoes">${ac.join('')}</div></td></tr>`
+    }).join('')}</tbody></table></div></div>
+    <p class="soc-intro" style="margin-top:12px">Versão publicada não muda mais — corrigir é publicar uma versão nova. As fichas guardam a versão com que foram aplicadas, e a prova (SHA-256) mostra que o texto não foi alterado depois.</p>`
+}
+function novaVersao() {
+  const base = _versoes.find(v => v.status === 'publicado') || _versoes[0]
+  abrirEditor(null, base ? { de: base } : { modelo: true })
+}
+async function publicar(qid) {
+  const v = _versoes.find(x => x.id === qid)
+  const ok = await confirmar({
+    titulo: `Publicar a versão ${v.versao}?`,
+    texto: 'Depois de publicada, a versão <strong>não pode mais ser alterada</strong>: as campanhas passam a poder usá-la e cada ficha fica presa a ela. Para corrigir depois, publique uma versão nova.',
+    ok: 'Publicar',
+  })
+  if (!ok) return
+  try {
+    const r = await rpc('socio_publicar_versao', { p_questionario_id: qid })
+    toast(`Versão ${r.versao} publicada.`, 'success')
+    await recarregarDetalhe()
+  } catch (e) { toast(msgErro(e), 'error') }
+}
+async function arquivar(qid) {
+  const v = _versoes.find(x => x.id === qid)
+  const ok = await confirmar({
+    titulo: `Arquivar a versão ${v.versao}?`,
+    texto: 'Versão arquivada não pode ser usada em campanha nova e não volta a ser publicada. As fichas já aplicadas com ela continuam valendo.',
+    ok: 'Arquivar', perigo: true,
+  })
+  if (!ok) return
+  try { await rpc('socio_arquivar_versao', { p_questionario_id: qid }); toast('Versão arquivada.', 'success'); await recarregarDetalhe() }
+  catch (e) { toast(msgErro(e), 'error') }
+}
+async function recarregarDetalhe() { await recarregar() }
+
+// ── editor ──
+function abrirEditor(qid, opts) {
+  opts = opts || {}
+  const c = catPorId(_sel)
+  const v = qid ? _versoes.find(x => x.id === qid) : null
+  const leitura = !!v && !(v.status === 'rascunho' && c.pode_gerir)
+  let est, aviso
+  if (v) { est = v.estrutura; aviso = v.aviso_entrevistado }
+  else if (opts.de) { est = opts.de.estrutura; aviso = opts.de.aviso_entrevistado }
+  else { est = SocioPrevia.modelo(); aviso = '' }
+  _ed = { qid: v ? v.id : null, leitura, versao: v ? v.versao : null, seq: 0, timer: null }
+  document.getElementById('ed-titulo').textContent = v
+    ? `${c.codigo} — versão ${v.versao}${leitura ? ' (só leitura)' : ' (rascunho)'}`
+    : `${c.codigo} — nova versão${opts.de ? ` a partir da v${opts.de.versao}` : ''}`
+  const json = document.getElementById('ed-json'), av = document.getElementById('ed-aviso')
+  json.value = JSON.stringify(est, null, 2)
+  av.value = aviso || ''
+  json.readOnly = av.readOnly = leitura
+  document.getElementById('ed-ferr').hidden = leitura
+  _ed.original = json.value + '\u0000' + av.value
+  document.getElementById('ed-rodape').innerHTML = leitura
+    ? `${c.pode_gerir && !_versoes.some(x => x.status === 'rascunho') ? `<button class="btn btn-secondary" type="button" onclick="edCopiar()">Nova versão a partir desta</button>` : ''}
+       <button class="btn btn-primary" type="button" onclick="fecharEditor()">Fechar</button>`
+    : `<button class="btn btn-secondary" type="button" onclick="fecharEditor()">Fechar</button>
+       <button class="btn btn-primary" type="button" id="ed-salvar" onclick="salvarRascunho()">Salvar rascunho</button>`
+  socAbrir('editor')
+  edConferir()
+}
+function edCopiar() {
+  const v = _versoes.find(x => x.id === _ed.qid)
+  socFechar('editor')
+  abrirEditor(null, { de: v })
+}
+function edMudou() {
+  clearTimeout(_ed.timer)
+  document.getElementById('ed-estado').textContent = 'Alterações não salvas'
+  _ed.timer = setTimeout(edConferir, 450)
+}
+function edFormatar() {
+  const el = document.getElementById('ed-json')
+  try { el.value = JSON.stringify(JSON.parse(el.value), null, 2); edMudou() }
+  catch (e) { toast('O JSON tem erro de sintaxe — corrija antes de formatar.', 'warning') }
+}
+async function edUsarModelo() {
+  const el = document.getElementById('ed-json')
+  if (el.value.trim() && el.value.trim() !== '{}') {
+    const ok = await confirmar({ titulo: 'Trocar pelo modelo?', texto: 'O texto atual do JSON será substituído pelo modelo de exemplo.', ok: 'Trocar' })
+    if (!ok) return
+  }
+  el.value = JSON.stringify(SocioPrevia.modelo(), null, 2)
+  edMudou()
+}
+// pré-visualização local + conferência no banco (fn_socio_validar_estrutura,
+// a mesma regra que barra a publicação)
+async function edConferir() {
+  if (!_ed) return
+  const seq = ++_ed.seq
+  const erros = document.getElementById('ed-erros')
+  const previa = document.getElementById('ed-previa')
+  const aviso = document.getElementById('ed-aviso').value
+  let est
+  try { est = JSON.parse(document.getElementById('ed-json').value) }
+  catch (e) {
+    erros.innerHTML = `<ul class="soc-erros"><li>O texto não é um JSON válido: ${esc(e.message)}</li></ul>`
+    return
+  }
+  previa.innerHTML = SocioPrevia.previaHTML(est, { aviso, unidadeAnalise: (catPorId(_sel) || {}).unidade_analise })
+  try {
+    const lista = await rpc('fn_socio_validar_estrutura', { p: est })
+    if (!_ed || seq !== _ed.seq) return   // resposta de uma digitação antiga
+    const extra = aviso.trim().length < 20 ? ['Aviso ao entrevistado: mínimo de 20 caracteres'] : []
+    const todos = [...extra, ...(lista || [])]
+    erros.innerHTML = todos.length
+      ? `<ul class="soc-erros">${todos.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
+      : `<div class="soc-erros-ok">Sem pendências — pode publicar.</div>`
+  } catch (e) {
+    if (seq === _ed.seq) erros.innerHTML = `<ul class="soc-erros"><li>Não foi possível conferir agora: ${esc(msgErro(e))}</li></ul>`
+  }
+}
+async function fecharEditor() {
+  if (_ed && !_ed.leitura) {
+    const atual = document.getElementById('ed-json').value + '\u0000' + document.getElementById('ed-aviso').value
+    if (atual !== _ed.original) {
+      const ok = await confirmar({ titulo: 'Descartar alterações?', texto: 'O que foi mudado desde o último salvamento será perdido.', ok: 'Descartar', perigo: true })
+      if (!ok) return
+    }
+  }
+  if (_ed) clearTimeout(_ed.timer)
+  _ed = null
+  socFechar('editor')
+}
+async function salvarRascunho() {
+  let est
+  try { est = JSON.parse(document.getElementById('ed-json').value) }
+  catch (e) { return toast('O JSON tem erro de sintaxe — corrija antes de salvar.', 'warning') }
+  const aviso = document.getElementById('ed-aviso').value.trim()
+  if (aviso.length < 20) return toast('Escreva o aviso ao entrevistado (mínimo de 20 caracteres).', 'warning')
+  const pronto = btnEspera(document.getElementById('ed-salvar'))
+  try {
+    const r = await rpc('socio_salvar_versao', { p_instrumento: _sel, p_estrutura: est, p_aviso: aviso, p_questionario_id: _ed.qid })
+    _ed.qid = r.id
+    _ed.original = document.getElementById('ed-json').value + '\u0000' + document.getElementById('ed-aviso').value
+    document.getElementById('ed-titulo').textContent = `${catPorId(_sel).codigo} — versão ${r.versao} (rascunho)`
+    const n = (r.erros || []).length
+    document.getElementById('ed-estado').textContent = `Salvo às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    toast(n ? `Rascunho v${r.versao} salvo, com ${n} pendência(s) — publicar só depois de resolver.` : `Rascunho v${r.versao} salvo.`, n ? 'warning' : 'success')
+    await carregarVersoes()
+    if (_subAba === 'versoes') document.getElementById('soc-sub').innerHTML = await versoesHTML()
+  } catch (e) { toast(msgErro(e), 'error') } finally { pronto() }
+}
+
+// ── equipe ──
+async function equipeHTML() {
+  const c = catPorId(_sel)
+  _pessoas = await rpc('socio_pessoas_do_departamento', { p_instrumento: _sel }) || []
+  const caixa = (p, papel, rot) => {
+    const nato = papel === 'gestor' && p.e_chefe
+    const marcado = nato || (p.papeis || []).includes(papel)
+    return `<label class="soc-papel"><input type="checkbox" ${marcado ? 'checked' : ''} ${nato ? 'disabled' : ''}
+      onchange="definirPapel('${p.usuario_id}','${papel}',this)" aria-label="${esc(rot)}: ${esc(p.nome)}"><span>${rot}${nato ? ' (chefe)' : ''}</span></label>`
+  }
+  return `<p class="soc-intro">Só aparecem pessoas lotadas no ${esc(c.departamento_sigla)} (ou numa divisão dele), ou que ocupam cargo nele. Quem é de outro
+      departamento entra por pedido de acesso. Quem não aparece e deveria: falta a lotação em Sistema › Estrutura Org.</p>
+    ${!c.pode_gerir && _admin ? `<div class="soc-aviso" role="note">${bico('shield')}<div><strong>Você está corrigindo como administrador.</strong>Cada mudança pede justificativa, que fica na trilha de auditoria.</div></div>` : ''}
+    <div class="card"><div class="table-wrap"><table class="soc-tab"><thead><tr><th>Pessoa</th><th>Papéis</th></tr></thead><tbody>
+    ${_pessoas.length ? _pessoas.map(p => `<tr><td><div class="soc-tit">${esc(p.nome)}</div><div class="soc-sub">${esc(p.email)}</div></td>
+      <td>${caixa(p, 'gestor', 'Gestor')}${caixa(p, 'aplicador', 'Aplicador')}${caixa(p, 'leitor', 'Lê fichas')}</td></tr>`).join('')
+      : `<tr><td colspan="2"><div class="empty-state">Ninguém com lotação ou cargo neste departamento.</div></td></tr>`}
+    </tbody></table></div></div>
+    <p class="soc-intro" style="margin-top:12px"><strong>Gestor</strong>: escreve e publica versões, monta a equipe, decide pedidos e valida fichas.
+      <strong>Aplicador</strong>: entrevista em campo e vê as próprias fichas. <strong>Lê fichas</strong>: vê as respostas, sem nome nem localização.</p>`
+}
+async function definirPapel(uid, papel, caixa) {
+  const ativo = caixa.checked
+  const c = catPorId(_sel)
+  let just = null
+  if (!c.pode_gerir) {
+    just = await confirmar({ titulo: 'Justificar a correção', texto: 'Como administrador, toda mudança de papel fica registrada com o motivo.',
+      ok: 'Salvar', campo: 'Justificativa', minimo: 20 })
+    if (!just) { caixa.checked = !ativo; return }
+  }
+  caixa.disabled = true
+  try {
+    await rpc('socio_definir_papel', { p_instrumento: _sel, p_usuario: uid, p_papel: papel, p_ativo: ativo, p_justificativa: just })
+    toast(ativo ? 'Papel concedido.' : 'Papel retirado.', 'success')
+    if (uid === _usuario.id) await recarregar()
+  } catch (e) { caixa.checked = !ativo; toast(msgErro(e), 'error') } finally { caixa.disabled = false }
+}
+
+// ── acessos do instrumento ──
+function acessosHTML() {
+  const doInstr = _acessos.filter(a => a.instrumento_id === _sel && a.usuario_id !== _usuario.id)
+  const hoje = hojeAcre()
+  const pend = doInstr.filter(a => a.status === 'pendente')
+  const vig = doInstr.filter(a => a.status === 'aprovado' && a.data_fim >= hoje)
+  const hist = doInstr.filter(a => !pend.includes(a) && !vig.includes(a))
+  const g = (catPorId(_sel) || {}).pode_gerir
+  const linha = (a, acao) => `<tr><td><div class="soc-tit">${esc(a.solicitante?.nome_completo || '—')}</div><div class="soc-sub">${esc(a.solicitante?.email || '')}</div></td>
+    <td>${esc(NIVEL_ROTULO[a.nivel])}</td><td style="max-width:320px">${esc(a.justificativa)}</td>
+    <td class="soc-num">${fmtDia(a.data_fim)}</td><td><div class="soc-acoes">${acao}</div></td></tr>`
+  const tabela = (titulo, rows, vazio, acao) => `<div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">${titulo}</div></div>
+    <div class="table-wrap"><table class="soc-tab"><thead><tr><th>Pessoa</th><th>Acesso</th><th>Para quê</th><th>Até</th><th><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>${rows.length ? rows.map(a => linha(a, acao(a))).join('') : `<tr><td colspan="5"><div class="empty-state">${vazio}</div></td></tr>`}</tbody></table></div></div>`
+  return `<p class="soc-intro">Pessoas de outros departamentos. Quem decide é o gestor do departamento dono — nunca quem pediu.</p>` +
+    (g ? '' : `<div class="soc-aviso" role="note">${bico('shield')}<div><strong>Só o gestor do departamento dono decide pedidos.</strong>Como administrador você acompanha, mas não decide no lugar dele.</div></div>`) +
+    tabela('Aguardando decisão', pend, 'Nenhum pedido aguardando.', a => g ? `<button class="btn btn-primary btn-sm" type="button" onclick="abrirDecidir('${a.id}')">Decidir</button>` : '') +
+    tabela('Em vigor', vig, 'Ninguém de fora tem acesso agora.', a => g ? `<button class="btn btn-secondary btn-sm" type="button" onclick="revogar('${a.id}')">Revogar</button>` : '') +
+    `<details class="card soc-corpo"><summary class="card-title" style="cursor:pointer">Histórico (${hist.length})</summary>
+      <div class="table-wrap" style="margin-top:12px"><table class="soc-tab"><thead><tr><th>Pessoa</th><th>Acesso</th><th>Situação</th><th>Até</th><th>Parecer</th></tr></thead><tbody>
+      ${hist.length ? hist.map(a => { const [cls, txt] = STATUS_PEDIDO[a.status] || ['badge-cinza', a.status]
+        return `<tr><td>${esc(a.solicitante?.nome_completo || '—')}</td><td>${esc(NIVEL_ROTULO[a.nivel])}</td>
+          <td>${a.status === 'aprovado' ? badge('badge-cinza', 'Vencido') : badge(cls, txt)}</td><td class="soc-num">${fmtDia(a.data_fim)}</td><td>${esc(a.parecer || '')}</td></tr>` }).join('')
+        : '<tr><td colspan="5"><div class="empty-state">Sem histórico.</div></td></tr>'}</tbody></table></div></details>`
+}
+
+// ── cadastro ──
+function cadastroHTML() {
+  const c = catPorId(_sel)
+  const deps = _admin ? _deps.filter(d => d.unidade_org_id !== c.unidade_org_id) : []
+  return `<div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">Cadastro</div></div><div class="soc-corpo">
+      <div class="form-group"><label class="form-label" for="cd-titulo">Título</label><input class="form-control" id="cd-titulo" maxlength="200" value="${esc(c.titulo)}"></div>
+      <div class="form-group"><label class="form-label" for="cd-fin">Para que serve</label><textarea class="form-control" id="cd-fin" rows="3" maxlength="2000">${esc(c.finalidade)}</textarea></div>
+      <div class="grid-2"><div class="form-group"><label class="form-label" for="cd-unid">O que é entrevistado</label>
+        <select class="form-control" id="cd-unid">${Object.entries(SocioPrevia.UNIDADE).map(([k, t]) => `<option value="${k}" ${k === c.unidade_analise ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="soc-papel" style="margin-top:28px"><input type="checkbox" id="cd-ativo" ${c.ativo ? 'checked' : ''}><span>Ativo (aparece no catálogo)</span></label></div></div>
+      <div class="form-hint" style="margin-bottom:12px">O código (${esc(c.codigo)}) não muda: ele está no código de cada ficha.</div>
+      <button class="btn btn-primary" type="button" id="cd-salvar" onclick="salvarCadastro()">Salvar</button></div></div>
+    ${_admin ? `<div class="card"><div class="card-header"><div class="card-title">Trocar o departamento dono</div></div><div class="soc-corpo">
+      <p class="soc-intro">Só o administrador. Os papéis do departamento atual deixam de valer, e quem é do novo departamento passa a ver o questionário e as fichas.</p>
+      <div class="form-group"><label class="form-label" for="cd-dep">Novo dono</label><select class="form-control" id="cd-dep">
+        ${deps.map(d => `<option value="${d.unidade_org_id}">${esc(d.sigla)} — ${esc(d.nome)}</option>`).join('')}</select></div>
+      <button class="btn btn-danger" type="button" onclick="transferir()">Trocar dono…</button></div></div>` : ''}`
+}
+async function salvarCadastro() {
+  const pronto = btnEspera(document.getElementById('cd-salvar'))
+  try {
+    await rpc('socio_atualizar_instrumento', {
+      p_id: _sel, p_titulo: document.getElementById('cd-titulo').value.trim(),
+      p_finalidade: document.getElementById('cd-fin').value.trim(),
+      p_unidade_analise: document.getElementById('cd-unid').value, p_ativo: document.getElementById('cd-ativo').checked,
+    })
+    toast('Cadastro salvo.', 'success')
+    await recarregar()
+  } catch (e) { toast(msgErro(e), 'error') } finally { pronto() }
+}
+async function transferir() {
+  const sel = document.getElementById('cd-dep')
+  const nome = sel.options[sel.selectedIndex]?.text
+  if (!sel.value) return
+  const just = await confirmar({ titulo: 'Trocar o departamento dono?', perigo: true, ok: 'Trocar',
+    texto: `O questionário passa para <strong>${esc(nome)}</strong>. Os papéis atuais deixam de valer.`, campo: 'Justificativa (vai para a trilha de auditoria)', minimo: 20 })
+  if (!just) return
+  try { await rpc('socio_transferir_instrumento', { p_id: _sel, p_unidade_org_id: sel.value, p_justificativa: just }); toast('Departamento dono trocado.', 'success'); await recarregar() }
+  catch (e) { toast(msgErro(e), 'error') }
+}
+
+// ── pedir acesso ──
+function abrirPedir(id) {
+  const c = catPorId(id)
+  _pedirId = id
+  document.getElementById('pd-quest').innerHTML = `<span class="soc-cod">${esc(c.codigo)}</span> <strong>${esc(c.titulo)}</strong> — dono: ${esc(c.departamento_sigla)}. O gestor de lá recebe o pedido e decide.`
+  document.querySelector('input[name="pd-nivel"][value="agregados"]').checked = true
+  document.getElementById('pd-just').value = ''
+  socContar('pd-just', 'pd-cont', 20)
+  const fim = document.getElementById('pd-fim')
+  fim.min = hojeAcre(); fim.max = somarDias(hojeAcre(), 365); fim.value = somarDias(hojeAcre(), 90)
+  socAbrir('pedir')
+}
+async function enviarPedido() {
+  const just = document.getElementById('pd-just').value.trim()
+  if (just.length < 20) return toast('Explique para que precisa (mínimo de 20 caracteres).', 'warning')
+  const pronto = btnEspera(document.getElementById('pd-enviar'))
+  try {
+    await rpc('socio_pedir_acesso', { p_instrumento: _pedirId, p_nivel: document.querySelector('input[name="pd-nivel"]:checked').value,
+      p_justificativa: just, p_data_fim: document.getElementById('pd-fim').value })
+    socFechar('pedir')
+    toast('Pedido enviado ao gestor do departamento.', 'success')
+    await recarregar()
+  } catch (e) { toast(msgErro(e), 'error') } finally { pronto() }
+}
+async function cancelarPedido(id) {
+  const ok = await confirmar({ titulo: 'Cancelar o pedido?', texto: 'O gestor deixa de vê-lo como pendente.', ok: 'Cancelar pedido', perigo: true })
+  if (!ok) return
+  try { await rpc('socio_encerrar_acesso', { p_acesso: id }); toast('Pedido cancelado.', 'success'); await recarregar() }
+  catch (e) { toast(msgErro(e), 'error') }
+}
+
+// ── decidir / revogar ──
+function abrirDecidir(id) {
+  const a = _acessos.find(x => x.id === id)
+  const c = catPorId(a.instrumento_id)
+  _decidirId = id
+  document.getElementById('dc-resumo').innerHTML = `<strong>${esc(a.solicitante?.nome_completo || '—')}</strong> pede
+    <strong>${esc(NIVEL_ROTULO[a.nivel])}</strong> em <span class="soc-cod">${esc(c ? c.codigo : '')}</span> ${esc(c ? c.titulo : '')}, até ${fmtDia(a.data_fim)}.
+    <br><em>“${esc(a.justificativa)}”</em>`
+  document.querySelector('input[name="dc-dec"][value="sim"]').checked = true
+  const fim = document.getElementById('dc-fim')
+  fim.min = hojeAcre(); fim.max = a.data_fim; fim.value = a.data_fim
+  document.getElementById('dc-parecer').value = ''
+  dcMudou()
+  socAbrir('decidir')
+}
+function dcMudou() {
+  const sim = document.querySelector('input[name="dc-dec"]:checked').value === 'sim'
+  document.getElementById('dc-fim-grupo').hidden = !sim
+  document.getElementById('dc-obrig').hidden = sim
+  document.getElementById('dc-confirmar').className = 'btn ' + (sim ? 'btn-primary' : 'btn-danger')
+  document.getElementById('dc-confirmar').textContent = sim ? 'Aprovar' : 'Recusar'
+}
+async function confirmarDecisao() {
+  const sim = document.querySelector('input[name="dc-dec"]:checked').value === 'sim'
+  const parecer = document.getElementById('dc-parecer').value.trim()
+  if (!sim && parecer.length < 5) return toast('Diga o motivo da recusa.', 'warning')
+  const pronto = btnEspera(document.getElementById('dc-confirmar'))
+  try {
+    await rpc('socio_decidir_acesso', { p_acesso: _decidirId, p_aprovar: sim, p_parecer: parecer || null,
+      p_data_fim: sim ? document.getElementById('dc-fim').value : null })
+    socFechar('decidir')
+    toast(sim ? 'Acesso aprovado.' : 'Pedido recusado.', 'success')
+    await recarregar()
+  } catch (e) { toast(msgErro(e), 'error') } finally { pronto() }
+}
+async function revogar(id) {
+  const motivo = await confirmar({ titulo: 'Revogar o acesso?', texto: 'A pessoa perde o acesso agora e recebe o motivo.', ok: 'Revogar', perigo: true, campo: 'Motivo', minimo: 5 })
+  if (!motivo) return
+  try { await rpc('socio_encerrar_acesso', { p_acesso: id, p_motivo: motivo }); toast('Acesso revogado.', 'success'); await recarregar() }
+  catch (e) { toast(msgErro(e), 'error') }
+}
+</script>
+</body>
+</html>

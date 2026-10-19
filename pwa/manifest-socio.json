@@ -1,0 +1,19 @@
+{
+  "name": "SIGUC Diagnóstico Socioeconômico",
+  "short_name": "Socioeconômico",
+  "description": "Entrevistas de campo do Diagnóstico Socioeconômico — SEMA/AC",
+  "start_url": "/pages/socio-app.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0A1A0F",
+  "theme_color": "#0A1A0F",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "categories": ["government", "productivity"],
+  "icons": [
+    { "src": "/pwa/icons/icon-socio-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icons/icon-socio-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icons/icon-socio-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "prefer_related_applications": false
+}

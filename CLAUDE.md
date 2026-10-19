@@ -4819,7 +4819,124 @@ monitor para aquele `auth.uid()`. Achado em produção com 1 monitor
   `tests/biomonitor-admin-monitor.test.js` (consistência de fonte entre
   o payload de `salvarMonitor` e o `select` de `carregarDados`).
 
+## Regra do sistema — Diagnóstico Socioeconômico (migrations 362/362b/362c)
+Questionários de campo de VÁRIOS instrumentos, cada um DONO de um departamento.
+Plano, formato da estrutura e decisões em `docs/socioeconomico/plano.md`. Fase 1
+(banco + interpretador) entregue em 18/10/2026; mesa, app de campo, indicadores e
+retenção são as Fases 2–5. Nada veio do DIMA (nem fichas, nem estrutura).
+- **Modelo**: `socio_instrumentos` (dono = `unidade_org_id`) → `socio_questionarios`
+  (versão; publicada = imutável, hash SHA-256 gerado) → `socio_campanhas` (período,
+  território, equipe em `socio_campanha_aplicadores`) → `socio_fichas`. UC é
+  OPCIONAL: cada campanha diz se exige município/UC e quais aceita.
+- **Acesso = `fn_socio_pode_de(uid, instrumento, acao)`, fonte única** (`ver`,
+  `ler_fichas`, `aplicar`, `treinar`, `gerir`, `ver_identificacao`, `admin`). NÃO
+  usa `pode_ver`/`nivel_efetivo`: o módulo é aberto a todos, o instrumento não.
+  Departamento = `usuario_unidades()` (lotação + cargo) com herança para baixo;
+  chefe (titular do cargo da unidade) é gestor nato; gestor designa
+  gestor/aplicador/leitor SÓ entre quem é do departamento. Chefia acima vê só
+  estrutura e agregados. Outro departamento: `socio_pedir_acesso` (agregados |
+  leitor | aplicador, justificativa ≥ 20, prazo ≤ 1 ano) → decide o GESTOR do
+  dono (nunca quem pediu, nunca o super_admin). **super_admin vê o catálogo mas
+  NÃO lê ficha** sem pedir; troca o dono (`socio_transferir_instrumento`) e
+  corrige papéis só com justificativa (vai para a `trilha_auditoria`).
+  ⚠️ Sem lotação nem cargo = sem departamento, e NÃO há fail-open (medido em
+  18/10/2026: 14 de 71 usuários ativos têm lotação). Cadastrar a lotação antes
+  da 1ª campanha.
+- **Identificação separada**: `socio_fichas_identificacao` (nome, GPS, colunas
+  `identificacao` da lista) só para o gestor e o próprio entrevistador — leitor e
+  quem é de fora nunca. A lista do domicílio mora em jsonb na ficha
+  (`socio_fichas.linhas`), sem tabela de moradores: reenviar regrava sem apagar.
+- **Escrita só por RPC** `socio_*` (SECURITY DEFINER; nenhuma policy de escrita —
+  não criar). Envio = `socio_enviar_ficha` (idempotente por `uuid_cliente`, código
+  `<CODIGO>-…`, treino = `TRE-` e aceita rascunho; carência de 15 dias após o fim
+  da campanha para ficha concluída a tempo). Validação = `socio_mudar_status`.
+  Erros no formato `socio:<codigo>: <texto>`.
+- **Interpretador em DOIS lugares, idênticos**: SQL (`fn_socio_*`, 362b) e
+  `js/socio-regras.js`. Regra nova entra nos dois e no teste cruzado. O que no
+  DIMA era fixo do questionário de domicílio aqui é declarado na estrutura:
+  `lista`, `derivada` (`total_linhas`, `existe_linha`, `maior_nivel`) e
+  `coerencia` (`igual_total_linhas`, `nega_linha`). `length()` do Postgres conta
+  caracteres — o JS usa `Array.from(s).length`, nunca `.length`.
+- `fn_socio_validar_estrutura(jsonb)` devolve a lista de erros legíveis (salto
+  para pergunta posterior, chave/opção repetida, derivada inválida…): rascunho
+  salva com erro, publicar não.
+- Notificação: `tipo = 'sistema'` + `meta.modulo = 'socio'` + `meta.subtipo`.
+  ROPA: TRAT-021.
+- Guarda: `supabase/tests/socio/rodar.sh` (Postgres 16 local + stub do SIGUC):
+  ~70 asserções de acesso e fluxo + 1.800 casos aleatórios JS × SQL. Contrafactual
+  conferido (super_admin lendo ficha e JS divergente reprovam).
+- **Mesa — Fase 2** (`pages/socio-questionarios.html`, grupo "Diagnóstico
+  Socioeconômico" no menu, logo abaixo de Principal e fora dos superblocos, sem
+  `modulo:`/`perfis:` — a página é aberta a todos): abas Do meu departamento ·
+  Catálogo (com "Pedir acesso") · Pedidos (recebidos com contador + os meus); no
+  questionário, Versões (editor JSON + pré-visualização + conferência ao vivo por
+  `fn_socio_validar_estrutura`, publicar/arquivar com confirmação), Equipe
+  (chefe = gestor nato, caixa travada; super_admin só com justificativa), Acessos
+  (decidir/revogar — super_admin acompanha, não decide) e Cadastro (troca de dono
+  só super_admin). A tela só esconde botão: quem decide é o banco.
+  Pré-visualização em `js/socio-previa.js` (pura, saltos e derivadas escritos em
+  português; também oferece o MODELO do editor, que o `rodar.sh` confere contra a
+  validação do banco). Estilos em `css/socio.css` (prefixo `soc-`; `.card` do
+  SIGUC não tem padding — conteúdo solto vai em `.soc-corpo`). Erro do banco
+  `socio:<codigo>: <texto>` → a tela mostra só o texto (`msgErro`).
+  Guarda: `tests/socio-questionarios.test.js` (9, página real + banco falso em
+  memória; contrafactual conferido). `tests/sidebar-grupos.test.js` passou a
+  esperar 'socio' depois de 'principal'.
+- `pwa/sw.js`: frota 113 → 114 (`js/layout.js` está no shell do Frota).
+- **App de campo — Fase 3** (`pages/socio-app.html`, migration 363; detalhe em
+  §8 do plano): 5º app offline, PWA com escopo próprio (`VERSOES.socio`,
+  `SHELLS.socio`; sem APK ainda — o `apk-auto-trigger.yml` só avisa e pula app
+  sem workflow). Login SIGUC + PIN (`pin-baralho`), cliente isolado com sessão em
+  `localStorage['siguc-socio-session']`. Tudo vem de `socio_app_pacote()` (uma
+  chamada; guardado no IndexedDB `siguc_socio_v1`) e a ficha guarda a CÓPIA da
+  versão aplicada. Formulário desenhado da estrutura por `js/socio-form.js`
+  (salto, lista, derivada, especifique, "Não respondeu"; nenhuma regra própria —
+  tudo de `js/socio-regras.js`); armazenamento em `js/socio-offline.js` (fotos
+  como BYTES, nunca Blob — iPhone); fila em `js/socio-sync.js`: foto antes da
+  ficha em `socio-fotos/<uuid_cliente>/…`, depois `socio_enviar_ficha`
+  (idempotente). Erro `socio:<codigo>` → ficha "Com problema", com Corrigir;
+  outro erro → segue pendente. Correção mantém uuid, código e `finalizada_em`.
+  ⚠️ `FileList` de `<input type=file>` é VIVA: zerar o `value` antes de ler
+  esvazia a lista — copiar com `Array.from` primeiro (bug real achado no teste).
+  Guarda: `tests/socio-app.test.js` (8, página real + Supabase falso + "internet"
+  ligada/desligada por `page.route`; contrafactual conferido) e o bloco 7b do
+  `supabase/tests/socio/10_testes.sql` (pacote e policies do bucket).
+  `pwa/sw.js`: socio 1 (novo).
+- **Mesa — Fase 4** (abas Campanhas e Fichas do questionário, migration 364;
+  detalhe em §9 do plano): não são páginas próprias — `js/socio-campanhas.js` e
+  `js/socio-fichas.js`, carregados por `pages/socio-questionarios.html`. Leituras
+  montadas no banco: `socio_campanhas_resumo` (quem vê), `socio_campanha_equipe`
+  (gestor), `socio_fichas_lista` (filtra por `fn_socio_pode_ver_ficha`) e
+  `socio_ficha_detalhe` (identificação/fotos = `null` para quem não pode — a tela
+  só desenha o que veio). Escrita: `socio_salvar_campanha`,
+  `socio_situacao_campanha`, `socio_definir_aplicador`, `socio_mudar_status`
+  (devolver/descartar com motivo) e `socio_vincular_comunidade` (364, mesmo
+  município). Respostas desenhadas pela estrutura da VERSÃO da ficha.
+  ⚠️ Janela injetada no fim do `<body>` ficava por cima da confirmação (mesmo
+  z-index): `socAbrir` empilha pelo z-index na ordem de abertura.
+  Guarda: `tests/socio-mesa-fase4.test.js` (7; contrafactual conferido) e o
+  bloco 9b do `10_testes.sql`. Sem mudança em `pwa/sw.js` (tela de mesa).
+- **Fase 5** (migration 365 + Edge Function `socio-expurgo`; detalhe em §10 do
+  plano): aba Indicadores (`js/socio-indicadores.js`) lê `socio_indicadores` —
+  só validadas, sem treino, **nada por pergunta abaixo de 5 fichas** no recorte,
+  número sem mínimo/máximo, texto livre nunca. Exportação por `socio_exportar`
+  (ExcelJS, carregado no clique), registrada em `socio_exportacoes` na mesma
+  transação; leitor sem texto livre; identificação só para o gestor que pedir.
+  Retenção diária `fn_socio_aplicar_retencao` (prazo do TRAT-021; treino 30 dias)
+  limpa os campos, nunca apaga linha; arquivo vai para `socio_expurgo_arquivos`
+  e a Edge Function remove do Storage. ⚠️ `socAbrir` só puxa o foco se ele ainda
+  não estiver dentro da janela (senão o texto digitado ia para outro campo).
+  Guarda: +4 em `tests/socio-mesa-fase4.test.js` (11; planilha aberta e
+  conferida; contrafactual conferido) e bloco 9c do `10_testes.sql`.
+
 ## Próxima tarefa
+**Diagnóstico Socioeconômico** — as 5 fases do plano estão entregues. O que fica
+para depois (§5 do plano, linha "depois"): áudio + transcrição local, editor
+visual de questionário, APK do app de campo, visita com vários instrumentos no
+mesmo domicílio. Antes da 1ª campanha real: cadastrar a lotação de quem vai usar
+(sem lotação não há departamento) e o aviso de campo (`lgpd_documentos`,
+`app = 'socio'`).
+
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).
 Próximo passo é a Fase D (Qualidade do Ar) — só estrutura reservada
