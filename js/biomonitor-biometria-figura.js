@@ -21,7 +21,9 @@ const BIO_BIOMETRIA_MEDIDAS = {
 
 const _BIO_FIG_COR = {
   pele: '#B9AE92', casco: '#E7DCC3', borda: '#A48A5A', plastrao: '#F4ECD8',
-  cara: '#1A6B8C', plas: '#B45309',
+  // Linhas de medida em VERMELHO (pedido do usuário): se destacam do casco
+  // bege. Carapaça × plastrão se distinguem pela vista e pela letra.
+  med: '#DC2626',
 }
 
 // Cabeça, nadadeiras e cauda — iguais nas duas vistas.
@@ -62,8 +64,8 @@ function _bioFigCima(dest) {
     <ellipse cx="100" cy="126" rx="50" ry="67" fill="none" stroke="${c.borda}" stroke-width="1.2"/>
     <path d="M88 64 L112 64 L118 82 L112 98 L88 98 L82 82 Z M88 98 L112 98 L118 116 L112 134 L88 134 L82 116 Z M88 134 L112 134 L118 152 L112 170 L88 170 L82 152 Z M88 170 L112 170 L116 186 L100 192 L84 186 Z" fill="none" stroke="${c.borda}" stroke-width="1.2"/>
     <path d="M82 82 L52 88 M82 116 L50 120 M82 152 L52 156 M118 82 L148 88 M118 116 L150 120 M118 152 L148 156" stroke="${c.borda}" stroke-width="1.2"/>
-    ${_bioFigMedida('A', c.cara, 100, 50, 100, 202, 126, 70, ap('A'))}
-    ${_bioFigMedida('B', c.cara, 42, 126, 158, 126, 70, 144, ap('B'))}
+    ${_bioFigMedida('A', c.med, 100, 50, 100, 202, 126, 70, ap('A'))}
+    ${_bioFigMedida('B', c.med, 42, 126, 158, 126, 70, 144, ap('B'))}
   </svg>`
 }
 
@@ -80,12 +82,12 @@ function _bioFigBarriga(dest) {
     <path d="M100 60 C125 60 138 72 138 92 L144 108 L144 142 L136 158 C136 178 126 192 112 196 L100 188 L88 196 C74 192 64 178 64 158 L56 142 L56 108 L62 92 C62 72 75 60 100 60 Z" fill="${c.plastrao}" stroke="${c.borda}" stroke-width="2"/>
     <path d="M100 62 L100 188 M66 82 L134 82 M58 106 L142 106 M58 140 L142 140 M66 162 L134 162 M76 182 L124 182" stroke="${c.borda}" stroke-width="1"/>
     <g class="bio-fig-med${mostraFant ? '' : ' apagada'}" data-med="B-ref">
-      <line x1="40" y1="214" x2="160" y2="214" stroke="${c.cara}" stroke-width="2" stroke-dasharray="4 4" opacity=".6"/>
-      <text x="100" y="236" text-anchor="middle" font-size="10.5" fill="${c.cara}"
+      <line x1="40" y1="214" x2="160" y2="214" stroke="${c.med}" stroke-width="2" stroke-dasharray="4 4" opacity=".6"/>
+      <text x="100" y="236" text-anchor="middle" font-size="10.5" fill="${c.med}"
         font-family="DM Sans,Arial,sans-serif">larg. da carapaça (B)</text>
     </g>
-    ${_bioFigMedida('C', c.plas, 100, 64, 100, 190, 122, 72, ap('C'))}
-    ${_bioFigMedida('D', c.plas, 60, 124, 140, 124, 78, 152, ap('D'))}
+    ${_bioFigMedida('C', c.med, 100, 64, 100, 190, 122, 72, ap('C'))}
+    ${_bioFigMedida('D', c.med, 60, 124, 140, 124, 78, 152, ap('D'))}
   </svg>`
 }
 

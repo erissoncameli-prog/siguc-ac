@@ -2985,7 +2985,8 @@ plastrão** (`largura_plastrao_cm`, nova) e peso.
   4 medidas do formulário tem um "?" (verbetes `comprimento-carapaca`,
   `largura-carapaca`, `comprimento-plastrao`, `largura-plastrao`) que abre
   a mesma figura com só a sua medida acesa; D leva junto a largura da
-  carapaça tracejada. O guia "Berçário" ganhou o passo "Biometria: onde
+  carapaça tracejada. Todas as linhas de medida em VERMELHO (#DC2626,
+  pedido do usuário) — carapaça × plastrão se distinguem pela vista e letra. O guia "Berçário" ganhou o passo "Biometria: onde
   medir" com as quatro. O motor (`js/guia-app.js`) passou a aceitar
   `figura` (função declarada no código) em passo e verbete — genérico,
   serve a qualquer app; sem o módulo carregado, o verbete abre só com
@@ -2994,7 +2995,8 @@ plastrão** (`largura_plastrao_cm`, nova) e peso.
   fonte: cada medida atravessa formulário → envio → download → PDF; e a
   figura acendendo a medida certa em cada "?").
 - `pwa/sw.js`: biomonitor 74 → 75 (medida) → 76 (figura, arquivo novo no
-  shell e nas 3 listas de `app-biomonitor/scripts/build-www.mjs`); agua
+  shell e nas 3 listas de `app-biomonitor/scripts/build-www.mjs`) → 77
+  (linhas em vermelho); agua
   43 → 44 (`js/guia-app.js`/`css/guia-app.css` estão no shell da Água).
 
 ## Biomonitor — Equipamentos em cautela (migrations 226/227/228)

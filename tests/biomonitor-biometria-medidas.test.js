@@ -157,3 +157,18 @@ test('sem o módulo da figura, o verbete abre só com o texto', async ({ page })
   expect(r.titulo).toBe('Largura do plastrão');
   expect(r.figura).toBe(false);
 });
+
+test('linhas de medida em vermelho e nenhuma cor indefinida no desenho', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(() => {
+    const html = bioBiometriaFiguraHTML(null)
+    const d = document.createElement('div'); d.innerHTML = html
+    return {
+      indefinido: /undefined/.test(html),
+      cores: [...d.querySelectorAll('.bio-fig-med[data-med] line')].map(l => l.getAttribute('stroke')),
+    }
+  });
+  expect(r.indefinido).toBe(false);
+  expect(r.cores.length).toBe(5);
+  expect([...new Set(r.cores)]).toEqual(['#DC2626']);
+});
