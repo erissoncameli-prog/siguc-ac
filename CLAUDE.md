@@ -2963,6 +2963,42 @@ cuidado (passa por ocorrência, captura causa/data).
   contra produção, não só o histórico de migrations do repositório.
 - `pwa/sw.js`: biomonitor v34 → v35.
 
+## Biomonitor — medidas do casco na biometria do filhote (migration 366)
+Biometria individual (`biometrias_individuais`) tem 5 medidas:
+comprimento da carapaça (`comprimento_cm` — a coluna manteve o nome, só o
+rótulo mudou), largura da carapaça, comprimento do plastrão, **largura do
+plastrão** (`largura_plastrao_cm`, nova) e peso.
+- **Largura do plastrão é medida própria, nunca copiada da carapaça**
+  (decisão do usuário, 21/10/2026). O plastrão é a placa ventral, sempre
+  mais estreita que a carapaça (que inclui os marginais); espelhar faria a
+  razão plastrão/carapaça dar 1 por construção. Protocolo: MAIOR largura do
+  plastrão — texto no verbete `largura-plastrao` (`js/biomonitor-guias.js`).
+- "Comprimento" virou "Comprimento da carapaça" em todo lugar: formulário
+  individual, biometria por amostragem (`comprimento_medio_cm`), histórico,
+  PDF por ninho, mesa de berçários, gráficos de crescimento do app, do
+  relatório e da Análise Científica.
+- `vw_filhotes_bercario` ganhou `ultimo_largura_plastrao_cm` ao final.
+- **Figura "onde medir" na Ajuda**: `js/biomonitor-biometria-figura.js`
+  (`bioBiometriaFiguraHTML(destaque)`, SVG desenhado no código — abre
+  offline). Carapaça = medidas por CIMA (A comprimento, B largura);
+  plastrão = medidas da BARRIGA (C comprimento, D largura). Cada uma das
+  4 medidas do formulário tem um "?" (verbetes `comprimento-carapaca`,
+  `largura-carapaca`, `comprimento-plastrao`, `largura-plastrao`) que abre
+  a mesma figura com só a sua medida acesa; D leva junto a largura da
+  carapaça tracejada. Todas as linhas de medida em VERMELHO (#DC2626,
+  pedido do usuário) — carapaça × plastrão se distinguem pela vista e letra. O guia "Berçário" ganhou o passo "Biometria: onde
+  medir" com as quatro. O motor (`js/guia-app.js`) passou a aceitar
+  `figura` (função declarada no código) em passo e verbete — genérico,
+  serve a qualquer app; sem o módulo carregado, o verbete abre só com
+  texto.
+- Guarda: `tests/biomonitor-biometria-medidas.test.js` (9 — consistência de
+  fonte: cada medida atravessa formulário → envio → download → PDF; e a
+  figura acendendo a medida certa em cada "?").
+- `pwa/sw.js`: biomonitor 74 → 75 (medida) → 76 (figura, arquivo novo no
+  shell e nas 3 listas de `app-biomonitor/scripts/build-www.mjs`) → 77
+  (linhas em vermelho); agua
+  43 → 44 (`js/guia-app.js`/`css/guia-app.css` estão no shell da Água).
+
 ## Biomonitor — Equipamentos em cautela (migrations 226/227/228)
 Cadastro do bem é SEMPRE na mesa (`biomonitor-equipamentos.html`,
 perfil tecnico/gestor/super_admin): descrição, plaqueta física

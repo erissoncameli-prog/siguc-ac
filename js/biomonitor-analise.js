@@ -705,9 +705,9 @@ function acSecCrescimento(ctx) {
       <td>${dentro ? 'na faixa-alvo' : c2 < idealMin ? 'abaixo da faixa-alvo' : 'acima da faixa-alvo'}</td></tr>`
   }).join('')
   const corpo = `${fund}
-    ${acMini('Comprimento × idade')}
-    <div class="ac-chart-wrap" style="height:240px"><canvas id="ac-cv-cresc" aria-label="Comprimento dos filhotes pela idade"></canvas></div>
-    ${linhasTaxa ? `${acMini('Taxa de crescimento por lote')}${acTabela('<th>Berçário</th><th>Espécie</th><th class="num">Intervalo</th><th class="num">Comprimento</th><th class="num">Peso</th>', linhasTaxa)}` : ''}
+    ${acMini('Comprimento da carapaça × idade')}
+    <div class="ac-chart-wrap" style="height:240px"><canvas id="ac-cv-cresc" aria-label="Comprimento da carapaça dos filhotes pela idade"></canvas></div>
+    ${linhasTaxa ? `${acMini('Taxa de crescimento por lote')}${acTabela('<th>Berçário</th><th>Espécie</th><th class="num">Intervalo</th><th class="num">Compr. carapaça</th><th class="num">Peso</th>', linhasTaxa)}` : ''}
     ${linhasTam ? `${acMini(`Tamanho na última biometria × faixa-alvo (${idealMin}–${idealMax} cm)`)}${acTabela('<th>Berçário</th><th>Espécie</th><th class="num">Casco</th><th class="num">Idade</th><th>Leitura</th>', linhasTam)}` : ''}`
   return acSec('crescimento', 'Crescimento em berçário', 'Taxa de crescimento e tamanho de soltura', corpo)
 }
@@ -936,7 +936,7 @@ function acChartCrescimento(det) {
     data: { datasets: ds },
     options: { responsive: true, maintainAspectRatio: false,
       scales: { x: { title: { display: true, text: 'idade (dias desde a eclosão)' }, grid: { color: AC_GRID } },
-        y: { title: { display: true, text: 'comprimento (cm)' }, grid: { color: AC_GRID } } },
+        y: { title: { display: true, text: 'comprimento da carapaça (cm)' }, grid: { color: AC_GRID } } },
       plugins: { legend: { position: 'bottom' } } },
   })
 }

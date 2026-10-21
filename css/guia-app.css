@@ -110,6 +110,8 @@
 }
 .guia-passo-ic svg { width: 24px; height: 24px; }
 .guia-corpo { margin: 8px 0 0; font-size: 14.5px; line-height: 1.55; color: #374151; }
+.guia-figura { margin: 12px 0 0; }
+.guia-figura svg { display: block; width: 100%; height: auto; }
 .guia-lista-itens { margin: 10px 0 0; padding-left: 18px; }
 .guia-lista-itens li { font-size: 14px; line-height: 1.5; color: #374151; margin-bottom: 6px; }
 .guia-nota {

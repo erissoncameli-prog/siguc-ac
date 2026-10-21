@@ -1,0 +1,174 @@
+// ── SIGUC Biomonitor · biometria individual — medidas do casco ────────
+// Executar: npx playwright test tests/biomonitor-biometria-medidas.test.js
+//
+// Migration 366: a biometria do filhote ganhou a LARGURA DO PLASTRÃO,
+// medida própria (maior largura da placa ventral), nunca copiada da
+// largura da carapaça — a razão plastrão/carapaça daria 1 por construção.
+// E "Comprimento" passou a se chamar "Comprimento da carapaça" (só o
+// rótulo; a coluna segue comprimento_cm).
+//
+// Guarda de CONSISTÊNCIA DE FONTE: cada medida tem de atravessar o
+// caminho inteiro (formulário → IndexedDB → envio → download → PDF).
+// Uma coluna esquecida em um desses pontos some em silêncio — o envio
+// grava null e o download apaga o valor local na próxima sincronização.
+
+const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const raiz = path.join(__dirname, '..');
+const ler = f => fs.readFileSync(path.join(raiz, f), 'utf8');
+
+const MEDIDAS = [
+  'comprimento_cm', 'largura_carapaca_cm',
+  'comprimento_plastrao_cm', 'largura_plastrao_cm', 'peso_g',
+];
+
+function trecho(src, inicio, fim) {
+  const i = src.indexOf(inicio);
+  expect(i, `trecho "${inicio}" não encontrado`).toBeGreaterThanOrEqual(0);
+  const j = src.indexOf(fim, i + inicio.length);
+  return src.slice(i, j < 0 ? undefined : j);
+}
+
+test('formulário: largura do plastrão existe e o comprimento é da carapaça', () => {
+  const html = ler('pages/biomonitor.html');
+  const form = trecho(html, 'Biometria — Filhote', 'bio-bio-ind-obs');
+  expect(form).toContain('id="bio-bio-ind-larg-plastrao"');
+  expect(form).toContain('Largura do plastrão (cm)');
+  expect(form).toContain('Comprimento da carapaça (cm)');
+  expect(form).not.toMatch(/>Comprimento \(cm\)</);
+  expect(html).toContain('Compr. médio da carapaça (cm)');
+});
+
+test('salvar no app grava as 5 medidas, sem copiar carapaça para plastrão', () => {
+  const src = ler('js/biomonitor-quelonios.js');
+  const fn = trecho(src, 'async function bioSalvarBiometriaInd', '\n}\n');
+  for (const c of MEDIDAS) expect(fn, c).toMatch(new RegExp(`\\b${c}:`));
+  expect(fn).toContain("getElementById('bio-bio-ind-larg-plastrao')");
+  // nunca derivada da largura da carapaça
+  expect(fn).not.toMatch(/largura_plastrao_cm:\s*largura\b/);
+  expect(fn).not.toMatch(/largPlastrao\s*=\s*.*largura\b(?!_)/);
+});
+
+test('sync: envio e download carregam as 5 medidas', () => {
+  const src = ler('js/biomonitor-sync.js');
+  const envio = trecho(src, 'Biometria individual…', 'bioOfflineAtualizarSync(');
+  const pull = trecho(src, 'async function bioSyncPullBiometriasInd', '\n}\n');
+  for (const c of MEDIDAS) {
+    expect(envio, `envio: ${c}`).toMatch(new RegExp(`\\b${c}:`));
+    expect(pull, `select do download: ${c}`).toMatch(new RegExp(`[\\s,]${c}[,\\s]`));
+    expect(pull, `gravação do download: ${c}`).toMatch(new RegExp(`\\b${c}:`));
+  }
+});
+
+test('PDF por ninho e tabela da mesa mostram a largura do plastrão', () => {
+  const pdf = ler('js/biomonitor-relatorio-ninho.js');
+  expect(pdf).toMatch(/from\('biometrias_individuais'\)\s*\.select\('[^']*largura_plastrao_cm/);
+  expect(pdf).toContain('larg. plastrão');
+  const mesa = ler('pages/biomonitor-bercarios.html');
+  expect(mesa).toContain('<th>Larg. plastrão</th>');
+  expect(mesa).toContain('ultimo_largura_plastrao_cm');
+});
+
+test('migration 366: coluna, CHECK e view com a coluna nova ao final', () => {
+  const sql = ler('supabase/migrations/366_biometria_largura_plastrao.sql');
+  expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS largura_plastrao_cm numeric\(5,1\)/);
+  expect(sql).toMatch(/OR largura_plastrao_cm IS NOT NULL/);
+  expect(sql).toMatch(/WITH \(security_invoker = true\)/);
+  // coluna nova depois de f.anomalia (CREATE OR REPLACE VIEW só acrescenta no fim)
+  expect(sql).toMatch(/f\.anomalia,\s*ub\.largura_plastrao_cm\s+AS ultimo_largura_plastrao_cm\s*FROM/);
+});
+
+// ── Ajuda com figura "onde medir" (js/biomonitor-biometria-figura.js) ──
+// Carapaça = medidas por cima (A, B); plastrão = medidas da barriga (C, D).
+// Cada "?" do formulário abre a MESMA figura com só a sua medida acesa.
+const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
+const CHROMIUM_PATH = '/opt/pw-browsers/chromium';
+if (fs.existsSync(CHROMIUM_PATH)) test.use({ launchOptions: { executablePath: CHROMIUM_PATH } });
+
+async function abrirApp(page) {
+  await page.route('**/api/env', r => r.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ supabaseUrl: 'https://stub.supabase.co', supabaseKey: 'chave-stub' }) }));
+  await page.route('**/cdn.jsdelivr.net/**', r => r.abort());
+  await page.goto(`${BASE}/pages/biomonitor.html`);
+  await page.locator('#tela-login').waitFor({ state: 'visible', timeout: 20_000 });
+  // o app declara o catálogo ao entrar na Home; aqui basta o conteúdo
+  await page.evaluate(() => { if (!guiaCatalogo()) guiaDefinir(BIOMONITOR_GUIAS) });
+}
+
+const VERBETE_DA_MEDIDA = {
+  A: 'comprimento-carapaca', B: 'largura-carapaca',
+  C: 'comprimento-plastrao', D: 'largura-plastrao',
+};
+
+test('cada "?" do formulário de biometria existe e aponta para a sua medida', async () => {
+  const form = trecho(ler('pages/biomonitor.html'), 'Biometria — Filhote', 'bio-bio-ind-obs');
+  for (const chave of Object.values(VERBETE_DA_MEDIDA)) {
+    expect(form, chave).toContain(`data-guia-verbete="${chave}"`);
+  }
+});
+
+test('o verbete abre a figura com SÓ a medida do campo acesa', async ({ page }) => {
+  await abrirApp(page);
+  for (const [letra, chave] of Object.entries(VERBETE_DA_MEDIDA)) {
+    const r = await page.evaluate(ch => {
+      guiaVerbete(ch)
+      const raiz = document.getElementById('guia-raiz')
+      const g = [...raiz.querySelectorAll('.bio-fig-med[data-med]')]
+      return {
+        temFigura: !!raiz.querySelector('.guia-figura .bio-fig-biometria'),
+        acesas: g.filter(x => !x.classList.contains('apagada')).map(x => x.dataset.med),
+      }
+    }, chave);
+    expect(r.temFigura, chave).toBe(true);
+    // D leva junto a referência tracejada da largura da carapaça
+    expect(r.acesas.sort(), chave).toEqual(letra === 'D' ? ['B-ref', 'D'] : [letra]);
+    await page.keyboard.press('Escape');
+  }
+});
+
+test('guia do Berçário mostra a figura com as quatro medidas', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(() => {
+    const g = BIOMONITOR_GUIAS.guias.find(x => x.slug === 'bercario')
+    const i = g.passos.findIndex(p => p.titulo === 'Biometria: onde medir')
+    guiaAbrir('bercario', { passo: i, voltarCentral: false })
+    const raiz = document.getElementById('guia-raiz')
+    return {
+      i,
+      acesas: [...raiz.querySelectorAll('.bio-fig-med')].filter(x => !x.classList.contains('apagada')).length,
+      svgs: raiz.querySelectorAll('.guia-figura svg').length,
+    }
+  });
+  expect(r.i).toBeGreaterThanOrEqual(0);
+  expect(r.svgs).toBe(2);
+  expect(r.acesas).toBe(5); // A, B, C, D + referência tracejada
+});
+
+test('sem o módulo da figura, o verbete abre só com o texto', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(() => {
+    window.bioBiometriaFiguraHTML = undefined
+    guiaVerbete('largura-plastrao')
+    const raiz = document.getElementById('guia-raiz')
+    return { titulo: raiz.querySelector('.guia-titulo')?.textContent, figura: !!raiz.querySelector('.guia-figura') }
+  });
+  expect(r.titulo).toBe('Largura do plastrão');
+  expect(r.figura).toBe(false);
+});
+
+test('linhas de medida em vermelho e nenhuma cor indefinida no desenho', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(() => {
+    const html = bioBiometriaFiguraHTML(null)
+    const d = document.createElement('div'); d.innerHTML = html
+    return {
+      indefinido: /undefined/.test(html),
+      cores: [...d.querySelectorAll('.bio-fig-med[data-med] line')].map(l => l.getAttribute('stroke')),
+    }
+  });
+  expect(r.indefinido).toBe(false);
+  expect(r.cores.length).toBe(5);
+  expect([...new Set(r.cores)]).toEqual(['#DC2626']);
+});

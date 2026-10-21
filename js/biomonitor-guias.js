@@ -127,6 +127,10 @@ const BIOMONITOR_GUIAS = {
           texto: 'Depois de registrar a eclosão, se os filhotes não forem soltos direto no rio, você escolhe **Berçário** em Destino dos Filhotes. Isso cria um LOTE — o grupo de filhotes daquele ninho, sob cuidado até a soltura.' },
         { titulo: 'Escolher o berçário certo', icone: 'pin',
           texto: 'O berçário é compartilhado pela equipe inteira do grupo — todos veem os mesmos lotes, não só quem registrou. Escolha pela capacidade disponível mostrada na tela, nunca por costume.' },
+        { titulo: 'Biometria: onde medir', icone: 'sliders',
+          figura: () => _bioGuiaFigura(null),
+          texto: '**Carapaça** são as medidas por cima (A comprimento, B largura). **Plastrão** são as medidas da barriga, com o filhote de barriga para cima (C comprimento, D largura). Deixe em branco a medida que não foi tirada.',
+          nota: 'O **?** ao lado de cada campo do formulário mostra esta figura com aquela medida em destaque.' },
         { titulo: 'Mortalidade e doença no berçário', icone: 'bell',
           texto: 'Óbito ou doença durante o cuidado é registrado como **ocorrência do lote** (não um recontagem manual do lote inteiro) — é o que mantém o histórico de causa por causa, igual às visitas de ninho.' },
         { titulo: 'Soltura', icone: 'check',
@@ -143,7 +147,7 @@ const BIOMONITOR_GUIAS = {
           texto: 'Ocorrência é qualquer evento que não é uma visita de rotina nem uma soltura — óbito, doença, biometria avulsa, dano a equipamento, achado incomum. Escolha o TIPO primeiro; ele decide quais campos aparecem depois.',
           alvo: '#bio-oc-tipo-grid' },
         { titulo: 'Biometria', icone: 'sliders',
-          texto: 'Comprimento e peso MÉDIOS da amostra, e quantos filhotes foram medidos — não é uma medição individual de cada um (essa existe à parte, na tela do indivíduo, para filhotes marcados).',
+          texto: 'Comprimento da carapaça e peso MÉDIOS da amostra, e quantos filhotes foram medidos — não é uma medição individual de cada um (essa existe à parte, na tela do indivíduo, para filhotes marcados).',
           alvo: '#bio-oc-sec-biometria' },
         { titulo: 'Mortalidade', icone: 'x',
           texto: 'Quantidade afetada + causa. É esse par (número e motivo) que sustenta o relatório de mortalidade por causa do berçário — nunca só o total.',
@@ -215,11 +219,31 @@ const BIOMONITOR_GUIAS = {
       texto: 'O número de ovos contado no encontro do ninho. A eclosão mostra esse número lado a lado com o total apurado agora, para conferir divergência grande antes de confirmar.' },
     'anomalia': { titulo: 'Anomalia em filhote', guia: 'eclosao',
       texto: 'Deformidade congênita (casco, membro, corpo, albinismo). É SUBCONJUNTO dos filhotes vivos, nunca um balde à parte — filhote com anomalia segue o fluxo normal de destino.' },
+    // Biometria do filhote: carapaça = medidas por CIMA, plastrão =
+    // medidas da BARRIGA. Cada "?" abre a mesma figura com a sua medida
+    // em destaque (js/biomonitor-biometria-figura.js).
+    'comprimento-carapaca': { titulo: 'Comprimento da carapaça', guia: 'bercario',
+      figura: () => _bioGuiaFigura('A'),
+      texto: 'Medida **A**, com o filhote visto por cima: em linha reta, pelo meio do casco, da borda da frente (acima do pescoço) até a borda de trás (acima da cauda).' },
+    'largura-carapaca': { titulo: 'Largura da carapaça', guia: 'bercario',
+      figura: () => _bioGuiaFigura('B'),
+      texto: 'Medida **B**, com o filhote visto por cima: na parte mais larga do casco, de uma borda lateral até a outra.' },
+    'comprimento-plastrao': { titulo: 'Comprimento do plastrão', guia: 'bercario',
+      figura: () => _bioGuiaFigura('C'),
+      texto: 'Medida **C**, com o filhote de barriga para cima: pelo meio do plastrão (a placa da barriga), da ponta da frente até a ponta de trás.' },
+    'largura-plastrao': { titulo: 'Largura do plastrão', guia: 'bercario',
+      figura: () => _bioGuiaFigura('D'),
+      texto: 'Medida **D**, com o filhote de barriga para cima: na MAIOR largura do plastrão (a placa da barriga). É sempre menor que a largura da carapaça (B), que inclui as bordas do casco — meça as duas, nunca copie uma na outra. Deixe em branco se não mediu.' },
     'lote': { titulo: 'Lote do berçário', guia: 'bercario',
       texto: 'O grupo de filhotes de um ninho que entrou no berçário. Compartilhado pela equipe inteira do grupo — todos veem os mesmos lotes.' },
     'cautela': { titulo: 'Cautela de equipamento', guia: 'equipamentos',
       texto: 'O registro de que você está responsável por um equipamento da SEMA, com prazo de devolução. A devolução em si é sempre confirmada pela gestão, nunca pelo próprio app.' }
   }
+}
+
+// Sem o módulo da figura carregado, o verbete segue só com o texto.
+function _bioGuiaFigura(destaque) {
+  return typeof bioBiometriaFiguraHTML === 'function' ? bioBiometriaFiguraHTML(destaque) : ''
 }
 
 if (typeof window !== 'undefined') window.BIOMONITOR_GUIAS = BIOMONITOR_GUIAS

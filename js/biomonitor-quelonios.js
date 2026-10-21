@@ -3020,9 +3020,10 @@ async function bioCarregarTimelineIndividuo(individuo) {
 
   timelineEl.innerHTML = medicoes.map(m => {
     const detalhes = [
-      m.comprimento_cm != null ? `Comp.: ${m.comprimento_cm} cm` : null,
+      m.comprimento_cm != null ? `Compr. carapaça: ${m.comprimento_cm} cm` : null,
       m.largura_carapaca_cm != null ? `Larg. carapaça: ${m.largura_carapaca_cm} cm` : null,
       m.comprimento_plastrao_cm != null ? `Compr. plastrão: ${m.comprimento_plastrao_cm} cm` : null,
+      m.largura_plastrao_cm != null ? `Larg. plastrão: ${m.largura_plastrao_cm} cm` : null,
       m.peso_g != null ? `Peso: ${m.peso_g} g` : null,
       m.observacoes || null,
     ].filter(Boolean).join(' · ')
@@ -3082,6 +3083,7 @@ function bioAbrirFormBiometriaInd(individuo, opts = {}) {
   if (el('bio-bio-ind-comp'))     el('bio-bio-ind-comp').value = ''
   if (el('bio-bio-ind-largura'))  el('bio-bio-ind-largura').value = ''
   if (el('bio-bio-ind-plastrao')) el('bio-bio-ind-plastrao').value = ''
+  if (el('bio-bio-ind-larg-plastrao')) el('bio-bio-ind-larg-plastrao').value = ''
   if (el('bio-bio-ind-peso'))     el('bio-bio-ind-peso').value = ''
   if (el('bio-bio-ind-obs'))    el('bio-bio-ind-obs').value  = ''
   if (el('bio-bio-ind-data'))   el('bio-bio-ind-data').value = new Date().toISOString().slice(0, 10)
@@ -3131,8 +3133,10 @@ async function bioSalvarBiometriaInd() {
   const comp     = parseFloat(document.getElementById('bio-bio-ind-comp').value) || null
   const largura  = parseFloat(document.getElementById('bio-bio-ind-largura').value) || null
   const plastrao = parseFloat(document.getElementById('bio-bio-ind-plastrao').value) || null
+  // Medida própria, nunca copiada da largura da carapaça (migration 366).
+  const largPlastrao = parseFloat(document.getElementById('bio-bio-ind-larg-plastrao')?.value) || null
   const peso     = parseFloat(document.getElementById('bio-bio-ind-peso').value) || null
-  if (comp == null && largura == null && plastrao == null && peso == null) {
+  if (comp == null && largura == null && plastrao == null && largPlastrao == null && peso == null) {
     bioToast('Informe ao menos uma medida.', 'err'); return
   }
 
@@ -3144,6 +3148,7 @@ async function bioSalvarBiometriaInd() {
     comprimento_cm:         comp,
     largura_carapaca_cm:    largura,
     comprimento_plastrao_cm: plastrao,
+    largura_plastrao_cm:    largPlastrao,
     peso_g:                 peso,
     observacoes:            document.getElementById('bio-bio-ind-obs').value.trim() || null,
     status_sync:            'pendente',
@@ -3182,7 +3187,7 @@ async function bioCarregarTimelineBercario(bercarioId, temporadaId) {
   timelineEl.innerHTML = ocorrencias.map(oc => {
     const icone = TIPO_ICONE[oc.tipo] ?? TIPO_ICONE.observacao
     const detalhes = []
-    if (oc.comprimento_medio_cm != null) detalhes.push(`Comp.: ${oc.comprimento_medio_cm} cm`)
+    if (oc.comprimento_medio_cm != null) detalhes.push(`Compr. carapaça: ${oc.comprimento_medio_cm} cm`)
     if (oc.peso_medio_g != null)         detalhes.push(`Peso: ${oc.peso_medio_g} g`)
     if (oc.n_amostrados != null)         detalhes.push(`Amostrados: ${oc.n_amostrados}`)
     if (oc.qtd_afetados != null)         detalhes.push(`Afetados: ${oc.qtd_afetados}`)
