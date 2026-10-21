@@ -22,8 +22,9 @@ const _GUIA_PENDENTE = 'siguc_guia_pendentes'   // conclusões ainda não enviad
 
 // ── Catálogo ──────────────────────────────────────────────────
 // cat = { escopo, titulo, guias:[{slug,titulo,resumo,icone,versao,
-//         passos:[{titulo,texto,icone,alvo,tela,lista:[]}]}],
-//         verbetes:{chave:{titulo,texto}}, aoTrocarTela(idTela) }
+//         passos:[{titulo,texto,icone,alvo,tela,lista:[],figura}]}],
+//         verbetes:{chave:{titulo,texto,figura}}, aoTrocarTela(idTela) }
+//   figura = função que devolve HTML (desenho declarado no código)
 function guiaDefinir(cat) {
   _guiaCat = cat
   _guiaEnviarPendentes()
@@ -150,6 +151,15 @@ function _guiaTexto(s) {
   return _guiaEsc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 }
 
+// Figura opcional de passo/verbete: função (ou string) DECLARADA NO
+// CÓDIGO do catálogo, nunca texto vindo de usuário ou do banco — por
+// isso entra como HTML. Falha ao desenhar = passo sem figura, nunca erro.
+function _guiaFigura(f) {
+  let html = ''
+  try { html = typeof f === 'function' ? f() : (typeof f === 'string' ? f : '') } catch { html = '' }
+  return html ? `<div class="guia-figura">${html}</div>` : ''
+}
+
 function _guiaIcone(nome) {
   if (typeof bico === 'function' && nome) { try { return bico(nome) } catch {} }
   return ''
@@ -262,6 +272,7 @@ function _guiaRenderPasso() {
       <span class="guia-passo-ic">${_guiaIcone(p.icone || guia.icone || 'help')}</span>
       <h2 class="guia-titulo">${_guiaEsc(p.titulo)}</h2>
       <p class="guia-corpo">${_guiaTexto(p.texto || '')}</p>
+      ${_guiaFigura(p.figura)}
       ${lista ? `<ul class="guia-lista-itens">${lista}</ul>` : ''}
       ${p.nota ? `<p class="guia-nota">${_guiaTexto(p.nota)}</p>` : ''}
     </div>
@@ -305,6 +316,7 @@ function guiaVerbete(chave) {
     <div class="guia-passo">
       <h2 class="guia-titulo">${_guiaEsc(v.titulo)}</h2>
       <p class="guia-corpo">${_guiaTexto(v.texto || '')}</p>
+      ${_guiaFigura(v.figura)}
       ${(v.lista || []).length ? `<ul class="guia-lista-itens">${
         v.lista.map(x => `<li>${_guiaTexto(x)}</li>`).join('')}</ul>` : ''}
     </div>

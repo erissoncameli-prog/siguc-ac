@@ -79,3 +79,81 @@ test('migration 366: coluna, CHECK e view com a coluna nova ao final', () => {
   // coluna nova depois de f.anomalia (CREATE OR REPLACE VIEW só acrescenta no fim)
   expect(sql).toMatch(/f\.anomalia,\s*ub\.largura_plastrao_cm\s+AS ultimo_largura_plastrao_cm\s*FROM/);
 });
+
+// ── Ajuda com figura "onde medir" (js/biomonitor-biometria-figura.js) ──
+// Carapaça = medidas por cima (A, B); plastrão = medidas da barriga (C, D).
+// Cada "?" do formulário abre a MESMA figura com só a sua medida acesa.
+const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
+const CHROMIUM_PATH = '/opt/pw-browsers/chromium';
+if (fs.existsSync(CHROMIUM_PATH)) test.use({ launchOptions: { executablePath: CHROMIUM_PATH } });
+
+async function abrirApp(page) {
+  await page.route('**/api/env', r => r.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ supabaseUrl: 'https://stub.supabase.co', supabaseKey: 'chave-stub' }) }));
+  await page.route('**/cdn.jsdelivr.net/**', r => r.abort());
+  await page.goto(`${BASE}/pages/biomonitor.html`);
+  await page.locator('#tela-login').waitFor({ state: 'visible', timeout: 20_000 });
+  // o app declara o catálogo ao entrar na Home; aqui basta o conteúdo
+  await page.evaluate(() => { if (!guiaCatalogo()) guiaDefinir(BIOMONITOR_GUIAS) });
+}
+
+const VERBETE_DA_MEDIDA = {
+  A: 'comprimento-carapaca', B: 'largura-carapaca',
+  C: 'comprimento-plastrao', D: 'largura-plastrao',
+};
+
+test('cada "?" do formulário de biometria existe e aponta para a sua medida', async () => {
+  const form = trecho(ler('pages/biomonitor.html'), 'Biometria — Filhote', 'bio-bio-ind-obs');
+  for (const chave of Object.values(VERBETE_DA_MEDIDA)) {
+    expect(form, chave).toContain(`data-guia-verbete="${chave}"`);
+  }
+});
+
+test('o verbete abre a figura com SÓ a medida do campo acesa', async ({ page }) => {
+  await abrirApp(page);
+  for (const [letra, chave] of Object.entries(VERBETE_DA_MEDIDA)) {
+    const r = await page.evaluate(ch => {
+      guiaVerbete(ch)
+      const raiz = document.getElementById('guia-raiz')
+      const g = [...raiz.querySelectorAll('.bio-fig-med[data-med]')]
+      return {
+        temFigura: !!raiz.querySelector('.guia-figura .bio-fig-biometria'),
+        acesas: g.filter(x => !x.classList.contains('apagada')).map(x => x.dataset.med),
+      }
+    }, chave);
+    expect(r.temFigura, chave).toBe(true);
+    // D leva junto a referência tracejada da largura da carapaça
+    expect(r.acesas.sort(), chave).toEqual(letra === 'D' ? ['B-ref', 'D'] : [letra]);
+    await page.keyboard.press('Escape');
+  }
+});
+
+test('guia do Berçário mostra a figura com as quatro medidas', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(() => {
+    const g = BIOMONITOR_GUIAS.guias.find(x => x.slug === 'bercario')
+    const i = g.passos.findIndex(p => p.titulo === 'Biometria: onde medir')
+    guiaAbrir('bercario', { passo: i, voltarCentral: false })
+    const raiz = document.getElementById('guia-raiz')
+    return {
+      i,
+      acesas: [...raiz.querySelectorAll('.bio-fig-med')].filter(x => !x.classList.contains('apagada')).length,
+      svgs: raiz.querySelectorAll('.guia-figura svg').length,
+    }
+  });
+  expect(r.i).toBeGreaterThanOrEqual(0);
+  expect(r.svgs).toBe(2);
+  expect(r.acesas).toBe(5); // A, B, C, D + referência tracejada
+});
+
+test('sem o módulo da figura, o verbete abre só com o texto', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(() => {
+    window.bioBiometriaFiguraHTML = undefined
+    guiaVerbete('largura-plastrao')
+    const raiz = document.getElementById('guia-raiz')
+    return { titulo: raiz.querySelector('.guia-titulo')?.textContent, figura: !!raiz.querySelector('.guia-figura') }
+  });
+  expect(r.titulo).toBe('Largura do plastrão');
+  expect(r.figura).toBe(false);
+});

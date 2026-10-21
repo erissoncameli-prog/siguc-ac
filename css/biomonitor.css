@@ -2007,3 +2007,14 @@ body.bio-modo-treino .bio-faixa-inst {
    Reaproveita .bio-btn-icon (já usado por back/sync no cabeçalho) —
    sem regra própria de cor, para não divergir se o tema do cabeçalho
    mudar. Só precisa existir a classe pra achar o botão. */
+
+/* ── Figura "onde medir o filhote" (js/biomonitor-biometria-figura.js) ── */
+.bio-fig-biometria { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bio-fig-biometria figure { margin: 0; text-align: center; }
+.bio-fig-biometria figcaption {
+  font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  color: #55685C; margin-bottom: 4px;
+}
+.bio-fig-med { transition: opacity .25s; }
+.bio-fig-med.apagada { opacity: .12; }
+@media (prefers-reduced-motion: reduce) { .bio-fig-med { transition: none; } }
