@@ -111,7 +111,7 @@ async function bioColetarDadosRelatorioNinhos(db, ninhoIds, opts = {}) {
   const filhoteIds = modo === 'completo' ? (filhotes || []).map(f => f.id) : []
   const { data: biometrias } = filhoteIds.length
     ? await db.from('biometrias_individuais')
-        .select('individuo_id,data_medicao,hora_medicao,comprimento_cm,peso_g,largura_carapaca_cm,comprimento_plastrao_cm,observacoes')
+        .select('individuo_id,data_medicao,hora_medicao,comprimento_cm,peso_g,largura_carapaca_cm,comprimento_plastrao_cm,largura_plastrao_cm,observacoes')
         .in('individuo_id', filhoteIds).order('data_medicao')
     : { data: [] }
 
@@ -167,9 +167,10 @@ const _biopdfNum1 = v => (Math.round(v * 10) / 10).toLocaleString('pt-BR', { min
 
 function _biorelBiometriaTxt(b) {
   return [
-    b.comprimento_cm != null ? `${_biopdfNum1(b.comprimento_cm)} cm compr.` : null,
-    b.largura_carapaca_cm != null ? `${_biopdfNum1(b.largura_carapaca_cm)} cm larg.` : null,
-    b.comprimento_plastrao_cm != null ? `${_biopdfNum1(b.comprimento_plastrao_cm)} cm plastrão` : null,
+    b.comprimento_cm != null ? `${_biopdfNum1(b.comprimento_cm)} cm compr. carapaça` : null,
+    b.largura_carapaca_cm != null ? `${_biopdfNum1(b.largura_carapaca_cm)} cm larg. carapaça` : null,
+    b.comprimento_plastrao_cm != null ? `${_biopdfNum1(b.comprimento_plastrao_cm)} cm compr. plastrão` : null,
+    b.largura_plastrao_cm != null ? `${_biopdfNum1(b.largura_plastrao_cm)} cm larg. plastrão` : null,
     b.peso_g != null ? `${_biopdfNum1(b.peso_g)} g` : null,
   ].filter(Boolean).join(' · ') || '—'
 }
@@ -177,7 +178,7 @@ function _biorelBiometriaTxt(b) {
 function _biorelOcorrenciaTxt(o) {
   if (o.tipo === 'biometria') {
     return [
-      o.comprimento_medio_cm != null ? `${_biopdfNum1(o.comprimento_medio_cm)} cm médio` : null,
+      o.comprimento_medio_cm != null ? `${_biopdfNum1(o.comprimento_medio_cm)} cm compr. carapaça médio` : null,
       o.peso_medio_g != null ? `${_biopdfNum1(o.peso_medio_g)} g médio` : null,
       o.n_amostrados ? `${o.n_amostrados} amostrados` : null,
     ].filter(Boolean).join(' · ') || o.descricao || '—'

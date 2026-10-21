@@ -340,7 +340,7 @@
             <span style="font-size:.78rem;color:var(--cinza-500)">${formatData(o.data_ocorrencia)}</span>
           </div>
           <div style="font-size:.83rem;color:var(--cinza-900);display:flex;gap:14px;flex-wrap:wrap">
-            ${o.comprimento_medio_cm != null ? `<span>Comprimento médio: <strong>${o.comprimento_medio_cm} cm</strong></span>` : ''}
+            ${o.comprimento_medio_cm != null ? `<span>Compr. médio da carapaça: <strong>${o.comprimento_medio_cm} cm</strong></span>` : ''}
             ${o.peso_medio_g != null ? `<span>Peso médio: <strong>${o.peso_medio_g} g</strong></span>` : ''}
             ${o.n_amostrados != null ? `<span>Amostrados: <strong>${o.n_amostrados}</strong></span>` : ''}
             ${o.qtd_afetados ? `<span>Afetados: <strong style="color:#DC2626">${o.qtd_afetados}</strong></span>` : ''}
@@ -355,7 +355,7 @@
     if (tab === 'individuos') {
       cont.innerHTML = _detAtual.individuos.length ? `
         <div class="table-wrap"><div class="table-scroll"><table><thead><tr>
-          <th>Nº</th><th>Status</th><th>Última medição</th><th>Compr.</th><th>Larg. carapaça</th><th>Compr. plastrão</th><th>Peso</th><th>Total med.</th>
+          <th>Nº</th><th>Status</th><th>Última medição</th><th>Compr. carapaça</th><th>Larg. carapaça</th><th>Compr. plastrão</th><th>Larg. plastrão</th><th>Peso</th><th>Total med.</th>
         </tr></thead><tbody>
           ${_detAtual.individuos.map(f => `<tr>
             <td style="font-weight:700;color:${f.status === 'morto' ? '#DC2626' : f.doente ? '#7C3AED' : '#2A9D6F'}">${f.numero}</td>
@@ -364,6 +364,7 @@
             <td>${f.ultimo_comprimento_cm != null ? f.ultimo_comprimento_cm + ' cm' : '—'}</td>
             <td>${f.ultimo_largura_carapaca_cm != null ? f.ultimo_largura_carapaca_cm + ' cm' : '—'}</td>
             <td>${f.ultimo_comprimento_plastrao_cm != null ? f.ultimo_comprimento_plastrao_cm + ' cm' : '—'}</td>
+            <td>${f.ultimo_largura_plastrao_cm != null ? f.ultimo_largura_plastrao_cm + ' cm' : '—'}</td>
             <td>${f.ultimo_peso_g != null ? f.ultimo_peso_g + ' g' : '—'}</td>
             <td>${f.total_medicoes || 0}</td>
           </tr>`).join('')}
@@ -458,7 +459,7 @@
       </div>
       <div class="ind-chart-card">
         <p class="ind-chart-title">Curva de crescimento</p>
-        <p class="ind-chart-sub">Comprimento (cm) e peso médio (g) por biometria registrada</p>
+        <p class="ind-chart-sub">Comprimento da carapaça (cm) e peso médio (g) por biometria registrada</p>
         ${biometria.length ? `<div class="ind-chart-wrap"><canvas id="ind-canvas-crescimento"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.85rem">Sem biometria registrada ainda.</p>`}
       </div>
       <div class="ind-chart-card">
@@ -493,7 +494,7 @@
         data: {
           labels: biometria.map(b => formatData(b.data)),
           datasets: [
-            { label: 'Comprimento (cm)', data: biometria.map(b => b.comp), borderColor: '#1A6B8C', backgroundColor: '#1A6B8C', borderWidth: 2, tension: .35, pointRadius: 3, yAxisID: 'y' },
+            { label: 'Compr. carapaça (cm)', data: biometria.map(b => b.comp), borderColor: '#1A6B8C', backgroundColor: '#1A6B8C', borderWidth: 2, tension: .35, pointRadius: 3, yAxisID: 'y' },
             { label: 'Peso médio (g)', data: biometria.map(b => b.peso), borderColor: '#C9A84C', backgroundColor: '#C9A84C', borderWidth: 2, tension: .35, pointRadius: 3, yAxisID: 'y2' },
           ]
         },

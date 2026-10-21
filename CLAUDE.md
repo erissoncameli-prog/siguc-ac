@@ -2963,6 +2963,25 @@ cuidado (passa por ocorrência, captura causa/data).
   contra produção, não só o histórico de migrations do repositório.
 - `pwa/sw.js`: biomonitor v34 → v35.
 
+## Biomonitor — medidas do casco na biometria do filhote (migration 366)
+Biometria individual (`biometrias_individuais`) tem 5 medidas:
+comprimento da carapaça (`comprimento_cm` — a coluna manteve o nome, só o
+rótulo mudou), largura da carapaça, comprimento do plastrão, **largura do
+plastrão** (`largura_plastrao_cm`, nova) e peso.
+- **Largura do plastrão é medida própria, nunca copiada da carapaça**
+  (decisão do usuário, 21/10/2026). O plastrão é a placa ventral, sempre
+  mais estreita que a carapaça (que inclui os marginais); espelhar faria a
+  razão plastrão/carapaça dar 1 por construção. Protocolo: MAIOR largura do
+  plastrão — texto no verbete `largura-plastrao` (`js/biomonitor-guias.js`).
+- "Comprimento" virou "Comprimento da carapaça" em todo lugar: formulário
+  individual, biometria por amostragem (`comprimento_medio_cm`), histórico,
+  PDF por ninho, mesa de berçários, gráficos de crescimento do app, do
+  relatório e da Análise Científica.
+- `vw_filhotes_bercario` ganhou `ultimo_largura_plastrao_cm` ao final.
+- Guarda: `tests/biomonitor-biometria-medidas.test.js` (5, consistência de
+  fonte: cada medida atravessa formulário → envio → download → PDF).
+- `pwa/sw.js`: biomonitor 74 → 75.
+
 ## Biomonitor — Equipamentos em cautela (migrations 226/227/228)
 Cadastro do bem é SEMPRE na mesa (`biomonitor-equipamentos.html`,
 perfil tecnico/gestor/super_admin): descrição, plaqueta física

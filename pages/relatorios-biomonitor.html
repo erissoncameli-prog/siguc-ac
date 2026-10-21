@@ -1290,7 +1290,7 @@ body.mapa-em-tela-cheia { overflow:hidden; }
       <div class="rel-charts-row triple">
         <div class="rel-chart-card"><p class="rel-chart-title">Destino dos Filhotes</p><div class="rel-chart-wrap short"><canvas id="graf-destino"></canvas></div></div>
         <div class="rel-chart-card"><p class="rel-chart-title">Ocorrências no Berçário</p><div class="rel-chart-wrap short"><canvas id="graf-oc"></canvas></div></div>
-        <div class="rel-chart-card"><p class="rel-chart-title">Curva de Crescimento</p><p class="rel-chart-sub">Comprimento (cm) e peso médio (g) por biometria</p><div class="rel-chart-wrap short"><canvas id="graf-biometria"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Curva de Crescimento</p><p class="rel-chart-sub">Comprimento da carapaça (cm) e peso médio (g) por biometria</p><div class="rel-chart-wrap short"><canvas id="graf-biometria"></canvas></div></div>
       </div>
       <div class="rel-charts-row">
         <div class="rel-chart-card">
@@ -1300,7 +1300,7 @@ body.mapa-em-tela-cheia { overflow:hidden; }
         </div>
         <div class="rel-chart-card">
           <p class="rel-chart-title">Curva de Crescimento por Berçário</p>
-          <p class="rel-chart-sub">Comprimento médio (cm) ao longo do tempo (top 8 por nº de filhotes)</p>
+          <p class="rel-chart-sub">Comprimento médio da carapaça (cm) ao longo do tempo (top 8 por nº de filhotes)</p>
           ${_bercCrescimento.length ? `<div class="rel-chart-wrap"><canvas id="graf-berc-crescimento"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.8rem;padding:20px 0;text-align:center">Sem biometria registrada para os filtros selecionados.</p>`}
         </div>
       </div>
@@ -1326,8 +1326,8 @@ body.mapa-em-tela-cheia { overflow:hidden; }
       </div>
       <div class="rel-charts-row">
         <div class="rel-chart-card">
-          <p class="rel-chart-title">Crescimento — Comprimento por Espécie</p>
-          <p class="rel-chart-sub">Comprimento médio (cm) ao longo do tempo</p>
+          <p class="rel-chart-title">Crescimento — Comprimento da Carapaça por Espécie</p>
+          <p class="rel-chart-sub">Comprimento médio da carapaça (cm) ao longo do tempo</p>
           ${_arr('crescimento_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-cresc-comp"></canvas></div>` : _vazio('Sem biometria registrada.')}
         </div>
         <div class="rel-chart-card">
@@ -1338,8 +1338,8 @@ body.mapa-em-tela-cheia { overflow:hidden; }
       </div>
       <div class="rel-charts-row">
         <div class="rel-chart-card">
-          <p class="rel-chart-title">Ganho de Comprimento por Berçário</p>
-          <p class="rel-chart-sub">Δ comprimento (cm), média por filhote · cor = espécie</p>
+          <p class="rel-chart-title">Ganho de Comprimento da Carapaça por Berçário</p>
+          <p class="rel-chart-sub">Δ comprimento da carapaça (cm), média por filhote · cor = espécie</p>
           ${_ganho('n_comp') ? `<div class="rel-chart-wrap"><canvas id="graf-ganho-comp"></canvas></div>` : _vazio('Faça 2+ medições do mesmo filhote para ver o ganho.')}
         </div>
         <div class="rel-chart-card">
@@ -1703,7 +1703,7 @@ body.mapa-em-tela-cheia { overflow:hidden; }
       data:{
         labels: serie.map(s => s.data),
         datasets:[
-          { label:'Comprimento (cm)', data:serie.map(s => s.comp_medio), borderColor:'#1A6B8C', borderWidth:2, tension:.35, pointRadius:3, yAxisID:'y' },
+          { label:'Compr. carapaça (cm)', data:serie.map(s => s.comp_medio), borderColor:'#1A6B8C', borderWidth:2, tension:.35, pointRadius:3, yAxisID:'y' },
           { label:'Peso médio (g)',   data:serie.map(s => s.peso_medio), borderColor:'#C9A84C', borderWidth:2, tension:.35, pointRadius:3, yAxisID:'y2' }
         ]
       },
@@ -1765,7 +1765,7 @@ body.mapa-em-tela-cheia { overflow:hidden; }
         plugins:{ legend:legendOpts },
         scales:{
           x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
-          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true, title:{display:true,text:'Comprimento (cm)',color:'#9CA3AF',font:{size:9}} }
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true, title:{display:true,text:'Compr. carapaça (cm)',color:'#9CA3AF',font:{size:9}} }
         }
       }
     })
@@ -2064,7 +2064,7 @@ body.mapa-em-tela-cheia { overflow:hidden; }
         <div class="painel-card"><h3>Fenologia da temporada</h3><p class="cap">Ninhos encontrados e filhotes vivos por mês.</p><div class="rel-chart-wrap"><canvas id="graf-p-fenologia"></canvas></div></div>
         <div class="painel-card"><h3>Ovos por praia (top 8)</h3><p class="cap">Postura × viáveis × perdidos · por temporada/UC/praia.</p><div class="rel-chart-wrap tall"><canvas id="graf-p-ovospraia"></canvas></div></div>
         <div class="painel-card"><h3>Taxa de soltura por espécie</h3><p class="cap">Filhotes soltos ÷ entrados no berçário (%).</p>${_arr('taxa_soltura_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-p-taxa-solt"></canvas></div>` : _vazio('Nenhum lote em berçário nos filtros atuais.')}</div>
-        <div class="painel-card"><h3>Crescimento por espécie</h3><p class="cap">Comprimento médio (cm) dos filhotes no berçário ao longo do tempo.</p>${_arr('crescimento_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-p-cresc"></canvas></div>` : _vazio('Sem biometria registrada nos filtros atuais.')}</div>
+        <div class="painel-card"><h3>Crescimento por espécie</h3><p class="cap">Comprimento médio da carapaça (cm) dos filhotes no berçário ao longo do tempo.</p>${_arr('crescimento_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-p-cresc"></canvas></div>` : _vazio('Sem biometria registrada nos filtros atuais.')}</div>
       </div>`
   }
 
@@ -2282,7 +2282,7 @@ body.mapa-em-tela-cheia { overflow:hidden; }
         { id: 'graf-p-fenologia', titulo: 'Fenologia da temporada', legenda: 'Ninhos encontrados e filhotes vivos por mês.' },
         { id: 'graf-p-ovospraia', titulo: 'Ovos por praia (top 8)', legenda: 'Postura × viáveis × perdidos.' },
         { id: 'graf-p-taxa-solt', titulo: 'Taxa de soltura por espécie', legenda: 'Filhotes soltos ÷ entrados no berçário (%).' },
-        { id: 'graf-p-cresc', titulo: 'Crescimento por espécie', legenda: 'Comprimento médio (cm) no berçário ao longo do tempo.' },
+        { id: 'graf-p-cresc', titulo: 'Crescimento por espécie', legenda: 'Comprimento médio da carapaça (cm) no berçário ao longo do tempo.' },
       ])
       _biopdfAssinatura(ctx)
 
