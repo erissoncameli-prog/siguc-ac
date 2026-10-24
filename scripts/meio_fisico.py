@@ -288,7 +288,7 @@ def _esri_para_geojson(g):
     return None
 
 
-def baixar_arcgis(url, campos):
+def baixar_arcgis(url, campos, fmt='json'):
     """Baixa a camada no retângulo do Acre por QUADRANTES: quadrante que bate
     no teto de registros do servidor (ou avisa exceededTransferLimit) divide
     em 4. Feição que cruza quadrantes vem repetida — fica uma por id. A
@@ -307,7 +307,7 @@ def baixar_arcgis(url, campos):
     while pilha:
         b, nivel = pilha.pop()
         j = _get_json(f'{url}/query', {**base, 'geometry': env(b), 'outFields': ','.join([oid, *campos]),
-                                       'outSR': 4326, 'returnGeometry': 'true', 'f': 'json'})
+                                       'outSR': 4326, 'returnGeometry': 'true', 'f': fmt})
         fs = j.get('features') or []
         if (j.get('exceededTransferLimit') or len(fs) >= teto) and nivel < 8:
             mx, my = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
@@ -318,11 +318,11 @@ def baixar_arcgis(url, campos):
             baixar_arcgis._mostrou = True  # diagnóstico: formato da 1ª feição
             print(f'{url}: 1ª feição crua: {json.dumps(fs[0])[:700]}; chaves da resposta {list(j)}')
         for f in fs:
-            at = f.get('attributes') or {}
-            k = at.get(oid)
+            at = f.get('attributes') or f.get('properties') or {}
+            k = at.get(oid, f.get('id'))
             if k in por_id:
                 continue
-            gj = _esri_para_geojson(f.get('geometry'))
+            gj = f.get('geometry') if fmt == 'geojson' else _esri_para_geojson(f.get('geometry'))
             if gj:
                 por_id[k] = {'type': 'Feature', 'properties': {c: at.get(c) for c in campos}, 'geometry': gj}
         if not fs and nivel == 0:
@@ -348,7 +348,10 @@ def gerar(temas, saida, acre_arq):
     acre = make_valid(shape(json.load(open(acre_arq))['features'][0]['geometry']))
     area_acre = abs(GEOD.geometry_area_perimeter(acre)[0]) / 10000
     os.makedirs(saida, exist_ok=True)
-    resumo = []
+    resumo, falhas = [], []
+    # Diagnóstico provisório: hidrografia do IBGE BC250 (alternativa à ANA)
+    for cam in ('CCAR:BC250_Trecho_Drenagem_L', 'CCAR:BC250_Massa_Dagua_A'):
+        print(f'{cam}: no Acre {contar(CGEO, cam)} | atributos: {atributos(CGEO, cam)}')
     for tema in temas:
         if tema in TEMAS_IBGE:
             url, camada, campos = TEMAS_IBGE[tema]
@@ -359,9 +362,13 @@ def gerar(temas, saida, acre_arq):
         else:
             url, campos, linha, trava = TEMAS_ANA[tema]
             brutas, esperado = baixar_arcgis(url, campos)
+            if not brutas and esperado:
+                brutas, esperado = baixar_arcgis(url, campos, fmt='geojson')
             # Trava: lote que falhou em silêncio deixaria buraco no mapa.
             if len(brutas) != esperado:
-                raise SystemExit(f'{tema}: {len(brutas)} baixadas de {esperado} — arquivo NÃO gravado')
+                falhas.append(f'{tema}: {len(brutas)} baixadas de {esperado} — arquivo NÃO gravado')
+                print(falhas[-1])
+                continue
             fonte = 'ANA — ' + url.split('/services/')[-1]
             escala = None
             print(f'{tema}: descrição do serviço: {_descricao_camada(url)!r}')
@@ -392,6 +399,8 @@ def gerar(temas, saida, acre_arq):
                 vals[v] = vals.get(v, 0) + 1
             print(f'   {k}: {len(vals)} valores — {sorted(vals.items(), key=lambda x: -x[1])[:6]}')
         resumo.append((tema, len(feats), kb))
+    if falhas:
+        raise SystemExit('; '.join(falhas))
     return resumo
 
 
