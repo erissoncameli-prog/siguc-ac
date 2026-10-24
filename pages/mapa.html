@@ -570,6 +570,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/mapa-medicao.js"></script>
 <script src="../js/mapa-comparar.js"></script>
 <script src="../js/mapa-camadas-config.js"></script>
+<script src="../js/mapa-meio-fisico.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
 </head>
@@ -1236,6 +1237,7 @@ function renderPagina(){
         <div class="drag-grip" id="lb-drag-grip" title="Arrastar · duplo clique para redefinir posição"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2.5" r="1.3"/><circle cx="7" cy="2.5" r="1.3"/><circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="3" cy="11.5" r="1.3"/><circle cx="7" cy="11.5" r="1.3"/></svg></div>
         <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-meio" onclick="toggleLayerBar('meio')">${bico('layers')} Meio Físico <span class="mlb-badge" id="meio-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span> <span class="mlb-badge" id="pa-count-badge" title="Projetos de Assentamento" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-hidro" onclick="toggleLayerBar('hidro')">💧 Rec. Hídricos <span class="mlb-badge" id="hidro-count-badge" style="display:none">0</span></button>
@@ -1700,6 +1702,11 @@ function iniciarMapa(){
   _adicionarControleTelaCheia();
   if(typeof medMontar === 'function') medMontar(mapaL);
   if(typeof ccfEstilos === 'function'){ ccfEstilos(); ccfInstalarDadosPessoais(() => db); _ccfLigarEditor(); }
+  if(typeof mfMontar === 'function'){ mfEstilos(); mfMontar(mapaL, { aoMudar: () => {
+    _atualizarLegendaMapa();
+    const b = document.getElementById('meio-count-badge'), n = mfAtivos().length;
+    if(b){ b.textContent = n; b.style.display = n ? '' : 'none'; }
+  } }); }
   if(typeof cmpMontar === 'function') cmpMontar(mapaL, {
     // Comparação nunca mexe no painel (decisão do usuário): só avisa o que ficou por baixo
     camadasPorBaixo: () => Object.entries(VEG_LAYERS).filter(([,c]) => c.layer && mapaL.hasLayer(c.layer)).map(([k]) => _CMP_ROTULO_VEG[k] || k),
@@ -1808,6 +1815,7 @@ function toggleLayerBar(id){
     document.querySelectorAll('.ap-bloco').forEach(apAtualizar);
     areasAtualizarCabecalhos();
   }
+  if(id === 'meio' && typeof mfLigarPainel === 'function') mfLigarPainel(document.getElementById('mf-painel'));
   // Cobertura Vegetal: carrega os mosaicos Planet/NICFI e as datas Sentinel-2.
   if(id === 'veg'){
     const chk = document.getElementById('veg-planet-chk');
@@ -2151,6 +2159,8 @@ function _renderDropdown(id){
       </label>
     </div>
   ` + foot;
+  // Meio físico (IBGE): conteúdo e delegação em js/mapa-meio-fisico.js
+  if(id==='meio') return hdr('Meio Físico — IBGE') + `<div id="mf-painel" style="display:flex;flex-direction:column;gap:8px">${typeof mfPainelHTML==='function'?mfPainelHTML():''}</div>` + foot;
   if(id==='acre') return hdr('🗺 Delimitação do Estado do Acre') + `
     <div style="display:flex;align-items:flex-start;gap:10px;padding:4px 0 10px">
       <div style="width:36px;height:36px;border-radius:8px;background:#f0fdf4;border:2px solid #1F4E2C;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">🗺</div>
@@ -2913,6 +2923,7 @@ function _atualizarLegendaMapa(){
   if(VEG_LAYERS.sentinel?.layer) itens.push({ simbolo:'rect', cor:'#059669', opacidade:0.7, label: 'Sentinel-2 — ' + _fmtDataBR(_sentinelDataSel) });
 
   // Camadas personalizadas
+  if(typeof mfItensLegenda === 'function') itens.push(...mfItensLegenda());
   camadas.filter(c=>c.visivel).forEach(c => {
     const porClasse = typeof ccfItensLegenda === 'function' ? ccfItensLegenda(c, 0.5) : null;
     if(porClasse) itens.push(...porClasse);
