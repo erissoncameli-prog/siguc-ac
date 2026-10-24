@@ -314,6 +314,9 @@ def baixar_arcgis(url, campos):
             pilha += [((b[0], b[1], mx, my), nivel + 1), ((mx, b[1], b[2], my), nivel + 1),
                       ((b[0], my, mx, b[3]), nivel + 1), ((mx, my, b[2], b[3]), nivel + 1)]
             continue
+        if fs and not por_id and not getattr(baixar_arcgis, '_mostrou', False):
+            baixar_arcgis._mostrou = True  # diagnóstico: formato da 1ª feição
+            print(f'{url}: 1ª feição crua: {json.dumps(fs[0])[:700]}; chaves da resposta {list(j)}')
         for f in fs:
             at = f.get('attributes') or {}
             k = at.get(oid)
