@@ -246,7 +246,6 @@ TEMAS_ANA = {
                                                           'usoprinc', 'nuareaha'], False, 'contagem'),
     'bacias_ana': (f'{SNIRH}/Divisao_de_bacias/MapServer/2', ['DMI_NM', 'DMI_CD', 'DMI_AR_KM2'], False, 'cobertura'),
 }
-LOTE_IDS = 200
 
 
 def _get_json(url, params):
@@ -290,27 +289,43 @@ def _esri_para_geojson(g):
 
 
 def baixar_arcgis(url, campos):
-    """Pega os ids no retângulo do Acre e baixa por lote de ids — não depende
-    de paginação do servidor (MapServer antigo não pagina). Devolve (feições,
-    quantos ids o servidor disse ter)."""
-    env = f'{BBOX[0]},{BBOX[1]},{BBOX[2]},{BBOX[3]}'
-    base = {'geometry': env, 'geometryType': 'esriGeometryEnvelope', 'inSR': 4326,
-            'spatialRel': 'esriSpatialRelIntersects', 'where': '1=1'}
-    ids = sorted(_get_json(f'{url}/query', {**base, 'returnIdsOnly': 'true', 'f': 'json'}).get('objectIds') or [])
-    feats = []
-    for i in range(0, len(ids), LOTE_IDS):
-        j = _get_json(f'{url}/query', {'objectIds': ','.join(map(str, ids[i:i + LOTE_IDS])),
-                                       'outFields': ','.join(campos), 'outSR': 4326,
-                                       'returnGeometry': 'true', 'f': 'json'})
-        antes = len(feats)
-        for f in j.get('features') or []:
+    """Baixa a camada no retângulo do Acre por QUADRANTES: quadrante que bate
+    no teto de registros do servidor (ou avisa exceededTransferLimit) divide
+    em 4. Feição que cruza quadrantes vem repetida — fica uma por id. A
+    consulta por `objectIds` voltava vazia no SNIRH (medido 24/10/2026), e
+    MapServer antigo não pagina. Devolve (feições, quantos ids o servidor
+    disse ter no retângulo)."""
+    info = _get_json(url, {'f': 'json'})
+    oid = next((f['name'] for f in info.get('fields') or [] if f.get('type') == 'esriFieldTypeOID'), None)
+    teto = int(info.get('maxRecordCount') or 1000)
+    if not oid:
+        raise SystemExit(f'{url}: camada sem campo de id')
+    base = {'geometryType': 'esriGeometryEnvelope', 'inSR': 4326, 'spatialRel': 'esriSpatialRelIntersects', 'where': '1=1'}
+    env = lambda b: f'{b[0]},{b[1]},{b[2]},{b[3]}'
+    total = len(_get_json(f'{url}/query', {**base, 'geometry': env(BBOX), 'returnIdsOnly': 'true', 'f': 'json'}).get('objectIds') or [])
+    por_id, pilha = {}, [(BBOX, 0)]
+    while pilha:
+        b, nivel = pilha.pop()
+        j = _get_json(f'{url}/query', {**base, 'geometry': env(b), 'outFields': ','.join([oid, *campos]),
+                                       'outSR': 4326, 'returnGeometry': 'true', 'f': 'json'})
+        fs = j.get('features') or []
+        if (j.get('exceededTransferLimit') or len(fs) >= teto) and nivel < 8:
+            mx, my = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+            pilha += [((b[0], b[1], mx, my), nivel + 1), ((mx, b[1], b[2], my), nivel + 1),
+                      ((b[0], my, mx, b[3]), nivel + 1), ((mx, my, b[2], b[3]), nivel + 1)]
+            continue
+        for f in fs:
+            at = f.get('attributes') or {}
+            k = at.get(oid)
+            if k in por_id:
+                continue
             gj = _esri_para_geojson(f.get('geometry'))
             if gj:
-                feats.append({'type': 'Feature', 'properties': f.get('attributes') or {}, 'geometry': gj})
-        if i == 0 and len(feats) == antes:
-            # 1º lote vazio: mostrar o que o servidor devolveu (diagnóstico)
-            print(f'{url}: 1º lote sem feição convertida; chaves {list(j)}; início {json.dumps(j)[:600]}')
-    return feats, len(ids)
+                por_id[k] = {'type': 'Feature', 'properties': {c: at.get(c) for c in campos}, 'geometry': gj}
+        if not fs and nivel == 0:
+            print(f'{url}: consulta vazia; início {json.dumps(j)[:900]}')
+    print(f'{url}: id={oid}, teto={teto}, {len(por_id)} feições de {total} ids')
+    return list(por_id.values()), total
 
 
 def _descricao_camada(url):
