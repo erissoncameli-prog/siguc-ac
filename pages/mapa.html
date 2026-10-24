@@ -566,6 +566,9 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/mapa-uc-tipos.js"></script>
 <script src="../js/mapa-assentamentos.js"></script>
 <script src="../js/mapa-linha-tempo.js"></script>
+<script src="../js/mapa-camadas.js"></script>
+<script src="../js/mapa-medicao.js"></script>
+<script src="../js/mapa-comparar.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
 </head>
@@ -949,10 +952,15 @@ function _reaplicarTiles(){
 const HIDRO_WMS_URL    = 'https://geoservicos.ibge.gov.br/geoserver/ows';
 const HIDRO_WMS_LAYERS = 'CCAR:BC250_Massa_Dagua_A,CCAR:BC250_Trecho_Drenagem_L';
 
+// Nome de cada camada do painel Cobertura Vegetal, para o aviso da comparação de imagens
+const _CMP_ROTULO_VEG = { mapbiomas:'MapBiomas', prodes:'PRODES anual', prodes_hist:'PRODES acumulado',
+  hidrografia:'Hidrografia IBGE', gibs:'NASA GIBS', planet:'Planet / NICFI', sentinel:'Sentinel-2' };
 const VEG_LAYERS = {
   mapbiomas: { layer:null, make(op){ return L.tileLayer('https://storage.googleapis.com/mapbiomas-public/brasil/collection-8/lclu/coverage/{z}/{x}/{y}.png',{attribution:'MapBiomas Coleção 8',opacity:op/100,maxZoom:22,maxNativeZoom:12}); } },
-  prodes:    { layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:yearly_deforestation_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
-  prodes_hist:{ layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:accumulated_deforestation_2007_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE Acumulado',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
+  // PRODES, Planet e Sentinel: fábricas únicas em js/mapa-camadas.js (as
+  // mesmas da linha do tempo e da comparação de imagens).
+  prodes:    { layer:null, make(op){ return mapaProdesLayer(L, { opacidade: op }); } },
+  prodes_hist:{ layer:null, make(op){ return mapaProdesLayer(L, { acumulado: true, opacidade: op }); } },
   // Hidrografia oficial IBGE (BC250, GeoServer CCAR). Renderiza como imagem
   // (img-src https: já liberado). Se o nome da camada mudar, ajuste HIDRO_WMS_*.
   hidrografia:{ layer:null, make(op){ return L.tileLayer.wms(HIDRO_WMS_URL,{layers:HIDRO_WMS_LAYERS,format:'image/png',transparent:true,version:'1.1.1',attribution:'Hidrografia · IBGE (BC250)',opacity:op/100,maxZoom:22,maxNativeZoom:16,errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); } },
@@ -963,17 +971,13 @@ const VEG_LAYERS = {
   planet: { layer:null, make(op){
     const m = document.getElementById('planet-mosaico')?.value || _planetMosaicoSel;
     if(!m) return null;
-    return L.tileLayer(`/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(m)}`,
-      {attribution:'Planet / NICFI',opacity:op/100,maxZoom:21,maxNativeZoom:18,
-       errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); }
+    return mapaPlanetLayer(L, m, op); }
   },
   sentinel: { layer:null, make(op){
     const d = document.getElementById('sentinel-data')?.value || _sentinelDataSel;
     if(!d) return null;
     const nuvem = document.getElementById('sentinel-nuvem')?.value || 30;
-    return L.tileLayer(`/api/sentinel?z={z}&x={x}&y={y}&data=${encodeURIComponent(d)}&nuvem=${nuvem}`,
-      {attribution:'Sentinel-2 / Copernicus',opacity:op/100,maxZoom:18,maxNativeZoom:15,
-       errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); }
+    return mapaSentinelLayer(L, { data: d, nuvem, opacidade: op }); }
   },
 };
 
@@ -981,10 +985,7 @@ const VEG_LAYERS = {
 let _planetMosaicos = null, _planetMosaicoSel = null;
 async function _planetCarregarMosaicos(){
   if(_planetMosaicos) return _planetMosaicos;
-  try {
-    const r = await fetch('/api/planet?op=mosaics', { signal: AbortSignal.timeout(15000) });
-    _planetMosaicos = await r.json();
-  } catch(_){ _planetMosaicos = { disponivel:false, motivo:'rede', mosaicos:[] }; }
+  _planetMosaicos = await mapaPlanetMosaicos();   // cache único (js/mapa-camadas.js)
   if(_planetMosaicos.recente) _planetMosaicoSel = _planetMosaicos.recente.name;
   return _planetMosaicos;
 }
@@ -1023,11 +1024,7 @@ let _sentinelDatas = null, _sentinelDataSel = null;
 function _fmtDataBR(iso){ if(!iso) return '—'; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; }
 async function _sentinelCarregarDatas(){
   const b = mapaL.getBounds();
-  const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(',');
-  try {
-    const r = await fetch(`/api/sentinel?bbox=${encodeURIComponent(bbox)}`, { signal: AbortSignal.timeout(15000) });
-    _sentinelDatas = await r.json();
-  } catch(_){ _sentinelDatas = { disponivel:false, motivo:'rede', datas:[] }; }
+  _sentinelDatas = await mapaSentinelCenas([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
   if(_sentinelDatas.datas?.length) _sentinelDataSel = _sentinelDatas.datas[0].data;
   return _sentinelDatas;
 }
@@ -1700,6 +1697,12 @@ function iniciarMapa(){
   _adicionarMiniMapa();
   _adicionarControleBasemap();
   _adicionarControleTelaCheia();
+  if(typeof medMontar === 'function') medMontar(mapaL);
+  if(typeof cmpMontar === 'function') cmpMontar(mapaL, {
+    // Comparação nunca mexe no painel (decisão do usuário): só avisa o que ficou por baixo
+    camadasPorBaixo: () => Object.entries(VEG_LAYERS).filter(([,c]) => c.layer && mapaL.hasLayer(c.layer)).map(([k]) => _CMP_ROTULO_VEG[k] || k),
+    prodesAnos: async () => Object.keys((await _tlCarregarResumo()).prodes || {}).map(Number),
+  });
   clusters = L.markerClusterGroup({ maxClusterRadius:40, disableClusteringAtZoom:14 });
   mapaL.addLayer(clusters);
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
@@ -4193,9 +4196,7 @@ function _tlRemoverSat() {
 
 function _tlSetPlanet(mos) {
   _tlRemoverSat()
-  _tlPlanetLayer = L.tileLayer(`/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(mos.name)}`,
-    { attribution: 'Planet / NICFI', opacity: 1, maxZoom: 21, maxNativeZoom: 18,
-      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' })
+  _tlPlanetLayer = mapaPlanetLayer(L, mos.name, 100)
   _tlPlanetLayer.addTo(mapaL); _tlPlanetLayer.setZIndex(140)
   _tlImgLabel = `🛰 Planet/NICFI · ${mos.label} · ~4,7 m`
 }
@@ -4205,9 +4206,7 @@ function _tlSetPlanet(mos) {
 const TL_S2_ANO_MIN = 2017
 function _tlSetSentinelAno(ano) {
   _tlRemoverSat()
-  _tlS2Layer = L.tileLayer(`/api/sentinel?z={z}&x={x}&y={y}&ano=${ano}`,
-    { attribution: 'Sentinel-2 / Copernicus', opacity: 1, maxZoom: 21, maxNativeZoom: 15,
-      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' })
+  _tlS2Layer = mapaSentinelLayer(L, { ano, opacidade: 100 })
   _tlS2Layer.addTo(mapaL); _tlS2Layer.setZIndex(140)
   _tlImgLabel = `🛰 Sentinel-2 · época seca ${ano} · 10 m`
 }
@@ -4276,11 +4275,7 @@ async function _tlSetSatelite(ano) {
 function _tlSetProdes(ano) {
   if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null }
   if (!_mostraDesmat()) return
-  _tlProdesLayer = L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms', {
-    layers: 'prodes-amazon-nb:yearly_deforestation_biome', format: 'image/png', transparent: true,
-    version: '1.1.1', CQL_FILTER: `year=${ano}`, opacity: 0.85, attribution: 'PRODES/INPE',
-    maxZoom: 22, maxNativeZoom: 15
-  })
+  _tlProdesLayer = mapaProdesLayer(L, { ano, opacidade: 85 })
   _tlProdesLayer.addTo(mapaL); _tlProdesLayer.setZIndex(160)
 }
 function _tlPlotFocos(items) {
@@ -8495,6 +8490,8 @@ function fecharModalProjeto() {
 }
 
 function iniciarDesenho() {
+  // Medição e desenho do leaflet-draw disputam o mesmo clique no mapa
+  if (typeof medDesativar === 'function') medDesativar()
   // Fecha modal temporariamente para ver o mapa
   document.getElementById('proj-overlay').style.display = 'none'
   document.getElementById('proj-draw-area').classList.add('ativo')
