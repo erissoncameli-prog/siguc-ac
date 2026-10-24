@@ -8,6 +8,11 @@ respondem 403 na rede das sessões de desenvolvimento (CLAUDE.md), e
 geometria de camada grande nunca entra pelo pg_net (reiniciou o banco 3×).
 
 Modos:
+  --autoteste   recorte/simplificação/eixo com dado sintético, sem rede.
+  --gerar [tema ...]  baixa do IBGE (BDiA 1:250 mil + clima), recorta pelo
+                Acre (data/acre_estado.geojson, o mesmo do mapa), simplifica
+                ~45 m e grava data/meio_fisico/<tema>.geojson. Tema que não
+                cobrir 95–105% da área do estado NÃO é gravado.
   --descobrir-ana  idem para os servidores ArcGIS da ANA (o GeoServer dela
                 não existe mais: o nome não resolve; o de metadados dá 403).
   --descobrir   lista as camadas que os serviços oferecem (por palavra-chave)
@@ -16,11 +21,22 @@ Modos:
                 camadas não são adivinhados.
 """
 import argparse
+import json
+import os
 import re
 import sys
+import time
 import xml.etree.ElementTree as ET
+from datetime import date
 
 import requests
+from pyproj import Geod
+from shapely import make_valid
+from shapely.geometry import mapping, shape
+from shapely.ops import transform, unary_union
+from shapely.prepared import prep
+
+GEOD = Geod(ellps='GRS80')
 
 # Retângulo do Acre (lon/lat) com folga pequena
 BBOX = (-74.0, -11.2, -66.5, -7.0)
@@ -117,6 +133,149 @@ def descobrir():
         arcgis(nome, url)
 
 
+# ── Geração dos arquivos (IBGE BDiA, 1:250 mil) ──────────────────────────
+BDIA = 'https://geoservicos.ibge.gov.br/geoserver/BDIA/ows'
+CGEO = 'https://geoservicos.ibge.gov.br/geoserver/ows'
+# tema → (serviço, camada, atributos mantidos). Atributo fora da lista não
+# entra no arquivo (o popup mostra o que vier, então a lista É o que o
+# usuário vê). Nomes conferidos no DescribeFeatureType da descoberta.
+TEMAS_IBGE = {
+    'geologia': (BDIA, 'BDIA:geol_area', ['nm_unidade', 'letra_simb', 'nm_tempo_g', 'nm_provincia',
+                                          'nm_sub_provincia', 'nm_lito1', 'nm_lito2', 'nm_lito3']),
+    'geomorfologia': (BDIA, 'BDIA:geom_area', ['nm_dominio', 'nm_regiao', 'nm_unidade', 'letra_simb',
+                                               'compartimento', 'categoria', 'natureza', 'forma', 'legenda']),
+    'pedologia': (BDIA, 'BDIA:pedo_area', ['legenda_2', 'ordem', 'subordem', 'grande_gru', 'nom_unidad',
+                                           'cod_simbol', 'textura', 'horizonte', 'relevo', 'componente']),
+    'vegetacao': (BDIA, 'BDIA:vege_area', ['leg_sup', 'legenda_2', 'legenda_1', 'nm_uveg', 'nm_uantr',
+                                           'nm_contat', 'nm_pretet', 'clas_domi']),
+    'clima': (CGEO, 'CGEO:ANMS2010_03_clima', ['umida_seca', 'temperat']),
+}
+CASAS = 5            # ~1 m: muito mais fino que a escala da fonte
+TOLERANCIA = 0.0004  # ~45 m: abaixo do que 1:250 mil resolve (~125 m no papel a 0,5 mm)
+PAGINA_WFS = 1000
+
+
+def baixar_wfs(url, camada):
+    feats, inicio = [], 0
+    bbox = f'{BBOX[1]},{BBOX[0]},{BBOX[3]},{BBOX[2]},urn:ogc:def:crs:EPSG::4326'
+    while True:
+        p = {'service': 'WFS', 'version': '2.0.0', 'request': 'GetFeature', 'typeNames': camada,
+             'outputFormat': 'application/json', 'srsName': 'EPSG:4326', 'bbox': bbox,
+             'count': PAGINA_WFS, 'startIndex': inicio, 'sortBy': 'id1' if 'BDIA' in camada else ''}
+        if not p['sortBy']:
+            del p['sortBy']
+        for tentativa in range(4):
+            r = requests.get(url, params=p, headers=UA, timeout=300)
+            if r.status_code == 200:
+                break
+            time.sleep(5 * (tentativa + 1))
+        r.raise_for_status()
+        j = r.json()
+        lote = j.get('features') or []
+        feats.extend(lote)
+        if len(lote) < PAGINA_WFS:
+            return feats
+        inicio += PAGINA_WFS
+
+
+def _arred(c):
+    if isinstance(c[0], (int, float)):
+        return [round(c[0], CASAS), round(c[1], CASAS)]
+    return [_arred(x) for x in c]
+
+
+def recortar(feats, acre, campos):
+    """Recorta pelo Acre, simplifica e fica só com os campos pedidos.
+    Feição que não sobra nada dentro do estado sai. Devolve (lista, avisos)."""
+    acre_p = prep(acre)
+    out, invalidas = [], 0
+    for f in feats:
+        g = f.get('geometry')
+        if not g:
+            continue
+        geo = shape(g)
+        # eixo trocado (lat,lon) vem com x positivo pequeno — corrige
+        if geo.bounds[0] > -20 and geo.bounds[1] < -20:
+            geo = transform(lambda x, y, z=None: (y, x), geo)
+        if not geo.is_valid:
+            geo = make_valid(geo)
+            invalidas += 1
+        if not acre_p.intersects(geo):
+            continue
+        geo = geo.intersection(acre)
+        if geo.is_empty:
+            continue
+        geo = geo.simplify(TOLERANCIA, preserve_topology=True)
+        if geo.geom_type == 'GeometryCollection':
+            polis = [x for x in geo.geoms if x.geom_type in ('Polygon', 'MultiPolygon')]
+            if not polis:
+                continue
+            geo = unary_union(polis)
+        if geo.is_empty or geo.area == 0:
+            continue
+        props = {k: (f.get('properties') or {}).get(k) for k in campos}
+        props = {k: v for k, v in props.items() if v not in (None, '')}
+        gj = mapping(geo)
+        out.append({'type': 'Feature', 'properties': props,
+                    'geometry': {'type': gj['type'], 'coordinates': _arred(gj['coordinates'])}})
+    return out, invalidas
+
+
+def area_ha(geom_gj):
+    a, _ = GEOD.geometry_area_perimeter(shape(geom_gj))
+    return abs(a) / 10000
+
+
+def gerar(temas, saida, acre_arq):
+    acre = make_valid(shape(json.load(open(acre_arq))['features'][0]['geometry']))
+    area_acre = abs(GEOD.geometry_area_perimeter(acre)[0]) / 10000
+    os.makedirs(saida, exist_ok=True)
+    resumo = []
+    for tema in temas:
+        url, camada, campos = TEMAS_IBGE[tema]
+        brutas = baixar_wfs(url, camada)
+        feats, inval = recortar(brutas, acre, campos)
+        cobre = sum(area_ha(f['geometry']) for f in feats)
+        pct = cobre / area_acre * 100
+        # Trava: um tema que não cobre o estado veio pela metade (paginação,
+        # bbox, eixo) — nada é gravado.
+        if pct < 95 or pct > 105:
+            raise SystemExit(f'{tema}: cobre {pct:.1f}% da área do Acre — arquivo NÃO gravado')
+        fc = {'type': 'FeatureCollection', 'fonte': f'IBGE — {camada}', 'escala': '1:250.000' if 'BDIA' in camada else '1:5.000.000',
+              'gerado_em': date.today().isoformat(), 'features': feats}
+        arq = os.path.join(saida, f'{tema}.geojson')
+        with open(arq, 'w', encoding='utf-8') as fh:
+            json.dump(fc, fh, ensure_ascii=False, separators=(',', ':'))
+        kb = os.path.getsize(arq) / 1024
+        print(f'{tema}: {len(brutas)} baixadas → {len(feats)} no Acre ({inval} corrigidas), cobre {pct:.1f}%, {kb:.0f} KB')
+        for k in campos[:3]:
+            vals = {}
+            for f in feats:
+                v = f['properties'].get(k)
+                vals[v] = vals.get(v, 0) + 1
+            print(f'   {k}: {len(vals)} valores — {sorted(vals.items(), key=lambda x: -x[1])[:6]}')
+        resumo.append((tema, len(feats), kb))
+    return resumo
+
+
+def autoteste():
+    from shapely.geometry import box as _box
+    acre = _box(-70, -10, -69, -9)
+    feats = [
+        {'type': 'Feature', 'properties': {'a': 1, 'b': 'x', 'c': None},
+         'geometry': mapping(_box(-69.5, -9.5, -68.5, -8.5))},        # metade dentro
+        {'type': 'Feature', 'properties': {'a': 2}, 'geometry': mapping(_box(-60, -5, -59, -4))},  # fora
+        {'type': 'Feature', 'properties': {'a': 3},                   # eixo trocado (lat, lon)
+         'geometry': {'type': 'Polygon', 'coordinates': [[[-9.8, -69.8], [-9.8, -69.6], [-9.6, -69.6], [-9.6, -69.8], [-9.8, -69.8]]]}},
+    ]
+    out, _ = recortar(feats, acre, ['a', 'c'])
+    assert [f['properties'] for f in out] == [{'a': 1}, {'a': 3}], out
+    b = shape(out[0]['geometry']).bounds
+    assert b == (-69.5, -9.5, -69.0, -9.0), b                       # recortado no limite
+    assert abs(shape(out[1]['geometry']).bounds[0] - (-69.8)) < 1e-9  # eixo corrigido
+    print('autoteste ok')
+
+
 # ANA: listar serviços e camadas nas pastas de dados abertos dos dois
 # servidores ArcGIS que responderam; contar feições no Acre (returnCountOnly).
 ANA_PASTAS = [
@@ -171,12 +330,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--descobrir', action='store_true')
     ap.add_argument('--descobrir-ana', action='store_true')
+    ap.add_argument('--autoteste', action='store_true')
+    ap.add_argument('--gerar', nargs='*', help='temas do IBGE (vazio = todos)')
+    ap.add_argument('--saida', default='data/meio_fisico')
+    ap.add_argument('--acre', default='data/acre_estado.geojson')
     a = ap.parse_args()
     if a.descobrir:
         descobrir()
         return 0
     if a.descobrir_ana:
         descobrir_ana()
+        return 0
+    if a.autoteste:
+        autoteste()
+        return 0
+    if a.gerar is not None:
+        gerar(a.gerar or list(TEMAS_IBGE), a.saida, a.acre)
         return 0
     ap.print_help()
     return 1
