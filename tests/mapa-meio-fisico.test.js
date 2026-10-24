@@ -27,6 +27,10 @@ const PEDO = { type: 'FeatureCollection', fonte: 'IBGE — BDIA:pedo_area', esca
   { type: 'Feature', geometry: quad(-69.7, -10.0, 0.2), properties: { legenda_2: 'Latossolos Amarelos', ordem: 'LATOSSOLOS', textura: 'argilosa' } },
   { type: 'Feature', geometry: quad(-69.4, -10.0, 0.2), properties: { legenda_2: 'Argissolos Vermelhos', ordem: 'ARGISSOLOS', textura: 'argilosa' } },
 ] };
+const RIOS = { type: 'FeatureCollection', fonte: 'ANA — SNIRH2016/Rios_principais/MapServer/0', features: [
+  { type: 'Feature', geometry: { type: 'LineString', coordinates: [[-70.0, -9.6], [-69.2, -9.4]] }, properties: { NORIOCOMP: 'Rio Acre', DEDOMINIAL: 'Federal', NUAREAMONT: 23456.7 } },
+  { type: 'Feature', geometry: { type: 'LineString', coordinates: [[-69.8, -9.9], [-69.5, -9.7]] }, properties: { NORIOCOMP: 'Igarapé X', DEDOMINIAL: 'Estadual' } },
+] };
 
 async function abrir(page) {
   await page.addInitScript(() => {
@@ -40,7 +44,7 @@ async function abrir(page) {
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.js', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.js'), contentType: 'application/javascript' }));
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.css', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.css'), contentType: 'text/css' }));
   const pedidos = [];
-  await page.route('**/data/meio_fisico/**', r => { pedidos.push(new URL(r.request().url()).pathname); r.fulfill({ json: PEDO }) });
+  await page.route('**/data/meio_fisico/**', r => { const u = new URL(r.request().url()).pathname; pedidos.push(u); r.fulfill({ json: u.endsWith('/rios.geojson') ? RIOS : PEDO }) });
   await page.goto(`${BASE}/pages/mapa.html`);
   await page.waitForFunction(() => typeof renderPagina === 'function' && typeof L !== 'undefined' && typeof mfMontar === 'function');
   await page.evaluate(() => {
@@ -55,17 +59,18 @@ async function abrir(page) {
 
 async function ligarPedologia(page) {
   await page.click('#mlb-btn-meio');
-  await expect(page.locator('[data-mf-tema]')).toHaveCount(5);
+  await expect(page.locator('[data-mf-tema]')).toHaveCount(8);
   await page.locator('[data-mf-tema="pedologia"] [data-mf-acao="ligar"]').check();
   await page.waitForFunction(() => mfAtivos().includes('pedologia'));
 }
 
-test('aba lista os 5 temas com fonte e escala; nada é baixado antes de ligar', async ({ page }) => {
+test('aba lista os 8 temas (IBGE e ANA) com fonte e escala; nada é baixado antes de ligar', async ({ page }) => {
   const pedidos = await abrir(page);
   await page.click('#mlb-btn-meio');
   const textos = await page.locator('[data-mf-tema] .mf-meta').allInnerTexts();
-  expect(textos.length).toBe(5);
-  expect(textos.every(t => /IBGE/.test(t) && /1:/.test(t))).toBe(true);
+  expect(textos.length).toBe(8);
+  expect(textos.every(t => /IBGE|ANA/.test(t) && /1:/.test(t))).toBe(true);
+  expect(textos.filter(t => /ANA/.test(t)).length).toBe(3);
   expect(pedidos).toEqual([]);
 });
 
@@ -128,4 +133,27 @@ test('arquivo que falha: aviso no tema e a caixa volta a desmarcada', async ({ p
   await page.locator('[data-mf-tema="geologia"] [data-mf-acao="ligar"]').check();
   await expect(page.locator('[data-mf-tema="geologia"] .mf-status')).toHaveText('Não foi possível carregar o arquivo.');
   await expect(page.locator('[data-mf-tema="geologia"] [data-mf-acao="ligar"]')).not.toBeChecked();
+});
+
+test('rios da ANA: só traço (sem preenchimento), contador em trechos, legenda em linha e popup com domínio', async ({ page }) => {
+  await abrir(page);
+  await page.click('#mlb-btn-meio');
+  await page.locator('[data-mf-tema="rios"] [data-mf-acao="ligar"]').check();
+  await page.waitForFunction(() => mfAtivos().includes('rios'));
+  await expect(page.locator('[data-mf-tema="rios"] .mf-status')).toHaveText('2 trechos');
+  const r = await page.evaluate(() => _mf.camadas.rios.layer.getLayers().map(l => ({ fill: l.options.fill, cor: l.options.color })));
+  expect(r.every(x => x.fill === false)).toBe(true);
+  expect(r[0].cor).not.toBe(r[1].cor);        // Federal × Estadual
+  const leg = await page.evaluate(() => mfItensLegenda());
+  expect(leg.every(i => i.simbolo === 'line')).toBe(true);
+  expect(leg.map(i => i.label)).toEqual(expect.arrayContaining(['Rios principais — Federal', 'Rios principais — Estadual']));
+  // opacidade mexe no traço, não no preenchimento
+  await page.evaluate(() => { const i = document.querySelector('[data-mf-tema="rios"] [data-mf-acao="opacidade"]'); i.value = '70'; i.dispatchEvent(new Event('input', { bubbles: true })) });
+  expect(await page.evaluate(() => _mf.camadas.rios.layer.getLayers()[0].options.opacity)).toBe(0.7);
+  await page.evaluate(() => _mf.camadas.rios.layer.getLayers()[0].openPopup());
+  const t = await page.locator('.leaflet-popup-content').last().innerText();
+  expect(t).toMatch(/rio acre/i);
+  expect(t).toContain('Domínio');
+  expect(t).toContain('Comprimento calculado');
+  expect(t).toContain('ANA');
 });

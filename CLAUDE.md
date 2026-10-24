@@ -1264,7 +1264,7 @@ no ⚙ da camada, gravado pelo "Salvar estilo" de sempre.
 
 ## Regra do sistema — Meio físico do Acre no Mapa das UCs (Fase 4, 24/10/2026)
 Aba "Meio Físico" da barra de camadas (`pages/mapa.html`), fonte única
-`js/mapa-meio-fisico.js` (prefixo `mf`). Temas do IBGE: geologia,
+`js/mapa-meio-fisico.js` (prefixo `mf`). 8 temas — IBGE: geologia,
 geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
 `geom_area`, `pedo_area`, `vege_area`) e clima (`CGEO:ANMS2010_03_clima`,
 1:5 milhões).
@@ -1286,10 +1286,19 @@ geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
 - Popup e painel SEMPRE dizem fonte, escala e "mapeamento regional — não
   substitui levantamento de campo". Arquivo só baixa ao ligar o tema;
   preferências em `localStorage['siguc_meio_fisico']`.
-- ANA: o GeoServer dela não existe mais (o nome não resolve) e o de metadados
-  dá 403; os dois servidores ArcGIS (`www.snirh.gov.br/arcgis`,
-  `portal1.snirh.gov.br/server`) respondem — ver a descoberta.
-- Guarda: `tests/mapa-meio-fisico.test.js` (5, página real com o arquivo
+- **ANA** (mesmo arquivo/aba, `TEMAS_ANA` no script): rios principais
+  (linha, `SNIRH2016/Rios_principais/0`), massas d'água (`Massa_dagua/0`) e
+  micro-regiões hidrográficas (`Divisao_de_bacias/2`), do ArcGIS do SNIRH (o
+  GeoServer da ANA não existe mais; o de metadados dá 403). Baixa por LOTE DE
+  IDS (`returnIdsOnly` + `objectIds`) — não depende de paginação do servidor —
+  e a trava é a CONTAGEM: baixado ≠ ids do servidor ⇒ nada gravado (rios e
+  massas não recobrem o estado, então a trava de área só vale para as
+  micro-regiões). Geometria do ArcGIS (`f=json`) convertida no script
+  (anel horário = contorno). Tema `linha` desenha só traço, conta "trechos" e
+  entra na legenda como linha. Não confundir com a "bacia" de texto do
+  `agua_pontos_coleta` (Painel das Bacias): esta é a divisão da ANA, só
+  camada de leitura.
+- Guarda: `tests/mapa-meio-fisico.test.js` (6, página real com o arquivo
   servido por stub). Sem mudança em `pwa/sw.js` (tela de mesa).
 
 ## Regra do sistema — painéis na tela cheia do mapa

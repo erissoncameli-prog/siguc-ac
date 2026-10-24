@@ -16,8 +16,10 @@
 //   classe de solo de um lote.
 // - Pane própria ABAIXO das camadas vetoriais (UC, TI, CAR seguem por cima)
 //   e acima das imagens.
-// - Arquivo só é baixado quando o tema é ligado (a página não carrega 5
+// - Arquivo só é baixado quando o tema é ligado (a página não carrega
 //   arquivos que ninguém pediu).
+// - Tema `linha` (rios) é desenhado só com traço; a opacidade vale para o
+//   traço e o contador diz "trechos", não "polígonos".
 
 const MF_BASE = (typeof MF_DATA_URL !== 'undefined' ? MF_DATA_URL : '../data/meio_fisico/')
 const MF_PANE = 'meioFisicoPane'
@@ -64,6 +66,33 @@ const MF_TEMAS = {
     popup: { titulo: 'temperat', campos: [
       { campo: 'temperat', rotulo: 'Classificação térmica' }, { campo: 'umida_seca', rotulo: 'Umidade / meses secos' }] },
   },
+  rios: {
+    rotulo: 'Rios principais', fonte: 'ANA — SNIRH (cursos d\'água)', escala: '1:1.000.000', cor: '#1D6FB8', linha: true,
+    colorir: ['DEDOMINIAL', 'NORIOCOMP'],
+    popup: { titulo: 'NORIOCOMP', campos: [
+      { campo: 'DEDOMINIAL', rotulo: 'Domínio' }, { campo: 'ORGAO_GEST', rotulo: 'Órgão gestor' },
+      { campo: 'NUAREAMONT', rotulo: 'Área drenada a montante', sufixo: ' km²', casas: 0 }] },
+  },
+  massas_dagua: {
+    rotulo: 'Massas d\'água', fonte: 'ANA — SNIRH (massas d\'água)', escala: '1:1.000.000', cor: '#0E7490',
+    colorir: ['detipomass', 'dedominial'],
+    popup: { titulo: 'nmoriginal', campos: [
+      { campo: 'nmgenerico', rotulo: 'Tipo (nome)' }, { campo: 'detipomass', rotulo: 'Tipo' },
+      { campo: 'dedominial', rotulo: 'Domínio' }, { campo: 'usoprinc', rotulo: 'Uso principal' },
+      { campo: 'nuareaha', rotulo: 'Área (cadastro ANA)', sufixo: ' ha', casas: 1 }] },
+  },
+  bacias_ana: {
+    rotulo: 'Micro-regiões hidrográficas', fonte: 'ANA — Divisão hidrográfica nacional', escala: '1:1.000.000', cor: '#4F46E5',
+    colorir: ['DMI_NM'],
+    popup: { titulo: 'DMI_NM', campos: [
+      { campo: 'DMI_CD', rotulo: 'Código' },
+      { campo: 'DMI_AR_KM2', rotulo: 'Área total da micro-região', sufixo: ' km²', casas: 0 }] },
+  },
+}
+
+function _mfUnidade(tema, n) {
+  const linha = MF_TEMAS[tema]?.linha
+  return `${n.toLocaleString('pt-BR')} ${linha ? (n === 1 ? 'trecho' : 'trechos') : (n === 1 ? 'polígono' : 'polígonos')}`
 }
 
 const _mf = { mapa: null, cache: {}, camadas: {}, aoMudar: null, pref: {} }
@@ -121,7 +150,11 @@ function _mfDesenhar(tema) {
   const t = MF_TEMAS[tema]
   reg.layer = L.geoJSON(c.geojson, {
     pane: MF_PANE,
-    style: f => { const cor = cores ? ccfCorDaFeicao(c, f.properties, cores) : t.cor; return { color: cor, weight: 0.6, opacity: 0.9, fillColor: cor, fillOpacity: op } },
+    style: f => {
+      const cor = cores ? ccfCorDaFeicao(c, f.properties, cores) : t.cor
+      return t.linha ? { color: cor, weight: 1.6, opacity: Math.max(op, 0.15), fill: false }
+        : { color: cor, weight: 0.6, opacity: 0.9, fillColor: cor, fillOpacity: op }
+    },
     onEachFeature: (f, layer) => layer.bindPopup(() =>
       ccfPopupHTML(c, f, {}) + `<div class="mf-fonte">${ccfEsc(t.fonte)} · escala ${ccfEsc(t.escala)}. Mapeamento regional — não substitui levantamento de campo.</div>`,
       { className: 'camada-popup-wrap', maxWidth: 360 }),
@@ -145,7 +178,7 @@ async function mfAlternar(tema, ligar) {
     if (!_mf.camadas[tema]) return // desligado enquanto baixava
     _mf.camadas[tema].camada = _mfCamada(tema, gj)
     _mfDesenhar(tema)
-    _mfStatus(tema, `${(gj.features || []).length.toLocaleString('pt-BR')} polígonos`)
+    _mfStatus(tema, _mfUnidade(tema, (gj.features || []).length))
   } catch (e) {
     delete _mf.camadas[tema]
     _mfStatus(tema, 'Não foi possível carregar o arquivo.', true)
@@ -165,7 +198,7 @@ function mfColorirPor(tema, campo) {
 function mfDefinirOpacidade(tema, v) {
   _mf.pref.opacidade[tema] = v
   const reg = _mf.camadas[tema]
-  if (reg && reg.layer) reg.layer.setStyle({ fillOpacity: v })
+  if (reg && reg.layer) reg.layer.setStyle(MF_TEMAS[tema].linha ? { opacity: Math.max(v, 0.15) } : { fillOpacity: v })
   _mfPrefSalvar()
 }
 
@@ -177,8 +210,9 @@ function mfItensLegenda() {
   mfAtivos().forEach(t => {
     const c = _mf.camadas[t].camada
     const porClasse = ccfItensLegenda(c, mfOpacidade(t))
-    if (porClasse) itens.push(...porClasse)
-    else itens.push({ simbolo: 'rect', cor: MF_TEMAS[t].cor, opacidade: mfOpacidade(t), label: MF_TEMAS[t].rotulo })
+    const simbolo = MF_TEMAS[t].linha ? 'line' : 'rect'
+    if (porClasse) itens.push(...porClasse.map(i => ({ ...i, simbolo })))
+    else itens.push({ simbolo, cor: MF_TEMAS[t].cor, opacidade: mfOpacidade(t), label: MF_TEMAS[t].rotulo })
   })
   return itens
 }
@@ -192,7 +226,8 @@ const _MF_ROTULO_CAMPO = {
   nm_unidade: 'Unidade', nm_tempo_g: 'Tempo geológico', nm_provincia: 'Província', nm_dominio: 'Domínio',
   nm_regiao: 'Região', compartimento: 'Compartimento', ordem: 'Ordem do solo', legenda_2: 'Classe detalhada',
   subordem: 'Subordem', textura: 'Textura', leg_sup: 'Cobertura dominante', nm_uantr: 'Uso antrópico',
-  temperat: 'Temperatura', umida_seca: 'Umidade',
+  temperat: 'Temperatura', umida_seca: 'Umidade', DEDOMINIAL: 'Domínio', NORIOCOMP: 'Nome do rio',
+  detipomass: 'Tipo', dedominial: 'Domínio', DMI_NM: 'Micro-região',
 }
 
 // Corpo da aba "Meio Físico" da barra de camadas.
@@ -203,15 +238,15 @@ function mfPainelHTML() {
     const op = Math.round(mfOpacidade(k) * 100)
     return `<div class="mf-tema" data-mf-tema="${k}">
       <label class="mf-cab"><input type="checkbox" data-mf-acao="ligar"${on ? ' checked' : ''}>
-        <span class="mf-amostra" style="background:${t.cor}"></span><span class="mf-nome">${ccfEsc(t.rotulo)}</span>
-        <span class="mf-status" role="status" aria-live="polite">${on && _mf.camadas[k].camada ? `${_mf.camadas[k].camada.geojson.features.length.toLocaleString('pt-BR')} polígonos` : ''}</span></label>
+        <span class="mf-amostra${t.linha ? ' mf-amostra-linha' : ''}" style="background:${t.cor}"></span><span class="mf-nome">${ccfEsc(t.rotulo)}</span>
+        <span class="mf-status" role="status" aria-live="polite">${on && _mf.camadas[k].camada ? _mfUnidade(k, _mf.camadas[k].camada.geojson.features.length) : ''}</span></label>
       <div class="mf-meta">${ccfEsc(t.fonte)} · ${ccfEsc(t.escala)}</div>
       <div class="mf-ctrl">
         <label>Colorir por <select data-mf-acao="colorir">${t.colorir.map(c => `<option value="${c}"${c === campo ? ' selected' : ''}>${ccfEsc(_MF_ROTULO_CAMPO[c] || c)}</option>`).join('')}</select></label>
         <label>Opacidade <input type="range" min="0" max="100" step="5" value="${op}" data-mf-acao="opacidade" aria-label="Opacidade de ${ccfEsc(t.rotulo)}"></label>
       </div>
     </div>`
-  }).join('') + `<div class="mf-nota">Mapeamento regional do IBGE, recortado pelo limite do Acre. Use para leitura de contexto; não substitui levantamento de campo.</div>`
+  }).join('') + `<div class="mf-nota">Mapeamento regional do IBGE e da ANA, recortado pelo limite do Acre. Use para leitura de contexto; não substitui levantamento de campo.</div>`
 }
 
 // Delegação no contêiner da aba (o HTML é refeito a cada abertura).
@@ -240,6 +275,7 @@ function mfEstilos() {
 .mf-cab{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;min-height:24px;}
 .mf-cab input{width:14px;height:14px;accent-color:#1F4E2C;}
 .mf-amostra{width:14px;height:14px;border-radius:3px;flex-shrink:0;opacity:.8;}
+.mf-amostra-linha{height:3px;border-radius:2px;opacity:1;}
 .mf-nome{flex:1;min-width:0;}
 .mf-status{font-size:10.5px;font-weight:500;color:var(--cinza-500,#6b7280);}
 .mf-erro{color:#B91C1C;}
