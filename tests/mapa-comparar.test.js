@@ -40,7 +40,7 @@ function pngSolido([r, g, b]) {
 const VERMELHO = [220, 20, 20], AZUL = [20, 40, 220]
 const PNG_PLANET = pngSolido(VERMELHO), PNG_S2 = pngSolido(AZUL)
 
-async function abrir(page) {
+async function abrir(page, { semPlanet = false, s2Motivo = null } = {}) {
   await page.addInitScript(() => {
     const mk = pend => { const f = function () {}; const p = new Proxy(f, { get(t, k) { if (k === 'then') return pend ? () => {} : r => r({ data: null, error: null }); if (k === 'auth') return mk(true); return mk(pend) }, apply() { return p } }); return p };
     window.supabase = { createClient: () => mk(false) };
@@ -55,6 +55,10 @@ async function abrir(page) {
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.css', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.css'), contentType: 'text/css' }));
   await page.route('**/api/**', r => {
     const u = new URL(r.request().url());
+    if (u.pathname === '/api/planet' && u.searchParams.get('op') === 'mosaics' && semPlanet) {
+      return r.fulfill({ json: { disponivel: false, recente: null, motivo: 'conta-sem-mosaicos', mosaicos: [] } });
+    }
+    if (u.pathname === '/api/sentinel' && u.searchParams.get('bbox') && s2Motivo) return r.fulfill({ json: { disponivel: false, motivo: s2Motivo, datas: [] } });
     if (u.pathname === '/api/planet' && u.searchParams.get('op') === 'mosaics') {
       return r.fulfill({ json: { disponivel: true, recente: { name: 'm2026-09', label: 'set/2026', data: '2026-09' }, mosaicos: [
         { name: 'm2026-09', label: 'set/2026', data: '2026-09' },
@@ -190,8 +194,15 @@ test('padrão Planet recente × 2 anos antes; Sentinel oferece época seca e cen
   await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue(`ano:${new Date().getFullYear() - 1}`);
   expect(await page.locator('[data-cmp-valor="dir"] option[value^="ano:"]').count()).toBeGreaterThan(5);
   await page.selectOption('[data-cmp-fonte="esq"]', 'prodes');
-  await expect(page.locator('[data-cmp-status="esq"]')).toContainText('sobre o mapa base');
-  expect(await page.evaluate(() => _cmp.lados.esq.layer.wmsParams.CQL_FILTER)).toMatch(/^year=\d{4}$/);
+  // PRODES abre no ACUMULADO (é o que mostra mudança entre dois anos)
+  await expect(page.locator('[data-cmp-status="esq"]')).toContainText('desmatado até o ano');
+  const wms = await page.evaluate(() => _cmp.lados.esq.layer.wmsParams);
+  expect(wms.CQL_FILTER).toMatch(/^INCLUDE;year<=\d{4}$/);
+  expect(wms.layers.split(',')).toHaveLength(2);
+  const anoSo = await page.evaluate(() => _cmp.prodesAnos[0]);
+  await page.selectOption('[data-cmp-valor="esq"]', `ano:${anoSo}`);
+  expect(await page.evaluate(() => _cmp.lados.esq.layer.wmsParams.CQL_FILTER)).toBe(`year=${anoSo}`);
+  await expect(page.locator('[data-cmp-status="esq"]')).toContainText('aproxime o zoom');
   // painel por cima dos controles do Leaflet (legenda, informações) — senão fica coberto
   const zp = await page.evaluate(() => [getComputedStyle(document.querySelector('.cmp-painel')).zIndex, getComputedStyle(document.querySelector('.leaflet-bottom')).zIndex].map(Number));
   expect(zp[0]).toBeGreaterThan(zp[1]);
@@ -215,4 +226,22 @@ test('no imersivo funciona e Esc sai da comparação sem sair da tela cheia; imp
   await expect(page.locator('.cmp-painel')).toBeVisible();
   await page.evaluate(() => { try { CART.imprimir('t') } catch (_) {} });
   await expect(page.locator('.cmp-painel')).toHaveCount(0);
+});
+
+test('Sentinel com credencial recusada: aviso diz a causa; sem Planet, abre em PRODES acumulado', async ({ page }) => {
+  await abrir(page, { semPlanet: true, s2Motivo: 'token-http-401' });
+  await page.click('.cmp-abrir');
+  const anos = await page.evaluate(() => _cmp.prodesAnos);
+  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue(`ate:${anos[0]}`);
+  expect(await page.evaluate(() => _cmp.lados.esq.valor)).toMatch(/^ate:\d{4}$/);
+  await expect(page.locator('[data-cmp-fonte="dir"] option[value="sentinel"]')).toContainText('fora do ar');
+  await page.selectOption('[data-cmp-fonte="dir"]', 'sentinel');
+  await expect(page.locator('[data-cmp-status="dir"]')).toContainText('fora do ar');
+  await expect(page.locator('.cmp-avisos')).toContainText('token-http-401');
+  await expect(page.locator('.cmp-avisos')).toContainText('CDSE_CLIENT_ID');
+  // dois lados "só o ano": o aviso explica por que não parece mudar
+  await page.selectOption('[data-cmp-fonte="dir"]', 'prodes');
+  await page.selectOption('[data-cmp-valor="dir"]', `ano:${anos[0]}`);
+  await page.selectOption('[data-cmp-valor="esq"]', `ano:${anos[3]}`);
+  await expect(page.locator('.cmp-avisos')).toContainText('Desmatado até');
 });

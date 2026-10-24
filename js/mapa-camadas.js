@@ -109,9 +109,11 @@ async function mapaSentinelCenas(bbox) {
 
 // ── PRODES (WMS TerraBrasilis) ───────────────────────────────────────
 // { ano } recorta o desmatamento anual por CQL (year=N); { acumulado:true }
-// = camada do acumulado até 2007. Mesma camada que prodes_resumo_ano lê.
+// = camada do acumulado até 2007; { ate:N } = TUDO o que foi desmatado até
+// o ano N (acumulado 2007 + anuais <= N, CQL por camada separado por ';').
+// Mesma camada que prodes_resumo_ano lê.
 const MAPA_PRODES_WMS = 'https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms';
-function mapaProdesLayer(L, { ano, acumulado, opacidade, ...extra } = {}) {
+function mapaProdesLayer(L, { ano, ate, acumulado, opacidade, ...extra } = {}) {
   const o = {
     layers: acumulado ? 'prodes-amazon-nb:accumulated_deforestation_2007_biome'
                       : 'prodes-amazon-nb:yearly_deforestation_biome',
@@ -121,7 +123,11 @@ function mapaProdesLayer(L, { ano, acumulado, opacidade, ...extra } = {}) {
     maxZoom: 22, maxNativeZoom: 15,
     ...extra,
   };
-  if (ano && !acumulado) o.CQL_FILTER = `year=${ano}`;
+  if (ate) {
+    o.layers = 'prodes-amazon-nb:accumulated_deforestation_2007_biome,prodes-amazon-nb:yearly_deforestation_biome';
+    o.CQL_FILTER = `INCLUDE;year<=${Number(ate)}`;
+    o.attribution = 'PRODES/INPE';
+  } else if (ano && !acumulado) o.CQL_FILTER = `year=${ano}`;
   return L.tileLayer.wms(MAPA_PRODES_WMS, o);
 }
 

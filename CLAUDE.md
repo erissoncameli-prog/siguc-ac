@@ -1221,7 +1221,19 @@ anual, misturáveis. Ideia do jurema-webgis, sem código dele.
   a folha (`cmpSairParaImprimir`) — o recorte não acompanha a A4 nesta fase.
 - ⚠️ Nos testes, o `load` da camada chega ANTES do fade dos tiles: medir pixel
   só depois de os `<img>` das panes estarem com opacidade 1.
-- Guarda: `tests/mapa-comparar.test.js` (5, por PIXEL com tiles de cor sólida
+- **Fonte fora do ar DIZ a causa** (relato do usuário: "Sentinel fica escuro,
+  PRODES não muda"). Medido em produção, 24/10/2026: `/api/sentinel` devolvia
+  tile vazio com `token-http-401` (o Copernicus recusou CDSE_CLIENT_ID/SECRET)
+  e `/api/planet` devolve `conta-sem-mosaicos` — o lado ficava só com o mapa
+  base. A abertura chama `mapaSentinelCenas` (mesma consulta das cenas) e, com
+  `motivo`, marca "(fora do ar)", explica no aviso e o padrão cai para PRODES.
+  O proxy agora devolve a causa real no `X-Sentinel-Status` e no log, e o
+  evalscript leva `dataMask` no alfa (cena de um dia fora da faixa saía PRETA).
+- **PRODES compara ACUMULADO** (`ate:N` → `mapaProdesLayer({ate})`: camada
+  acumulado 2007 + anual com `CQL_FILTER=INCLUDE;year<=N`). O polígono de um
+  ano só tem ~7 ha em média e cai em lugares diferentes a cada ano — "só o
+  ano" × "só o ano" não mostra mudança, e a tela avisa isso.
+- Guarda: `tests/mapa-comparar.test.js` (6, por PIXEL com tiles de cor sólida
   servidos por stub). Sem mudança em `pwa/sw.js` (nenhum arquivo tocado está
   em `SHELLS`).
 

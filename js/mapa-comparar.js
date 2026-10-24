@@ -25,8 +25,20 @@ const CMP_PANE = { esq: 'cmpEsquerda', dir: 'cmpDireita' }
 const CMP_FONTES = {
   planet:   'Planet / NICFI (mensal)',
   sentinel: 'Sentinel-2',
-  prodes:   'PRODES — desmatamento anual',
+  prodes:   'PRODES — desmatamento',
 }
+
+// Motivo devolvido por /api/sentinel?bbox= → frase para quem usa o mapa.
+// Credencial recusada é problema do servidor, não da área nem do período:
+// sem isto a tela só mostrava o mapa base e parecia "imagem escura".
+function _cmpS2MotivoTexto(m) {
+  if (!m) return ''
+  if (m === 'sem-credenciais') return 'Sentinel-2 desligado: o servidor não tem as credenciais do Copernicus (CDSE_CLIENT_ID/CDSE_CLIENT_SECRET na Vercel).'
+  if (/^token-http-(400|401|403)$/.test(m)) return `Sentinel-2 fora do ar: o Copernicus recusou a credencial do servidor (${m}). É preciso gerar um novo cliente OAuth no Copernicus Data Space e atualizar CDSE_CLIENT_ID/CDSE_CLIENT_SECRET na Vercel.`
+  if (m === 'rede') return 'Sentinel-2 sem resposta agora (rede). Tente de novo em instantes.'
+  return `Sentinel-2 indisponível no momento (${m}).`
+}
+function _cmpS2Falha() { const c = _cmp.cenas; return c && !c.disponivel && c.motivo ? c.motivo : '' }
 const CMP_S2_ANO_MIN = 2017     // mesmo piso da linha do tempo (TL_S2_ANO_MIN)
 const CMP_PRODES_ANO_MIN = 2008
 
@@ -81,6 +93,11 @@ async function _cmpCarregarListas() {
     }
     _cmp.prodesAnos = [...new Set(anos.map(Number))].sort((a, b) => b - a)
   }
+  // a mesma consulta lista as cenas recentes E diz se o Sentinel responde
+  if (!_cmp.cenas && typeof mapaSentinelCenas === 'function' && _cmp.mapa) {
+    const b = _cmp.mapa.getBounds()
+    _cmp.cenas = await mapaSentinelCenas([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()])
+  }
 }
 
 function _cmpPlanetOk() { return !!(_cmp.planet && _cmp.planet.disponivel && _cmp.planet.mosaicos && _cmp.planet.mosaicos.length) }
@@ -101,7 +118,12 @@ function _cmpOpcoes(fonte) {
       rotulo: `${_cmpDataBR(d.data)} — nuvens ${Math.round(d.nuvem)}%`, grupo: 'Cenas recentes na área visível' }))
     return op
   }
-  if (fonte === 'prodes') return _cmp.prodesAnos.map(a => ({ valor: String(a), rotulo: `Desmatamento ${a}` }))
+  // "Acumulado até N" é o que mostra a MUDANÇA entre dois anos; o polígono
+  // de um ano só tem em média ~7 ha e some na escala do município.
+  if (fonte === 'prodes') return [
+    ..._cmp.prodesAnos.map(a => ({ valor: `ate:${a}`, rotulo: `Desmatado até ${a}`, grupo: 'Acumulado (tudo até o ano)' })),
+    ..._cmp.prodesAnos.map(a => ({ valor: `ano:${a}`, rotulo: `Só o ano ${a} (ago/${a - 1}–jul/${a})`, grupo: 'Só o desmatamento do ano' })),
+  ]
   return []
 }
 
@@ -116,11 +138,19 @@ function _cmpRotuloCurto(lado) {
   if (l.fonte === 'sentinel') {
     return l.valor.startsWith('ano:') ? `Sentinel-2 · seca ${l.valor.slice(4)}` : `Sentinel-2 · ${_cmpDataBR(l.valor.slice(5))}`
   }
-  return `PRODES ${l.valor}`
+  const [modo, ano] = _cmpProdesValor(l.valor)
+  return modo === 'ate' ? `PRODES · até ${ano}` : `PRODES · só ${ano}`
+}
+
+// 'ate:2020' | 'ano:2020' | '2020' (formato antigo = só o ano)
+function _cmpProdesValor(v) {
+  const m = String(v).match(/^(ate|ano):(\d{4})$/)
+  return m ? [m[1], Number(m[2])] : ['ano', Number(v)]
 }
 
 // Padrão: Planet mais recente × o mesmo mês 2 anos antes; sem Planet,
-// Sentinel do ano passado × 4 anos antes.
+// Sentinel do ano passado × 4 anos antes; sem os dois, PRODES acumulado
+// (o mais recente × 10 anos antes).
 function _cmpPadrao() {
   if (_cmpPlanetOk()) {
     const ms = _cmp.planet.mosaicos   // mais recente primeiro
@@ -128,6 +158,11 @@ function _cmpPadrao() {
     const alvo = dir.data ? `${Number(dir.data.slice(0, 4)) - 2}${dir.data.slice(4, 7)}` : null
     const esq = (alvo && ms.find(m => (m.data || '').slice(0, 7) === alvo)) || ms[Math.min(ms.length - 1, 24)]
     return { esq: { fonte: 'planet', valor: esq.name }, dir: { fonte: 'planet', valor: dir.name } }
+  }
+  if (_cmpS2Falha() && _cmp.prodesAnos.length) {
+    const ps = _cmp.prodesAnos   // mais recente primeiro
+    const esq = ps.find(a => a <= ps[0] - 10) || ps[ps.length - 1]
+    return { esq: { fonte: 'prodes', valor: `ate:${esq}` }, dir: { fonte: 'prodes', valor: `ate:${ps[0]}` } }
   }
   const a = new Date().getFullYear() - 1
   return { esq: { fonte: 'sentinel', valor: `ano:${a - 4}` }, dir: { fonte: 'sentinel', valor: `ano:${a}` } }
@@ -191,7 +226,10 @@ function _cmpCriarCamada(lado) {
       ? mapaSentinelLayer(L, { ano: Number(l.valor.slice(4)), opacidade: 100, pane })
       : mapaSentinelLayer(L, { data: l.valor.slice(5), nuvem: 100, opacidade: 100, pane })
   }
-  return mapaProdesLayer(L, { ano: Number(l.valor), opacidade: 85, pane })
+  const [modo, ano] = _cmpProdesValor(l.valor)
+  return modo === 'ate'
+    ? mapaProdesLayer(L, { ate: ano, opacidade: 85, pane })
+    : mapaProdesLayer(L, { ano, opacidade: 85, pane })
 }
 
 function _cmpAplicar(lado) {
@@ -252,7 +290,7 @@ function _cmpMontarDom() {
       <div class="cmp-lado" data-lado="${k}">
         <div class="cmp-lado-tit">${k === 'esq' ? 'Esquerda' : 'Direita'}</div>
         <select class="cmp-sel" data-cmp-fonte="${k}" aria-label="Fonte da imagem — ${k === 'esq' ? 'esquerda' : 'direita'}">
-          ${Object.entries(CMP_FONTES).map(([f, r]) => `<option value="${f}"${f === 'planet' && !_cmpPlanetOk() ? ' disabled' : ''}>${r}${f === 'planet' && !_cmpPlanetOk() ? ' (indisponível)' : ''}</option>`).join('')}
+          ${Object.entries(CMP_FONTES).map(([f, r]) => `<option value="${f}"${f === 'planet' && !_cmpPlanetOk() ? ' disabled' : ''}>${r}${f === 'planet' && !_cmpPlanetOk() ? ' (indisponível)' : f === 'sentinel' && _cmpS2Falha() ? ' (fora do ar)' : ''}</option>`).join('')}
         </select>
         <select class="cmp-sel" data-cmp-valor="${k}" aria-label="Data da imagem — ${k === 'esq' ? 'esquerda' : 'direita'}"></select>
         <div class="cmp-status" data-cmp-status="${k}" role="status" aria-live="polite"></div>
@@ -326,10 +364,13 @@ function _cmpStatus(lado) {
   const el = p.querySelector(`[data-cmp-status="${lado}"]`)
   let t = '', cls = ''
   if (!l.valor) { t = 'Sem imagem disponível para esta fonte.'; cls = 'erro' }
+  else if (l.fonte === 'sentinel' && _cmpS2Falha()) { t = 'Sem imagem: o servidor do Sentinel-2 está fora do ar (ver aviso abaixo).'; cls = 'erro' }
   else if (l.carregando) t = 'Carregando imagem…'
   else if (l.erros && !l.ok) { t = 'Imagem indisponível nesta área. Escolha outro período.'; cls = 'erro' }
   else if (l.erros) { t = 'Parte da área visível está sem imagem.'; cls = 'aviso' }
-  else if (l.fonte === 'prodes') t = 'Polígonos sobre o mapa base (transparente fora deles).'
+  else if (l.fonte === 'prodes') t = _cmpProdesValor(l.valor)[0] === 'ate'
+    ? 'Polígonos de tudo o que foi desmatado até o ano, sobre o mapa base.'
+    : 'Só o desmatamento detectado neste ano — polígonos pequenos: aproxime o zoom.'
   el.textContent = t
   el.className = 'cmp-status' + (cls ? ' ' + cls : '')
 }
@@ -339,6 +380,9 @@ function _cmpAvisos() {
   const av = []
   const a = _cmp.lados.esq, b = _cmp.lados.dir
   if (a && b && a.fonte === b.fonte && a.valor === b.valor) av.push('Mesma imagem nos dois lados.')
+  if (_cmpS2Falha() && ((a && a.fonte === 'sentinel') || (b && b.fonte === 'sentinel'))) av.push(_cmpS2MotivoTexto(_cmpS2Falha()))
+  if (a && b && a.fonte === 'prodes' && b.fonte === 'prodes' && _cmpProdesValor(a.valor)[0] === 'ano' && _cmpProdesValor(b.valor)[0] === 'ano')
+    av.push('Cada lado mostra só o desmatamento daquele ano, em lugares diferentes. Para ver o que mudou, use "Desmatado até" nos dois lados.')
   let baixo = []
   try { baixo = (_cmp.opts.camadasPorBaixo && _cmp.opts.camadasPorBaixo()) || [] } catch (_) {}
   if (baixo.length) av.push(`Ligadas no painel e por baixo da comparação (aparecem só onde a imagem não cobre): ${baixo.join(', ')}. Ajuste em Cobertura Vegetal, se quiser.`)
