@@ -1,0 +1,42 @@
+name: Meio físico do Acre (IBGE + ANA)
+
+# Fase 4 do plano em docs/mapa-ucs/plano-medicao-comparacao.md: camadas de
+# geologia, geomorfologia, pedologia, vegetação, clima (IBGE) e drenagem/
+# ottobacias (ANA) para o Mapa das UCs. Roda FORA das sessões de
+# desenvolvimento porque os servidores do IBGE e da ANA respondem 403 no
+# proxy delas; o runner do GitHub alcança os dois.
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'descobrir = só lista as camadas disponíveis'
+        type: choice
+        options: [descobrir]
+        default: descobrir
+  push:
+    # Mudar o script ou o workflow já roda — é como se testa de uma branch
+    # (workflow_dispatch só existe na main).
+    paths:
+      - 'scripts/meio_fisico.py'
+      - '.github/workflows/meio-fisico.yml'
+
+concurrency:
+  group: meio-fisico
+  cancel-in-progress: false
+
+jobs:
+  meio-fisico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Dependências
+        run: pip install 'requests==2.32.5'
+      - name: Descobrir camadas
+        run: python scripts/meio_fisico.py --descobrir
