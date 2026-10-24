@@ -1262,6 +1262,36 @@ no ⚙ da camada, gravado pelo "Salvar estilo" de sempre.
   conferido — `_siguc_pid` fora da lista de técnicos reprova). Sem mudança em
   `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — Meio físico do Acre no Mapa das UCs (Fase 4, 24/10/2026)
+Aba "Meio Físico" da barra de camadas (`pages/mapa.html`), fonte única
+`js/mapa-meio-fisico.js` (prefixo `mf`). Temas do IBGE: geologia,
+geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
+`geom_area`, `pedo_area`, `vege_area`) e clima (`CGEO:ANMS2010_03_clima`,
+1:5 milhões).
+- **Arquivos estáticos** `data/meio_fisico/<tema>.geojson`, gerados SÓ por
+  `scripts/meio_fisico.py --gerar` no workflow `.github/workflows/meio-fisico.yml`
+  (o IBGE responde 403 nas sessões de desenvolvimento; o runner alcança). O
+  workflow grava o commit no próprio branch (`contents: write`; commit do
+  GITHUB_TOKEN não redispara workflow). Nunca editar o GeoJSON à mão.
+- Recorte pelo MESMO `data/acre_estado.geojson` do mapa, simplificação ~45 m
+  (abaixo do que 1:250 mil resolve), coordenadas com 5 casas, só os atributos
+  listados em `TEMAS_IBGE`. **Trava**: tema que não cobre 95–105% da área do
+  estado NÃO é gravado (paginação, bbox ou eixo errado). `--autoteste` sem rede
+  roda antes. `--descobrir`/`--descobrir-ana` listam camadas e contagens — os
+  nomes não são adivinhados.
+- Desenho = funções da Fase 3 (`ccfPopupHTML`, `ccfCorDaFeicao`,
+  `ccfItensLegenda`) sobre um objeto no formato de `camadas_mapa`, com popup e
+  "colorir por" declarados em `MF_TEMAS`. Pane `meioFisicoPane` (z 350): acima
+  das imagens e da comparação, abaixo das camadas vetoriais (UC por cima).
+- Popup e painel SEMPRE dizem fonte, escala e "mapeamento regional — não
+  substitui levantamento de campo". Arquivo só baixa ao ligar o tema;
+  preferências em `localStorage['siguc_meio_fisico']`.
+- ANA: o GeoServer dela não existe mais (o nome não resolve) e o de metadados
+  dá 403; os dois servidores ArcGIS (`www.snirh.gov.br/arcgis`,
+  `portal1.snirh.gov.br/server`) respondem — ver a descoberta.
+- Guarda: `tests/mapa-meio-fisico.test.js` (5, página real com o arquivo
+  servido por stub). Sem mudança em `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de

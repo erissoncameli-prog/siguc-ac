@@ -194,7 +194,12 @@ Popup configurável, medidas calculadas e cor por atributo nas camadas
 enviadas (`js/mapa-camadas-config.js`) + dado pessoal tirado do GeoJSON
 (migration 367). Ver a regra no CLAUDE.md.
 
+## Fase 4 — Meio físico (em andamento, 24/10/2026)
+IBGE (geologia, geomorfologia, pedologia, vegetação 1:250 mil + clima)
+gerado no GitHub Actions e desenhado com as funções da Fase 3. Ver a regra
+no CLAUDE.md. Drenagem/ottobacias da ANA dependem da descoberta nos
+servidores ArcGIS dela.
+
 ## Fora deste plano (registrado)
-- Meio físico IBGE/ANA
-  via GitHub Actions (Fase 4), GPS + legenda em degradê (Fase 5).
+- GPS + legenda em degradê (Fase 5).
 - Ortomosaico de drone e modelo 3D: sem levantamentos hoje.
