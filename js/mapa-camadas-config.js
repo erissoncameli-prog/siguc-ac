@@ -11,6 +11,9 @@
 //   popup:     { titulo: 'Num_Lote', campos: [{ campo, rotulo, prefixo, sufixo, casas }] }
 //              campos ausente = mostra todos (menos os técnicos), como sempre.
 //   colorirPor: { campo: 'Zona', cores: { 'ZPI': '#009E73', … } }
+//   colorirPor: { campo: 'Area_ha', modo: 'degrade', escala: 'linear'|'log', inverter }
+//              (Fase 5) campo NUMÉRICO vira rampa contínua (viridis) do mínimo ao
+//              máximo, com legenda em barra; sem valor = cinza.
 //
 // Regras:
 // - Medida calculada sai SEMPRE rotulada "calculada no mapa (não registral)":
@@ -124,10 +127,69 @@ function ccfValores(c, campo) {
     .map(([valor, n]) => ({ valor, n }))
 }
 
+// ── Degradê (campo numérico) ───────────────────────────────────────
+// Viridis: perceptualmente uniforme e legível em daltonismo e em P&B — a
+// cor clara é o MAIOR valor (inverter troca). Nunca a paleta de classes:
+// ela não tem ordem, e o leitor precisa ver "mais" e "menos".
+const CCF_RAMPA = ['#440154', '#3B528B', '#21918C', '#5EC962', '#FDE725']
+
+// Número de um valor de atributo (número, "12,5" ou "12.5"); null se não for.
+function ccfNumero(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (v === null || v === undefined) return null
+  const t = String(v).trim()
+  return /^-?\d+(?:[.,]\d+)?$/.test(t) ? Number(t.replace(',', '.')) : null
+}
+
+// Mínimo/máximo do campo se TODO valor preenchido for número (≥ 2 distintos);
+// null caso contrário — campo de texto nunca vira degradê.
+function ccfFaixaNumerica(c, campo) {
+  let min = Infinity, max = -Infinity, n = 0
+  for (const f of (c?.geojson?.features || [])) {
+    const v = f.properties?.[campo]
+    if (v === null || v === undefined || v === '') continue
+    const x = ccfNumero(v)
+    if (x === null) return null
+    n++; if (x < min) min = x; if (x > max) max = x
+  }
+  return n && max > min ? { min, max, n } : null
+}
+
+function _ccfHex(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)) }
+function _ccfMisturar(a, b, t) {
+  const A = _ccfHex(a), B = _ccfHex(b)
+  return '#' + A.map((x, i) => Math.round(x + (B[i] - x) * t).toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+// Cor da posição t ∈ [0,1] na rampa.
+function ccfCorRampa(t, inverter) {
+  t = Math.max(0, Math.min(1, inverter ? 1 - t : t))
+  const k = t * (CCF_RAMPA.length - 1), i = Math.min(CCF_RAMPA.length - 2, Math.floor(k))
+  return _ccfMisturar(CCF_RAMPA[i], CCF_RAMPA[i + 1], k - i)
+}
+
+// Configuração efetiva do degradê, ou null (não é degradê ou o campo deixou
+// de ser numérico). Log só com mínimo > 0; senão cai para linear e avisa.
+function ccfDegrade(c) {
+  const cfg = c?.style_config?.colorirPor
+  if (!cfg || !cfg.campo || cfg.modo !== 'degrade') return null
+  const fx = ccfFaixaNumerica(c, cfg.campo)
+  if (!fx) return null
+  const logPedido = cfg.escala === 'log'
+  const log = logPedido && fx.min > 0
+  return { ...fx, campo: cfg.campo, log, logRecusado: logPedido && !log, inverter: !!cfg.inverter }
+}
+
+function _ccfPosicao(d, x) {
+  return d.log ? (Math.log(x) - Math.log(d.min)) / (Math.log(d.max) - Math.log(d.min)) : (x - d.min) / (d.max - d.min)
+}
+
 // Cores efetivas: as salvas + paleta na ordem de frequência para o resto.
+// No degradê devolve { degrade } — quem usa passa adiante a ccfCorDaFeicao.
 function ccfCoresClasses(c) {
   const cfg = c?.style_config?.colorirPor
   if (!cfg || !cfg.campo) return null
+  const d = ccfDegrade(c)
+  if (d) return { degrade: d }
   const salvas = cfg.cores || {}
   const out = new Map()
   ccfValores(c, cfg.campo).forEach(({ valor }, i) => {
@@ -141,6 +203,10 @@ function ccfCorDaFeicao(c, props, coresCache) {
   if (!cfg || !cfg.campo) return null
   const cores = coresCache || ccfCoresClasses(c)
   const v = props?.[cfg.campo]
+  if (cores?.degrade) {
+    const x = ccfNumero(v)
+    return x === null ? CCF_COR_OUTROS : ccfCorRampa(_ccfPosicao(cores.degrade, x), cores.degrade.inverter)
+  }
   const k = v === null || v === undefined || v === '' ? '(sem valor)' : String(v)
   return cores.get(k) || CCF_COR_OUTROS
 }
@@ -150,11 +216,28 @@ function ccfItensLegenda(c, opacidade) {
   const cfg = c?.style_config?.colorirPor
   if (!cfg || !cfg.campo) return null
   const cores = ccfCoresClasses(c)
+  if (cores?.degrade) {
+    const d = cores.degrade
+    // um item só: a barra (js/mapa-cartografia.js desenha 'degrade')
+    const passos = [0, 0.25, 0.5, 0.75, 1].map(t => ccfCorRampa(t, d.inverter))
+    // rótulo do campo = o que o popup já usa para ele (senão o nome cru)
+    const rot = (c.style_config?.popup?.campos || []).find(x => x && x.campo === cfg.campo)?.rotulo || cfg.campo
+    const item = { simbolo: 'degrade', cores: passos, opacidade, label: `${c.nome} — ${rot}${d.log ? ' (escala log)' : ''}`,
+      min: ccfFormatar(d.min, _ccfCasasLeg(d)), max: ccfFormatar(d.max, _ccfCasasLeg(d)) }
+    const semValor = (c.geojson?.features || []).some(f => ccfNumero(f.properties?.[cfg.campo]) === null)
+    return semValor ? [item, { simbolo: 'rect', cor: CCF_COR_OUTROS, opacidade, label: `${c.nome} — sem valor` }] : [item]
+  }
   const vals = ccfValores(c, cfg.campo)
   const itens = vals.slice(0, CCF_MAX_CLASSES).map(({ valor }) =>
     ({ simbolo: 'rect', cor: cores.get(valor), opacidade, label: `${c.nome} — ${valor}` }))
   if (vals.length > CCF_MAX_CLASSES) itens.push({ simbolo: 'rect', cor: CCF_COR_OUTROS, opacidade, label: `${c.nome} — outros` })
   return itens
+}
+
+// Casas da legenda: as que o popup pede para o campo; senão, pela amplitude.
+function _ccfCasasLeg(d) {
+  const amp = d.max - d.min
+  return { casas: amp >= 100 ? 0 : amp >= 1 ? 1 : 3 }
 }
 
 // ── Popup ────────────────────────────────────────────────────────────
@@ -233,6 +316,19 @@ function ccfEditorHTML(c) {
   const cor = sc.colorirPor || {}
   const coresAtuais = ccfCoresClasses(c)
   const vals = cor.campo ? ccfValores(c, cor.campo) : []
+  const faixa = cor.campo ? ccfFaixaNumerica(c, cor.campo) : null
+  const deg = coresAtuais?.degrade || null
+  const modoAtual = deg ? (cor.escala === 'log' ? 'log' : 'linear') : 'classes'
+  const barra = deg ? `<div class="ccf-rampa" aria-hidden="true" style="background:linear-gradient(to right,${[0, .25, .5, .75, 1].map(t => ccfCorRampa(t, deg.inverter)).join(',')})"></div>
+      <div class="ccf-rampa-rot"><span>${ccfEsc(ccfFormatar(deg.min, _ccfCasasLeg(deg)))}</span><span>${ccfEsc(ccfFormatar(deg.max, _ccfCasasLeg(deg)))}</span></div>
+      ${deg.logRecusado ? '<div class="ccf-nota">Escala log precisa de todos os valores maiores que zero — usando linear.</div>' : ''}` : ''
+  const blocoModo = faixa ? `<label class="ccf-lbl">Como colorir
+      <select data-ccf-acao="modo">
+        <option value="classes"${modoAtual === 'classes' ? ' selected' : ''}>Classes (uma cor por valor)</option>
+        <option value="linear"${modoAtual === 'linear' ? ' selected' : ''}>Degradê (linear)</option>
+        <option value="log"${modoAtual === 'log' ? ' selected' : ''}>Degradê (escala log)</option>
+      </select></label>
+    ${deg ? `<label class="ccf-chk ccf-inverter"><input type="checkbox" data-ccf-acao="inverter"${deg.inverter ? ' checked' : ''}><span>Inverter (claro = menor valor)</span></label>${barra}` : ''}` : ''
   return `<div class="camada-expand-section ccf-editor" data-ccf-editor="${id}">
     <div class="camada-expand-section-title">Popup</div>
     <label class="ccf-lbl">Título
@@ -253,7 +349,8 @@ function ccfEditorHTML(c) {
     <div class="camada-expand-section-title" style="margin-top:8px">Colorir por atributo</div>
     <label class="ccf-lbl">Campo
       <select data-ccf-acao="colorir"><option value="">(cor única / sub-camadas)</option>${campos.map(k => opt(k, cor.campo)).join('')}</select></label>
-    ${cor.campo ? `<div class="ccf-classes">${vals.slice(0, CCF_MAX_CLASSES).map(({ valor, n }) => `
+    ${blocoModo}
+    ${cor.campo && !deg ? `<div class="ccf-classes">${vals.slice(0, CCF_MAX_CLASSES).map(({ valor, n }) => `
       <label class="ccf-classe"><input type="color" data-ccf-acao="cor" data-ccf-valor="${ccfEsc(valor)}" value="${coresAtuais.get(valor)}" class="camada-color-mini" aria-label="Cor de ${ccfEsc(valor)}">
         <span>${ccfEsc(valor)}</span><span class="ccf-n">${n}</span></label>`).join('')}
       ${vals.length > CCF_MAX_CLASSES ? `<div class="ccf-nota">${vals.length - CCF_MAX_CLASSES} valor(es) a mais ficam em cinza ("outros").</div>` : ''}</div>` : ''}
@@ -271,7 +368,19 @@ function ccfEditar(c, acao, el) {
     return pop
   }
   if (acao === 'titulo') { (sc.popup || (sc.popup = {})).titulo = el.value || undefined; return }
-  if (acao === 'colorir') { sc.colorirPor = el.value ? { campo: el.value, cores: {} } : undefined; return }
+  if (acao === 'colorir') {
+    // campo numérico nasce em degradê (mais de um valor sem ordem não diz nada)
+    sc.colorirPor = el.value ? { campo: el.value, cores: {} } : undefined
+    if (el.value && ccfFaixaNumerica(c, el.value)) sc.colorirPor.modo = 'degrade'
+    return
+  }
+  if (acao === 'modo') {
+    const cp = sc.colorirPor; if (!cp) return
+    if (el.value === 'classes') { delete cp.modo; delete cp.escala; delete cp.inverter }
+    else { cp.modo = 'degrade'; cp.escala = el.value === 'log' ? 'log' : undefined }
+    return
+  }
+  if (acao === 'inverter') { if (sc.colorirPor) sc.colorirPor.inverter = el.checked || undefined; return }
   if (acao === 'cor') { (sc.colorirPor.cores || (sc.colorirPor.cores = {}))[el.dataset.ccfValor] = el.value; return }
   if (!linha) return
   const campo = linha.dataset.ccfCampo
@@ -316,6 +425,9 @@ function ccfEstilos() {
 .ccf-classe{display:flex;align-items:center;gap:6px;font-size:11px;min-height:24px;}
 .ccf-classe span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ccf-n{color:var(--cinza-400,#9ca3af);font-variant-numeric:tabular-nums;}
+.ccf-inverter{margin:2px 0 4px;}
+.ccf-rampa{height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.15);margin-top:2px;}
+.ccf-rampa-rot{display:flex;justify-content:space-between;font-size:10.5px;color:var(--cinza-600,#4b5563);font-variant-numeric:tabular-nums;}
 `
   document.head.appendChild(st)
 }

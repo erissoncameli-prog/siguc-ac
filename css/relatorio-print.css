@@ -155,6 +155,8 @@
 .rel-mapa-folha-lado { border-left: 1px solid #374151; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 9px; color: #374151; background: #fff; }
 .rel-mapa-folha-lado h4 { font-size: 8px; font-weight: 800; color: #0A1A0F; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin: 0; }
 .rel-mapa-folha-lado .cart-leg-item { display:flex; align-items:center; gap:5px; font-size:9px; margin-bottom:3px; }
+.rel-mapa-folha-lado .cart-leg-item.cart-leg-degrade { flex-direction:column; align-items:flex-start; gap:2px; margin-bottom:5px; }
+.rel-mapa-folha-lado .cart-leg-degrade-rot { display:flex; justify-content:space-between; width:120px; font-size:8.5px; font-variant-numeric:tabular-nums; }
 .rel-mapa-folha-lado .rel-mapa-escala svg { margin-top: 4px; }
 /* Na folha só vale a moldura da direita: legenda/escala/info do Leaflet
    repetiriam (e divergiriam) o que já está lá. O zoom fica para ajustar
