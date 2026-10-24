@@ -139,9 +139,9 @@ corrente do mapa; o texto do lado diz isso.
 - "Mesma imagem nos dois lados."
 - **Camada cobrindo a comparação**: se Sentinel/Planet/GIBS/MapBiomas estiverem
   ligados no painel normal acima das panes, lista quais e sugere desligar.
-  Ao entrar na comparação, as camadas de imagem do painel são escondidas e
-  restauradas ao sair (decidir na implementação: esconder × só avisar — o
-  Jurema só avisa).
+  **Decisão do usuário (24/10/2026): só avisar** — o comparador nunca liga,
+  desliga nem muda opacidade de camada do painel. O aviso some sozinho quando
+  o usuário desliga a camada (ou zera a opacidade) no painel.
 
 ### Custo de API
 Comparação dobra os tiles pedidos. Planet (NICFI) e Sentinel passam pelos
@@ -160,7 +160,8 @@ por lado (vermelho × azul):
   recorte 1×1 à esquerda do divisor = cor da esquerda, à direita = cor da
   direita; depois de arrastar, o mesmo ponto troca de cor;
 - o recorte acompanha o pan (arrastar o mapa não desalinha a divisa);
-- teclado move o divisor; Esc sai e devolve o estado anterior das camadas;
+- teclado move o divisor; Esc sai sem alterar nenhuma camada do painel;
+- camada de imagem ligada no painel gera o aviso e continua ligada (nunca é desligada);
 - UC desenhada continua visível e clicável dos dois lados;
 - funciona no imersivo.
 Contrafactual: sem a conversão de coordenada de camada, o teste do pan reprova.
