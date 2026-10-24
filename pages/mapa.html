@@ -568,6 +568,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/mapa-linha-tempo.js"></script>
 <script src="../js/mapa-camadas.js"></script>
 <script src="../js/mapa-medicao.js"></script>
+<script src="../js/mapa-gps.js"></script>
 <script src="../js/mapa-comparar.js"></script>
 <script src="../js/mapa-camadas-config.js"></script>
 <script src="../js/mapa-meio-fisico.js"></script>
@@ -1701,6 +1702,8 @@ function iniciarMapa(){
   _adicionarControleBasemap();
   _adicionarControleTelaCheia();
   if(typeof medMontar === 'function') medMontar(mapaL);
+  // UC só é dita quando o limite das UCs já carregou (undefined = não sei; null = fora)
+  if(typeof gpsMontar === 'function') gpsMontar(mapaL, { ucEm: (lat,lng) => _ucGeojson?.features ? (_ucNomePorCoordenada(lat,lng) || null) : undefined });
   if(typeof ccfEstilos === 'function'){ ccfEstilos(); ccfInstalarDadosPessoais(() => db); _ccfLigarEditor(); }
   if(typeof mfMontar === 'function'){ mfEstilos(); mfMontar(mapaL, { aoMudar: () => {
     _atualizarLegendaMapa();
@@ -2614,7 +2617,7 @@ function _ccfLigarEditor(){
     ccfEditar(c, acao, t);
     if(c.visivel) _renderizarCamada(c);
     _atualizarLegendaMapa();
-    if(acao === 'colorir'){ renderCamadasHtml(); toggleExpandirCamada(c.id); }
+    if(['colorir','modo','inverter'].includes(acao)){ renderCamadasHtml(); toggleExpandirCamada(c.id); }
   };
   el.addEventListener('change', tratar);
   el.addEventListener('input', tratar);

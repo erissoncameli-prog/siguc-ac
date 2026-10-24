@@ -105,15 +105,37 @@ window.CART = (function () {
   }
 
   // itens: [{ simbolo:'rect'|'circle'|'line', cor:'#hex', label:'texto', dash?:bool }, ...]
+  //   ou { simbolo:'degrade', cores:['#hex',…], min:'texto', max:'texto', label } —
+  //   barra contínua (js/mapa-camadas-config.js, campo numérico). A impressão
+  //   (imprimir) copia este mesmo HTML, então tela e folha saem iguais.
   function legendaAtualizar(itens) {
     const el = document.getElementById('cart-legenda-ctrl');
     if (!el) return;
     if (!itens || !itens.length) { el.innerHTML = _legendaVazia(); return; }
     const linhas = itens.map(it => {
+      if (it.simbolo === 'degrade') return _degradeHTML(it);
       const s = _simboloSVG(it);
       return `<div class="cart-leg-item">${s}<span>${it.label}</span></div>`;
     }).join('');
     el.innerHTML = '<div class="cart-leg-title">Legenda</div>' + linhas;
+  }
+
+  // Barra em segmentos de <rect> (sem <linearGradient>: um id de gradiente
+  // repetido no DOM clonado da impressão faria a folha pintar a cor errada).
+  function _degradeHTML(it) {
+    const cores = it.cores || [];
+    const N = 40, W = 120, o = it.opacidade != null ? Math.max(it.opacidade, 0.6) : 0.85;
+    const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const cor = t => {
+      const k = t * (cores.length - 1), i = Math.min(cores.length - 2, Math.floor(k)), f = k - i;
+      const a = hex(cores[i]), b = hex(cores[i + 1]);
+      return 'rgb(' + a.map((x, j) => Math.round(x + (b[j] - x) * f)).join(',') + ')';
+    };
+    let seg = '';
+    for (let i = 0; i < N; i++) seg += `<rect x="${(i * W / N).toFixed(2)}" y="0" width="${(W / N + 0.4).toFixed(2)}" height="10" fill="${cor(i / (N - 1))}"/>`;
+    return `<div class="cart-leg-item cart-leg-degrade"><span>${it.label}</span>
+      <svg width="${W}" height="10" viewBox="0 0 ${W} 10" role="img" aria-label="${it.label}: de ${it.min} a ${it.max}" opacity="${o}">${seg}<rect x="0.5" y="0.5" width="${W - 1}" height="9" fill="none" stroke="rgba(0,0,0,.25)"/></svg>
+      <span class="cart-leg-degrade-rot"><span>${it.min}</span><span>${it.max}</span></span></div>`;
   }
 
   function _simboloSVG(it) {
@@ -339,6 +361,8 @@ window.CART = (function () {
   line-height: 1.3;
 }
 .cart-leg-item svg { flex-shrink: 0; }
+.cart-leg-item.cart-leg-degrade { flex-direction: column; align-items: flex-start; gap: 2px; margin-bottom: 5px; }
+.cart-leg-degrade-rot { display: flex; justify-content: space-between; width: 120px; font-size: 9.5px; color: #4b5563; font-variant-numeric: tabular-nums; }
 .cart-leg-empty {
   font-size: 10px;
   color: #9ca3af;

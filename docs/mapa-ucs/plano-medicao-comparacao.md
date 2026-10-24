@@ -203,6 +203,10 @@ hidrografia BC250 do IBGE por WMS). Fica para depois, se pedido: ottobacias
 finas (a camada "Uso da Água por Microbacia" do SNIRH tem ~4.700 microbacias
 no retângulo do Acre).
 
+## Fase 5 — Minha localização e legenda em degradê — ENTREGUE (24/10/2026)
+`js/mapa-gps.js` (ponto, precisão, UC do ponto, acompanhar; nada gravado) e
+degradê para campo numérico em "colorir por" (`js/mapa-camadas-config.js`), com
+legenda em barra na tela e na impressão. Ver a regra no CLAUDE.md. Fecha o plano.
+
 ## Fora deste plano (registrado)
-- GPS + legenda em degradê (Fase 5).
 - Ortomosaico de drone e modelo 3D: sem levantamentos hoje.

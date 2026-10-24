@@ -1306,6 +1306,47 @@ geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
 - Guarda: `tests/mapa-meio-fisico.test.js` (6, página real com o arquivo
   servido por stub). Sem mudança em `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — Minha localização e legenda em degradê no Mapa das UCs (Fase 5, 24/10/2026)
+Fecha o plano em `docs/mapa-ucs/plano-medicao-comparacao.md`.
+- **Minha localização = `js/mapa-gps.js`** (prefixo `gps`), fonte única; a
+  página chama `gpsMontar(mapaL, { ucEm })` em `iniciarMapa()`. Botão abaixo da
+  barra de medição (ícone `navigation`, novo em `BICON_PATHS`): ponto + círculo
+  de precisão (pane `gpsPane`, z 645), coordenada no formato da medição
+  (`medCoordenada`/`medCoordenadaTexto` — graus + UTM SIRGAS 2000), precisão,
+  e a UC do ponto por `_ucNomePorCoordenada` (`undefined` enquanto o limite das
+  UCs não carregou = a linha não aparece; `null` = "Fora das UCs mapeadas").
+  "Acompanhar" = `watchPosition`, que só reenquadra quando o ponto sai da área
+  central; desligar apaga o desenho e chama `clearWatch`.
+- **Nada é gravado nem enviado** — a posição fica no navegador enquanto o botão
+  está ligado; por isso não entra no ROPA (os apps de campo GRAVAM a posição e
+  têm aviso próprio). Precisão acima de 100 m é avisada: no computador a posição
+  vem da rede, e sem o aviso o ponto parece exato. Permissão negada, tempo
+  esgotado e falta de HTTPS viram texto no painel, nunca exceção.
+- ⚠️ **Canto do Leaflet por cima do outro**: `.leaflet-top` e `.leaflet-bottom`
+  têm o mesmo z-index e o de baixo vem depois no DOM — a legenda cobria o painel
+  aberto e o "Acompanhar" não recebia clique (achado pelo teste). O canto do
+  GPS ganha `.gps-canto-acima` (z 1001) só enquanto o painel está aberto. Mesma
+  família do ajuste do painel de camadas da Água.
+- **Degradê** em `js/mapa-camadas-config.js` (`colorirPor.modo = 'degrade'`,
+  `escala: 'log'`, `inverter`): campo em que TODO valor preenchido é número
+  (`ccfFaixaNumerica`, ≥ 2 valores distintos) nasce em degradê ao ser escolhido
+  no editor, com opção de voltar para classes. Rampa viridis (`CCF_RAMPA`,
+  ordenada, legível em daltonismo e P&B; claro = maior valor), sem valor =
+  cinza. Log só com mínimo > 0 — senão cai para linear e o editor avisa. Vale
+  para camadas enviadas E Meio Físico (área das massas d'água nasce em log:
+  centenas de lagoas pequenas e poucas grandes).
+- **Legenda em barra = `simbolo: 'degrade'`** em `CART.legendaAtualizar`
+  (`js/mapa-cartografia.js`), com mínimo e máximo; rótulo do campo = o do popup
+  quando existe. A impressão copia o MESMO HTML da legenda, por isso a barra é
+  desenhada em `<rect>` segmentados, nunca `<linearGradient>`: o id do
+  gradiente se repetiria no DOM clonado da folha. `css/relatorio-print.css` tem
+  a variante da folha.
+- Guardas: `tests/mapa-gps.test.js` (5, posição simulada pelo Playwright),
+  `tests/mapa-camadas-config.test.js` (8, inclusive a barra na folha de
+  impressão) e `tests/mapa-meio-fisico.test.js` (7).
+- `pwa/sw.js`: brigadas 276→277, biomonitor 78→79, frota 115→116, agua 45→46,
+  socio 2→3 (só `js/config.js` — o ícone novo — está nos shells).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de

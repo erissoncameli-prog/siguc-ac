@@ -28,8 +28,8 @@ const PEDO = { type: 'FeatureCollection', fonte: 'IBGE — BDIA:pedo_area', esca
   { type: 'Feature', geometry: quad(-69.4, -10.0, 0.2), properties: { legenda_2: 'Argissolos Vermelhos', ordem: 'ARGISSOLOS', textura: 'argilosa' } },
 ] };
 const MASSAS = { type: 'FeatureCollection', fonte: 'ANA — SNIRH2016/Massa_dagua/MapServer/0', features: [
-  { type: 'Feature', geometry: quad(-70.0, -9.6, 0.05), properties: { nmoriginal: 'Lagoa Sacado', detipomass: 'Natural' } },
-  { type: 'Feature', geometry: quad(-69.8, -9.6, 0.05), properties: { detipomass: 'Artificial', nmgenerico: 'Barragem' } },
+  { type: 'Feature', geometry: quad(-70.0, -9.6, 0.05), properties: { nmoriginal: 'Lagoa Sacado', detipomass: 'Natural', nuareaha: 3.2 } },
+  { type: 'Feature', geometry: quad(-69.8, -9.6, 0.05), properties: { detipomass: 'Artificial', nmgenerico: 'Barragem', nuareaha: 412 } },
 ] };
 
 async function abrir(page) {
@@ -155,4 +155,17 @@ test('massas d\'água da ANA: cor por tipo, popup sem escala inventada', async (
   expect(t).toMatch(/lagoa sacado/i);
   expect(t).toContain('escala não informada pelo serviço');
   expect(t).not.toMatch(/escala 1:/);
+});
+
+test('massas d\'água por área: degradê em escala log com legenda em barra', async ({ page }) => {
+  await abrir(page);
+  await page.click('#mlb-btn-meio');
+  await page.locator('[data-mf-tema="massas_dagua"] [data-mf-acao="ligar"]').check();
+  await page.waitForFunction(() => mfAtivos().includes('massas_dagua'));
+  await page.locator('[data-mf-tema="massas_dagua"] [data-mf-acao="colorir"]').selectOption('nuareaha');
+  const cores = await page.evaluate(() => _mf.camadas.massas_dagua.layer.getLayers().map(l => l.options.fillColor));
+  expect(cores).toEqual(['#440154', '#FDE725']);
+  const leg = page.locator('.cart-legenda .cart-leg-degrade');
+  await expect(leg).toContainText("Massas d'água — Área (cadastro ANA) (escala log)");
+  await expect(leg.locator('.cart-leg-degrade-rot')).toHaveText(/^3\s*412$/);
 });

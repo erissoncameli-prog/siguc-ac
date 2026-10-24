@@ -159,3 +159,58 @@ test('migration 367: CPF e nome saem do GeoJSON por trigger, leitura só pela RP
   // nenhuma policy de leitura na tabela privada
   expect(sql).not.toMatch(/CREATE POLICY[^;]*camadas_mapa_dados_pessoais/);
 });
+
+test('degradê (Fase 5): campo numérico nasce em degradê, legenda em barra com mín/máx, inverter e log', async ({ page }) => {
+  await abrir(page);
+  await page.evaluate(() => toggleExpandirCamada('cam-1'));
+  const ed = () => page.locator('[data-ccf-editor="cam-1"]');
+  // campo de texto: sem escolha de degradê
+  await ed().locator('[data-ccf-acao="colorir"]').selectOption('Zona');
+  await expect(ed().locator('[data-ccf-acao="modo"]')).toHaveCount(0);
+  // campo numérico ("Area_ha": 123,46 e 50; o 3º vazio)
+  await ed().locator('[data-ccf-acao="colorir"]').selectOption('Area_ha');
+  await expect(ed().locator('[data-ccf-acao="modo"]')).toHaveValue('linear');
+  await expect(ed().locator('.ccf-classe')).toHaveCount(0);           // nada de cor por classe
+  await expect(ed().locator('.ccf-rampa')).toBeVisible();
+  let cores = await page.evaluate(() => camadas[0].layer.getLayers().map(l => l.options.fillColor));
+  expect(cores).toEqual(['#FDE725', '#440154', '#9CA3AF']);           // maior = claro, menor = escuro, vazio = cinza
+  // legenda: uma barra com mínimo e máximo + "sem valor"
+  const leg = page.locator('.cart-legenda .cart-leg-degrade');
+  await expect(leg).toHaveCount(1);
+  await expect(leg).toContainText('Lotes de teste — Area_ha');
+  await expect(leg.locator('.cart-leg-degrade-rot')).toHaveText(/^50,0\s*123,5$/);
+  await expect(page.locator('.cart-legenda')).toContainText('Lotes de teste — sem valor');
+  expect(await leg.locator('svg rect').count()).toBeGreaterThan(20);  // barra em segmentos, sem <linearGradient> (id repetido na impressão)
+  expect(await leg.locator('linearGradient').count()).toBe(0);
+  // a folha de impressão leva a MESMA barra (CART.imprimir copia a legenda da tela)
+  await page.evaluate(() => CART.imprimir('Teste'));
+  const folha = page.locator('.rel-mapa-folha-lado .cart-leg-degrade');
+  await expect(folha).toHaveCount(1);
+  await expect(folha.locator('.cart-leg-degrade-rot')).toHaveText(/^50,0\s*123,5$/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.rel-mapa-folha-lado')).toHaveCount(0);
+  // inverter troca as pontas
+  await ed().locator('[data-ccf-acao="inverter"]').check();
+  cores = await page.evaluate(() => camadas[0].layer.getLayers().map(l => l.options.fillColor));
+  expect(cores.slice(0, 2)).toEqual(['#440154', '#FDE725']);
+  // log e volta para classes
+  await ed().locator('[data-ccf-acao="modo"]').selectOption('log');
+  await expect(page.locator('.cart-legenda .cart-leg-degrade')).toContainText('escala log');
+  await ed().locator('[data-ccf-acao="modo"]').selectOption('classes');
+  await expect(ed().locator('.ccf-classe')).toHaveCount(3);
+  await expect(page.locator('.cart-legenda .cart-leg-degrade')).toHaveCount(0);
+  const sc = await page.evaluate(() => camadas[0].style_config.colorirPor);
+  expect(sc).toEqual({ campo: 'Area_ha', cores: {} });
+});
+
+test('degradê: escala log com zero cai para linear e avisa; campo com texto nunca vira degradê', async ({ page }) => {
+  await abrir(page);
+  const r = await page.evaluate(() => {
+    const c = { nome: 'X', geojson: { features: [{ properties: { a: 0 } }, { properties: { a: 10 } }, { properties: { b: '1' } }, { properties: { b: 'dois' } }] },
+      style_config: { colorirPor: { campo: 'a', modo: 'degrade', escala: 'log' } } };
+    const d = ccfDegrade(c);
+    const textoMisto = ccfFaixaNumerica(c, 'b');
+    return { log: d.log, recusado: d.logRecusado, textoMisto, meio: ccfCorRampa(0.5) };
+  });
+  expect(r).toEqual({ log: false, recusado: true, textoMisto: null, meio: '#21918C' });
+});

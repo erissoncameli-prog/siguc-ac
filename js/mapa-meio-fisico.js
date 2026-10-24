@@ -68,7 +68,7 @@ const MF_TEMAS = {
   },
   massas_dagua: {
     rotulo: 'Massas d\'água', fonte: 'ANA — SNIRH (massas d\'água)', escala: null, cor: '#0E7490',
-    colorir: ['detipomass', 'dedominial'],
+    colorir: ['detipomass', 'dedominial', 'nuareaha'],
     popup: { titulo: 'nmoriginal', campos: [
       { campo: 'nmgenerico', rotulo: 'Tipo (nome)' }, { campo: 'detipomass', rotulo: 'Tipo' },
       { campo: 'dedominial', rotulo: 'Domínio' }, { campo: 'usoprinc', rotulo: 'Uso principal' },
@@ -127,9 +127,15 @@ async function _mfCarregar(tema) {
 function _mfCamada(tema, gj) {
   const t = MF_TEMAS[tema]
   const campo = _mf.pref.colorir[tema] || t.colorir[0]
+  const colorirPor = campo ? { campo, cores: {} } : undefined
+  // Campo numérico (área) vira degradê em escala log: poucas lagoas grandes
+  // e centenas pequenas — na linear, quase tudo sairia da mesma cor.
+  if (colorirPor && typeof ccfFaixaNumerica === 'function' && ccfFaixaNumerica({ geojson: gj }, campo)) {
+    colorirPor.modo = 'degrade'; colorirPor.escala = 'log'
+  }
   return {
     id: 'mf-' + tema, nome: t.rotulo, cor: t.cor, geojson: gj,
-    style_config: { popup: t.popup, colorirPor: campo ? { campo, cores: {} } : undefined },
+    style_config: { popup: t.popup, colorirPor },
   }
 }
 
@@ -216,7 +222,7 @@ const _MF_ROTULO_CAMPO = {
   nm_regiao: 'Região', compartimento: 'Compartimento', ordem: 'Ordem do solo', legenda_2: 'Classe detalhada',
   subordem: 'Subordem', textura: 'Textura', leg_sup: 'Cobertura dominante', nm_uantr: 'Uso antrópico',
   temperat: 'Temperatura', umida_seca: 'Umidade', 
-  detipomass: 'Tipo', dedominial: 'Domínio', DMI_NM: 'Micro-região',
+  detipomass: 'Tipo', dedominial: 'Domínio', nuareaha: 'Área (degradê)', DMI_NM: 'Micro-região',
 }
 
 // Corpo da aba "Meio Físico" da barra de camadas.
