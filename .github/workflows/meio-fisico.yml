@@ -39,4 +39,4 @@ jobs:
       - name: Dependências
         run: pip install 'requests==2.32.5'
       - name: Descobrir camadas
-        run: python scripts/meio_fisico.py --descobrir
+        run: python scripts/meio_fisico.py --descobrir-ana

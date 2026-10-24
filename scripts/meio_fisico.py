@@ -8,6 +8,8 @@ respondem 403 na rede das sessões de desenvolvimento (CLAUDE.md), e
 geometria de camada grande nunca entra pelo pg_net (reiniciou o banco 3×).
 
 Modos:
+  --descobrir-ana  idem para os servidores ArcGIS da ANA (o GeoServer dela
+                não existe mais: o nome não resolve; o de metadados dá 403).
   --descobrir   lista as camadas que os serviços oferecem (por palavra-chave)
                 e quantas feições cada uma tem dentro do retângulo do Acre.
                 Não grava nada. É o primeiro passo: os nomes exatos das
@@ -115,12 +117,66 @@ def descobrir():
         arcgis(nome, url)
 
 
+# ANA: listar serviços e camadas nas pastas de dados abertos dos dois
+# servidores ArcGIS que responderam; contar feições no Acre (returnCountOnly).
+ANA_PASTAS = [
+    ('https://www.snirh.gov.br/arcgis/rest/services', ['DADOSABERTOS', 'SPR', 'SGH', 'IG', 'INDE', 'SNIRH2016']),
+    ('https://portal1.snirh.gov.br/server/rest/services', ['dados_abertos', 'SPR', 'SGH', 'IG', 'consulta_geo']),
+]
+TEMA_ANA = re.compile(r'otto|bho|bacia|drenag|trecho|curso|hidrog|massa', re.I)
+
+
+def descobrir_ana():
+    env = f'{BBOX[0]},{BBOX[1]},{BBOX[2]},{BBOX[3]}'
+    for base, pastas in ANA_PASTAS:
+        for pasta in pastas:
+            try:
+                j = requests.get(f'{base}/{pasta}?f=json', headers=UA, timeout=60).json()
+            except Exception as e:  # noqa: BLE001
+                print(f'## {base}/{pasta}: ERRO {type(e).__name__}')
+                continue
+            for s in j.get('services') or []:
+                nome, tipo = s.get('name', ''), s.get('type', '')
+                if tipo not in ('MapServer', 'FeatureServer'):
+                    continue
+                url = f'{base}/{nome}/{tipo}'
+                try:
+                    sj = requests.get(f'{url}?f=json', headers=UA, timeout=60).json()
+                except Exception as e:  # noqa: BLE001
+                    print(f'## {url}: ERRO {type(e).__name__}')
+                    continue
+                camadas = [c for c in (sj.get('layers') or []) if TEMA_ANA.search(c.get('name', '')) or TEMA_ANA.search(nome)]
+                if not camadas:
+                    continue
+                print(f'## {url}')
+                for c in camadas[:40]:
+                    q = {'where': '1=1', 'geometry': env, 'geometryType': 'esriGeometryEnvelope', 'inSR': 4326,
+                         'spatialRel': 'esriSpatialRelIntersects', 'returnCountOnly': 'true', 'f': 'json'}
+                    try:
+                        n = requests.get(f"{url}/{c['id']}/query", params=q, headers=UA, timeout=90).json().get('count')
+                    except Exception as e:  # noqa: BLE001
+                        n = f'ERRO {type(e).__name__}'
+                    campos = ''
+                    try:
+                        lj = requests.get(f"{url}/{c['id']}?f=json", headers=UA, timeout=60).json()
+                        campos = ', '.join(f.get('name', '') for f in (lj.get('fields') or []))[:300]
+                        geo = lj.get('geometryType', '')
+                    except Exception:  # noqa: BLE001
+                        geo = '?'
+                    print(f"   - [{c['id']}] {c.get('name')} | {geo} | no Acre: {n}")
+                    print(f'       campos: {campos}')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--descobrir', action='store_true')
+    ap.add_argument('--descobrir-ana', action='store_true')
     a = ap.parse_args()
     if a.descobrir:
         descobrir()
+        return 0
+    if a.descobrir_ana:
+        descobrir_ana()
         return 0
     ap.print_help()
     return 1
