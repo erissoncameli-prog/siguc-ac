@@ -62,17 +62,67 @@ async function mapaPlanetMosaicos() {
   return _mapaPlanetCache;
 }
 
+const MAPA_TILE_VAZIO = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
 // Camada de um mosaico Planet (nome ex.: planet_medres_visual_2026-05_mosaic).
-function mapaPlanetLayer(L, mosaico, opacidade) {
+// `extra` (opcional) entra por último nas opções do Leaflet — ex.: { pane }.
+function mapaPlanetLayer(L, mosaico, opacidade, extra) {
   return L.tileLayer(
     `/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(mosaico)}`,
     {
       attribution: 'Planet / NICFI',
       opacity: (opacidade ?? 80) / 100,
       maxZoom: 21, maxNativeZoom: 18,
-      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+      errorTileUrl: MAPA_TILE_VAZIO,
+      ...(extra || {}),
     }
   );
+}
+
+// ── Sentinel-2 (proxy /api/sentinel, Copernicus Data Space) ──────────
+// Dois modos do proxy: { data: 'AAAA-MM-DD', nuvem } = cena do dia;
+// { ano: AAAA } = composição da época seca (mai–out, menos nublado).
+// Fonte única da URL: Mapa das UCs (camada do painel, linha do tempo e
+// comparação de imagens). Nunca remontar a URL numa página.
+function mapaSentinelLayer(L, { data, ano, nuvem, opacidade, ...extra } = {}) {
+  const q = ano ? `ano=${encodeURIComponent(ano)}`
+    : `data=${encodeURIComponent(data)}&nuvem=${encodeURIComponent(nuvem ?? 30)}`;
+  return L.tileLayer(`/api/sentinel?z={z}&x={x}&y={y}&${q}`, {
+    attribution: 'Sentinel-2 / Copernicus',
+    opacity: (opacidade ?? 80) / 100,
+    maxZoom: 21, maxNativeZoom: 15,
+    errorTileUrl: MAPA_TILE_VAZIO,
+    ...extra,
+  });
+}
+
+// Cenas Sentinel-2 que cobrem o retângulo [oeste, sul, leste, norte]
+// (últimos ~60 dias, pelo proxy). Devolve { disponivel, motivo?, dias?, datas:[{data, nuvem}] }.
+async function mapaSentinelCenas(bbox) {
+  try {
+    const r = await fetch(`/api/sentinel?bbox=${encodeURIComponent(bbox.join(','))}`, { signal: AbortSignal.timeout(15000) });
+    return await r.json();
+  } catch (_) {
+    return { disponivel: false, motivo: 'rede', datas: [] };
+  }
+}
+
+// ── PRODES (WMS TerraBrasilis) ───────────────────────────────────────
+// { ano } recorta o desmatamento anual por CQL (year=N); { acumulado:true }
+// = camada do acumulado até 2007. Mesma camada que prodes_resumo_ano lê.
+const MAPA_PRODES_WMS = 'https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms';
+function mapaProdesLayer(L, { ano, acumulado, opacidade, ...extra } = {}) {
+  const o = {
+    layers: acumulado ? 'prodes-amazon-nb:accumulated_deforestation_2007_biome'
+                      : 'prodes-amazon-nb:yearly_deforestation_biome',
+    format: 'image/png', transparent: true, version: '1.1.1',
+    attribution: acumulado ? 'PRODES/INPE Acumulado' : 'PRODES/INPE',
+    opacity: (opacidade ?? 70) / 100,
+    maxZoom: 22, maxNativeZoom: 15,
+    ...extra,
+  };
+  if (ano && !acumulado) o.CQL_FILTER = `year=${ano}`;
+  return L.tileLayer.wms(MAPA_PRODES_WMS, o);
 }
 
 // Camada diária do GIBS (cor real ou focos), para uma data YYYY-MM-DD.
@@ -85,7 +135,7 @@ function mapaGibsLayer(L, camadaId, data, opacidade) {
       attribution: 'NASA GIBS / Earthdata',
       opacity: (opacidade ?? 70) / 100,
       maxZoom: 21, maxNativeZoom: 9,
-      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+      errorTileUrl: MAPA_TILE_VAZIO,
     }
   );
 }
