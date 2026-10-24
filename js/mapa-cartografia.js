@@ -211,6 +211,8 @@ window.CART = (function () {
   // referência vêm das mesmas peças dos outros relatórios
   // (_htmlCabecalho + js/mapa-moldura.js).
   async function imprimir(titulo) {
+    // Comparação de imagens (js/mapa-comparar.js) não acompanha a folha A4
+    if (typeof cmpSairParaImprimir === 'function') cmpSairParaImprimir();
     const tituloFinal = titulo || 'Mapa das Unidades de Conservação — Acre';
     const mapEl = document.getElementById('mapa');
     if (!mapEl || !_map || typeof relAbrirPreview !== 'function') { window.print(); return; }

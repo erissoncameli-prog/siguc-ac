@@ -1189,6 +1189,42 @@ Map) — repositório sem licença, nenhum código dele. Plano em
 - `pwa/sw.js`: brigadas 275→276, biomonitor 77→78, frota 114→115, agua 44→45,
   socio 1→2 (só `js/config.js` mudou, e ele está nos 5 shells).
 
+## Regra do sistema — comparação de imagens no Mapa das UCs (24/10/2026)
+`js/mapa-comparar.js` (prefixo `cmp`), fonte única; a página chama
+`cmpMontar(mapaL, { camadasPorBaixo, prodesAnos })`. Botão no canto superior
+esquerdo do mapa (vale também no imersivo); divisor arrastável com Planet/NICFI
+mensal, Sentinel-2 (época seca do ano ou cena recente da área visível) e PRODES
+anual, misturáveis. Ideia do jurema-webgis, sem código dele.
+- **Camadas de uma fonte só**: `mapaPlanetLayer`, `mapaSentinelLayer`,
+  `mapaProdesLayer`, `mapaPlanetMosaicos`, `mapaSentinelCenas`
+  (`js/mapa-camadas.js`). `pages/mapa.html` passou a carregar esse arquivo e as
+  cópias inline (painel Cobertura Vegetal e linha do tempo) usam as mesmas
+  funções. Nunca remontar a URL do proxy ou do WMS numa página.
+- Duas panes (`cmpEsquerda`/`cmpDireita`, z 250): acima do `tilePane` (base +
+  imagens do painel) e abaixo das camadas vetoriais — UC, CAR e alertas seguem
+  por cima dos dois lados.
+- **Recorte por `clip: rect()` em coordenada de CAMADA**
+  (`containerPointToLayerPoint`), refeito a cada move/zoom: as panes andam com o
+  pan do mapa. `clip`, não `clip-path`: a pane é caixa 0×0. Contrafactual
+  conferido — com coordenada de tela o teste do pan reprova.
+- **Decisão do usuário: o comparador nunca liga, desliga nem muda opacidade de
+  camada do painel.** Só avisa o que ficou por baixo; o aviso some sozinho
+  quando o usuário desliga a camada (escuta `layeradd/layerremove`).
+- Divisor = `role="slider"` (setas 2%, Home/End). Arrastar desliga o arrasto do
+  mapa só durante o gesto. Esc em captura sai da comparação sem sair da tela
+  cheia; com ferramenta de medição ligada, o Esc é da medição.
+- Sentinel abre no último ano FECHADO (o corrente aparece como "parcial" até
+  1º/nov — a época seca do proxy vai de mai a out). PRODES lista os anos de
+  `prodes_resumo_ano` (via `_tlCarregarResumo`); sem o banco, 2008 → ano − 1.
+- Painel com z-index acima dos controles do Leaflet (legenda e caixa de
+  informações o cobriam). `CART.imprimir` encerra a comparação antes de montar
+  a folha (`cmpSairParaImprimir`) — o recorte não acompanha a A4 nesta fase.
+- ⚠️ Nos testes, o `load` da camada chega ANTES do fade dos tiles: medir pixel
+  só depois de os `<img>` das panes estarem com opacidade 1.
+- Guarda: `tests/mapa-comparar.test.js` (5, por PIXEL com tiles de cor sólida
+  servidos por stub). Sem mudança em `pwa/sw.js` (nenhum arquivo tocado está
+  em `SHELLS`).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de

@@ -568,6 +568,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/mapa-linha-tempo.js"></script>
 <script src="../js/mapa-camadas.js"></script>
 <script src="../js/mapa-medicao.js"></script>
+<script src="../js/mapa-comparar.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
 </head>
@@ -951,6 +952,9 @@ function _reaplicarTiles(){
 const HIDRO_WMS_URL    = 'https://geoservicos.ibge.gov.br/geoserver/ows';
 const HIDRO_WMS_LAYERS = 'CCAR:BC250_Massa_Dagua_A,CCAR:BC250_Trecho_Drenagem_L';
 
+// Nome de cada camada do painel Cobertura Vegetal, para o aviso da comparação de imagens
+const _CMP_ROTULO_VEG = { mapbiomas:'MapBiomas', prodes:'PRODES anual', prodes_hist:'PRODES acumulado',
+  hidrografia:'Hidrografia IBGE', gibs:'NASA GIBS', planet:'Planet / NICFI', sentinel:'Sentinel-2' };
 const VEG_LAYERS = {
   mapbiomas: { layer:null, make(op){ return L.tileLayer('https://storage.googleapis.com/mapbiomas-public/brasil/collection-8/lclu/coverage/{z}/{x}/{y}.png',{attribution:'MapBiomas Coleção 8',opacity:op/100,maxZoom:22,maxNativeZoom:12}); } },
   // PRODES, Planet e Sentinel: fábricas únicas em js/mapa-camadas.js (as
@@ -1694,6 +1698,11 @@ function iniciarMapa(){
   _adicionarControleBasemap();
   _adicionarControleTelaCheia();
   if(typeof medMontar === 'function') medMontar(mapaL);
+  if(typeof cmpMontar === 'function') cmpMontar(mapaL, {
+    // Comparação nunca mexe no painel (decisão do usuário): só avisa o que ficou por baixo
+    camadasPorBaixo: () => Object.entries(VEG_LAYERS).filter(([,c]) => c.layer && mapaL.hasLayer(c.layer)).map(([k]) => _CMP_ROTULO_VEG[k] || k),
+    prodesAnos: async () => Object.keys((await _tlCarregarResumo()).prodes || {}).map(Number),
+  });
   clusters = L.markerClusterGroup({ maxClusterRadius:40, disableClusteringAtZoom:14 });
   mapaL.addLayer(clusters);
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;

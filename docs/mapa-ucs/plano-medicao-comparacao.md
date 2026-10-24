@@ -85,7 +85,14 @@ consultado por ponto — fica de fora, e a tela não promete o que não mede):
 
 ---
 
-## Fase 2 — Comparação temporal (divisor arrastável)
+## Fase 2 — Comparação temporal (divisor arrastável) — ENTREGUE (24/10/2026)
+
+Ajustes feitos na implementação (registrados no CLAUDE.md):
+- Entrada é um botão no próprio mapa (canto superior esquerdo), que já vale no
+  imersivo — em vez de um botão na aba Cobertura Vegetal + outro no imersivo.
+- As panes ficam ACIMA das imagens do painel, então nada "cobre" a
+  comparação; o aviso diz o que ficou POR BAIXO (aparece onde a imagem não
+  cobre, como no lado do PRODES).
 
 ### O que entra
 Duas imagens lado a lado com um divisor vertical arrastável: "Esquerda" e
