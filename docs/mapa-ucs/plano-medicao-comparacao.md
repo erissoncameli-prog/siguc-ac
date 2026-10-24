@@ -189,7 +189,12 @@ nem nos `build-www.mjs` (conferido em 24/10/2026). Rodar também os testes de
 3. Fase 2 (comparação) — PR próprio.
 4. Registro das regras novas no `CLAUDE.md` em cada entrega.
 
+## Fase 3 — ENTREGUE (24/10/2026)
+Popup configurável, medidas calculadas e cor por atributo nas camadas
+enviadas (`js/mapa-camadas-config.js`) + dado pessoal tirado do GeoJSON
+(migration 367). Ver a regra no CLAUDE.md.
+
 ## Fora deste plano (registrado)
-- Popup/estilo declarativo para `camadas_mapa` (Fase 3), meio físico IBGE/ANA
+- Meio físico IBGE/ANA
   via GitHub Actions (Fase 4), GPS + legenda em degradê (Fase 5).
 - Ortomosaico de drone e modelo 3D: sem levantamentos hoje.
