@@ -16,8 +16,10 @@
 //   classe de solo de um lote.
 // - Pane própria ABAIXO das camadas vetoriais (UC, TI, CAR seguem por cima)
 //   e acima das imagens.
-// - Arquivo só é baixado quando o tema é ligado (a página não carrega 5
+// - Arquivo só é baixado quando o tema é ligado (a página não carrega
 //   arquivos que ninguém pediu).
+// - Rios NÃO estão aqui: o serviço da ANA não devolve geometria; o mapa já
+//   mostra a hidrografia do IBGE BC250 por WMS (Cobertura Vegetal).
 
 const MF_BASE = (typeof MF_DATA_URL !== 'undefined' ? MF_DATA_URL : '../data/meio_fisico/')
 const MF_PANE = 'meioFisicoPane'
@@ -64,7 +66,28 @@ const MF_TEMAS = {
     popup: { titulo: 'temperat', campos: [
       { campo: 'temperat', rotulo: 'Classificação térmica' }, { campo: 'umida_seca', rotulo: 'Umidade / meses secos' }] },
   },
+  massas_dagua: {
+    rotulo: 'Massas d\'água', fonte: 'ANA — SNIRH (massas d\'água)', escala: null, cor: '#0E7490',
+    colorir: ['detipomass', 'dedominial'],
+    popup: { titulo: 'nmoriginal', campos: [
+      { campo: 'nmgenerico', rotulo: 'Tipo (nome)' }, { campo: 'detipomass', rotulo: 'Tipo' },
+      { campo: 'dedominial', rotulo: 'Domínio' }, { campo: 'usoprinc', rotulo: 'Uso principal' },
+      { campo: 'nuareaha', rotulo: 'Área (cadastro ANA)', sufixo: ' ha', casas: 1 }] },
+  },
+  bacias_ana: {
+    rotulo: 'Micro-regiões hidrográficas', fonte: 'ANA — Divisão hidrográfica nacional', escala: null, cor: '#4F46E5',
+    colorir: ['DMI_NM'],
+    popup: { titulo: 'DMI_NM', campos: [
+      { campo: 'DMI_CD', rotulo: 'Código' },
+      { campo: 'DMI_AR_KM2', rotulo: 'Área total da micro-região', sufixo: ' km²', casas: 0 }] },
+  },
 }
+
+// O serviço da ANA não publica a escala (descrição vazia, conferido no
+// workflow): diz isso em vez de inventar um número.
+function _mfEscala(t) { return t.escala ? `escala ${t.escala}` : 'escala não informada pelo serviço' }
+
+function _mfUnidade(n) { return `${n.toLocaleString('pt-BR')} ${n === 1 ? 'polígono' : 'polígonos'}` }
 
 const _mf = { mapa: null, cache: {}, camadas: {}, aoMudar: null, pref: {} }
 
@@ -123,7 +146,7 @@ function _mfDesenhar(tema) {
     pane: MF_PANE,
     style: f => { const cor = cores ? ccfCorDaFeicao(c, f.properties, cores) : t.cor; return { color: cor, weight: 0.6, opacity: 0.9, fillColor: cor, fillOpacity: op } },
     onEachFeature: (f, layer) => layer.bindPopup(() =>
-      ccfPopupHTML(c, f, {}) + `<div class="mf-fonte">${ccfEsc(t.fonte)} · escala ${ccfEsc(t.escala)}. Mapeamento regional — não substitui levantamento de campo.</div>`,
+      ccfPopupHTML(c, f, {}) + `<div class="mf-fonte">${ccfEsc(t.fonte)} · ${ccfEsc(_mfEscala(t))}. Mapeamento regional — não substitui levantamento de campo.</div>`,
       { className: 'camada-popup-wrap', maxWidth: 360 }),
   }).addTo(_mf.mapa)
 }
@@ -145,7 +168,7 @@ async function mfAlternar(tema, ligar) {
     if (!_mf.camadas[tema]) return // desligado enquanto baixava
     _mf.camadas[tema].camada = _mfCamada(tema, gj)
     _mfDesenhar(tema)
-    _mfStatus(tema, `${(gj.features || []).length.toLocaleString('pt-BR')} polígonos`)
+    _mfStatus(tema, _mfUnidade((gj.features || []).length))
   } catch (e) {
     delete _mf.camadas[tema]
     _mfStatus(tema, 'Não foi possível carregar o arquivo.', true)
@@ -192,7 +215,8 @@ const _MF_ROTULO_CAMPO = {
   nm_unidade: 'Unidade', nm_tempo_g: 'Tempo geológico', nm_provincia: 'Província', nm_dominio: 'Domínio',
   nm_regiao: 'Região', compartimento: 'Compartimento', ordem: 'Ordem do solo', legenda_2: 'Classe detalhada',
   subordem: 'Subordem', textura: 'Textura', leg_sup: 'Cobertura dominante', nm_uantr: 'Uso antrópico',
-  temperat: 'Temperatura', umida_seca: 'Umidade',
+  temperat: 'Temperatura', umida_seca: 'Umidade', 
+  detipomass: 'Tipo', dedominial: 'Domínio', DMI_NM: 'Micro-região',
 }
 
 // Corpo da aba "Meio Físico" da barra de camadas.
@@ -204,14 +228,14 @@ function mfPainelHTML() {
     return `<div class="mf-tema" data-mf-tema="${k}">
       <label class="mf-cab"><input type="checkbox" data-mf-acao="ligar"${on ? ' checked' : ''}>
         <span class="mf-amostra" style="background:${t.cor}"></span><span class="mf-nome">${ccfEsc(t.rotulo)}</span>
-        <span class="mf-status" role="status" aria-live="polite">${on && _mf.camadas[k].camada ? `${_mf.camadas[k].camada.geojson.features.length.toLocaleString('pt-BR')} polígonos` : ''}</span></label>
-      <div class="mf-meta">${ccfEsc(t.fonte)} · ${ccfEsc(t.escala)}</div>
+        <span class="mf-status" role="status" aria-live="polite">${on && _mf.camadas[k].camada ? _mfUnidade(_mf.camadas[k].camada.geojson.features.length) : ''}</span></label>
+      <div class="mf-meta">${ccfEsc(t.fonte)} · ${ccfEsc(_mfEscala(t))}</div>
       <div class="mf-ctrl">
         <label>Colorir por <select data-mf-acao="colorir">${t.colorir.map(c => `<option value="${c}"${c === campo ? ' selected' : ''}>${ccfEsc(_MF_ROTULO_CAMPO[c] || c)}</option>`).join('')}</select></label>
         <label>Opacidade <input type="range" min="0" max="100" step="5" value="${op}" data-mf-acao="opacidade" aria-label="Opacidade de ${ccfEsc(t.rotulo)}"></label>
       </div>
     </div>`
-  }).join('') + `<div class="mf-nota">Mapeamento regional do IBGE, recortado pelo limite do Acre. Use para leitura de contexto; não substitui levantamento de campo.</div>`
+  }).join('') + `<div class="mf-nota">Mapeamento regional do IBGE e da ANA, recortado pelo limite do Acre. Use para leitura de contexto; não substitui levantamento de campo.</div>`
 }
 
 // Delegação no contêiner da aba (o HTML é refeito a cada abertura).

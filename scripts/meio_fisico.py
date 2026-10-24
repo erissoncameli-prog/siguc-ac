@@ -9,10 +9,13 @@ geometria de camada grande nunca entra pelo pg_net (reiniciou o banco 3×).
 
 Modos:
   --autoteste   recorte/simplificação/eixo com dado sintético, sem rede.
-  --gerar [tema ...]  baixa do IBGE (BDiA 1:250 mil + clima), recorta pelo
-                Acre (data/acre_estado.geojson, o mesmo do mapa), simplifica
-                ~45 m e grava data/meio_fisico/<tema>.geojson. Tema que não
-                cobrir 95–105% da área do estado NÃO é gravado.
+  --gerar [tema ...]  baixa do IBGE (BDiA 1:250 mil + clima) e da ANA
+                (massas d'água, micro-regiões hidrográficas), recorta
+                pelo Acre (data/acre_estado.geojson, o mesmo do mapa),
+                simplifica ~45 m e grava data/meio_fisico/<tema>.geojson.
+                Trava: tema de área que não cobrir 95–105% do estado, ou tema
+                cuja contagem baixada não bater com a do servidor, NÃO é
+                gravado.
   --descobrir-ana  idem para os servidores ArcGIS da ANA (o GeoServer dela
                 não existe mais: o nome não resolve; o de metadados dá 403).
   --descobrir   lista as camadas que os serviços oferecem (por palavra-chave)
@@ -184,6 +187,18 @@ def _arred(c):
     return [_arred(x) for x in c]
 
 
+def _so_poligono(geo):
+    """Só as partes de área (o recorte pela divisa pode devolver linha ou
+    ponto solto); None se não sobrar nada."""
+    tipos = ('Polygon', 'MultiPolygon')
+    if geo.geom_type in tipos:
+        return geo
+    if geo.geom_type in ('GeometryCollection', 'MultiPolygon', 'MultiLineString', 'MultiPoint'):
+        partes = [x for x in getattr(geo, 'geoms', []) if x.geom_type in tipos]
+        return unary_union(partes) if partes else None
+    return None
+
+
 def recortar(feats, acre, campos):
     """Recorta pelo Acre, simplifica e fica só com os campos pedidos.
     Feição que não sobra nada dentro do estado sai. Devolve (lista, avisos)."""
@@ -205,20 +220,124 @@ def recortar(feats, acre, campos):
         geo = geo.intersection(acre)
         if geo.is_empty:
             continue
+        geo = _so_poligono(geo)
+        if geo is None or geo.is_empty:
+            continue
         geo = geo.simplify(TOLERANCIA, preserve_topology=True)
-        if geo.geom_type == 'GeometryCollection':
-            polis = [x for x in geo.geoms if x.geom_type in ('Polygon', 'MultiPolygon')]
-            if not polis:
-                continue
-            geo = unary_union(polis)
-        if geo.is_empty or geo.area == 0:
+        geo = _so_poligono(geo)
+        if geo is None or geo.is_empty or geo.area == 0:
             continue
         props = {k: (f.get('properties') or {}).get(k) for k in campos}
+        props = {k: (v.strip() if isinstance(v, str) else v) for k, v in props.items()}
         props = {k: v for k, v in props.items() if v not in (None, '')}
         gj = mapping(geo)
         out.append({'type': 'Feature', 'properties': props,
                     'geometry': {'type': gj['type'], 'coordinates': _arred(gj['coordinates'])}})
     return out, invalidas
+
+
+# ── ANA (servidores ArcGIS do SNIRH) ─────────────────────────────────────
+# Nomes e campos conferidos pela descoberta (--descobrir-ana, 24/10/2026).
+# Rios NÃO entram: SNIRH2016/Rios_principais devolve só atributos, sem
+# geometria (f=json e f=geojson), e o mapa já mostra os rios do IBGE BC250
+# por WMS (painel Cobertura Vegetal → hidrografia).
+SNIRH = 'https://www.snirh.gov.br/arcgis/rest/services/SNIRH2016'
+# tema → (camada, atributos, trava). trava = 'cobertura' (área que
+# recobre o estado) ou 'contagem' (baixado == contado pelo servidor).
+TEMAS_ANA = {
+    'massas_dagua': (f'{SNIRH}/Massa_dagua/MapServer/0', ['nmoriginal', 'nmgenerico', 'detipomass', 'dedominial',
+                                                          'usoprinc', 'nuareaha'], 'contagem'),
+    'bacias_ana': (f'{SNIRH}/Divisao_de_bacias/MapServer/2', ['DMI_NM', 'DMI_CD', 'DMI_AR_KM2'], 'cobertura'),
+}
+
+
+def _get_json(url, params):
+    for tentativa in range(4):
+        try:
+            r = requests.get(url, params=params, headers=UA, timeout=300)
+            if r.status_code == 200:
+                j = r.json()
+                if 'error' not in j:
+                    return j
+                erro = j['error']
+            else:
+                erro = f'HTTP {r.status_code}'
+        except Exception as e:  # noqa: BLE001 — rede instável: tenta de novo
+            erro = f'{type(e).__name__}: {e}'
+        time.sleep(5 * (tentativa + 1))
+    raise SystemExit(f'{url}: {erro}')
+
+
+def _esri_para_geojson(g):
+    """Geometria do ArcGIS (f=json) → GeoJSON. Polígono: anel no sentido
+    horário é contorno, anti-horário é buraco (convenção do ArcGIS)."""
+    from shapely.geometry import LinearRing, MultiLineString, Polygon
+    if not g:
+        return None
+    if 'paths' in g:
+        return mapping(MultiLineString(g['paths']))
+    if 'rings' in g:
+        fora, buracos = [], []
+        for anel in g['rings']:
+            if len(anel) < 4:
+                continue
+            (buracos if LinearRing(anel).is_ccw else fora).append(make_valid(Polygon(anel)))
+        if not fora:
+            return None
+        geo = unary_union(fora)
+        if buracos:
+            geo = geo.difference(unary_union(buracos))
+        return mapping(geo)
+    return None
+
+
+def baixar_arcgis(url, campos):
+    """Baixa a camada no retângulo do Acre por QUADRANTES: quadrante que bate
+    no teto de registros do servidor (ou avisa exceededTransferLimit) divide
+    em 4. Feição que cruza quadrantes vem repetida — fica uma por id. A
+    consulta por `objectIds` voltava vazia no SNIRH (medido 24/10/2026), e
+    MapServer antigo não pagina. Devolve (feições, quantos ids o servidor
+    disse ter no retângulo)."""
+    info = _get_json(url, {'f': 'json'})
+    oid = next((f['name'] for f in info.get('fields') or [] if f.get('type') == 'esriFieldTypeOID'), None)
+    teto = int(info.get('maxRecordCount') or 1000)
+    if not oid:
+        raise SystemExit(f'{url}: camada sem campo de id')
+    base = {'geometryType': 'esriGeometryEnvelope', 'inSR': 4326, 'spatialRel': 'esriSpatialRelIntersects', 'where': '1=1'}
+    env = lambda b: f'{b[0]},{b[1]},{b[2]},{b[3]}'
+    total = len(_get_json(f'{url}/query', {**base, 'geometry': env(BBOX), 'returnIdsOnly': 'true', 'f': 'json'}).get('objectIds') or [])
+    por_id, pilha = {}, [(BBOX, 0)]
+    while pilha:
+        b, nivel = pilha.pop()
+        j = _get_json(f'{url}/query', {**base, 'geometry': env(b), 'outFields': ','.join([oid, *campos]),
+                                       'outSR': 4326, 'returnGeometry': 'true', 'f': 'json'})
+        fs = j.get('features') or []
+        if (j.get('exceededTransferLimit') or len(fs) >= teto) and nivel < 8:
+            mx, my = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+            pilha += [((b[0], b[1], mx, my), nivel + 1), ((mx, b[1], b[2], my), nivel + 1),
+                      ((b[0], my, mx, b[3]), nivel + 1), ((mx, my, b[2], b[3]), nivel + 1)]
+            continue
+        if fs and not any(f.get('geometry') for f in fs):
+            # SNIRH2016/Rios_principais faz isso (medido 24/10/2026): só atributos
+            raise SystemExit(f'{url}: o servidor devolve as feições SEM geometria')
+        for f in fs:
+            at = f.get('attributes') or {}
+            k = at.get(oid)
+            if k in por_id:
+                continue
+            gj = _esri_para_geojson(f.get('geometry'))
+            if gj:
+                por_id[k] = {'type': 'Feature', 'properties': {c: at.get(c) for c in campos}, 'geometry': gj}
+    print(f'{url}: id={oid}, teto={teto}, {len(por_id)} feições de {total} ids')
+    return list(por_id.values()), total
+
+
+def _descricao_camada(url):
+    try:
+        j = _get_json(url, {'f': 'json'})
+        return (j.get('description') or j.get('copyrightText') or '')[:300]
+    except SystemExit:
+        return ''
 
 
 def area_ha(geom_gj):
@@ -230,24 +349,41 @@ def gerar(temas, saida, acre_arq):
     acre = make_valid(shape(json.load(open(acre_arq))['features'][0]['geometry']))
     area_acre = abs(GEOD.geometry_area_perimeter(acre)[0]) / 10000
     os.makedirs(saida, exist_ok=True)
-    resumo = []
+    resumo, falhas = [], []
     for tema in temas:
-        url, camada, campos = TEMAS_IBGE[tema]
-        brutas = baixar_wfs(url, camada)
+        if tema in TEMAS_IBGE:
+            url, camada, campos = TEMAS_IBGE[tema]
+            brutas = baixar_wfs(url, camada)
+            trava = 'cobertura'
+            fonte = f'IBGE — {camada}'
+            escala = '1:250.000' if 'BDIA' in camada else '1:5.000.000'
+        else:
+            url, campos, trava = TEMAS_ANA[tema]
+            brutas, esperado = baixar_arcgis(url, campos)
+            # Trava: lote que falhou em silêncio deixaria buraco no mapa.
+            if len(brutas) != esperado:
+                falhas.append(f'{tema}: {len(brutas)} baixadas de {esperado} — arquivo NÃO gravado')
+                print(falhas[-1])
+                continue
+            fonte = 'ANA — ' + url.split('/services/')[-1]
+            escala = None
+            print(f'{tema}: descrição do serviço: {_descricao_camada(url)!r}')
         feats, inval = recortar(brutas, acre, campos)
-        cobre = sum(area_ha(f['geometry']) for f in feats)
-        pct = cobre / area_acre * 100
-        # Trava: um tema que não cobre o estado veio pela metade (paginação,
-        # bbox, eixo) — nada é gravado.
-        if pct < 95 or pct > 105:
+        if not feats:
+            raise SystemExit(f'{tema}: nenhuma feição dentro do Acre — arquivo NÃO gravado')
+        pct = sum(area_ha(f['geometry']) for f in feats) / area_acre * 100
+        medida = f'cobre {pct:.1f}%'
+        # Trava: tema que deveria recobrir o estado e não recobre veio pela
+        # metade (paginação, bbox, eixo) — nada é gravado.
+        if trava == 'cobertura' and (pct < 95 or pct > 105):
             raise SystemExit(f'{tema}: cobre {pct:.1f}% da área do Acre — arquivo NÃO gravado')
-        fc = {'type': 'FeatureCollection', 'fonte': f'IBGE — {camada}', 'escala': '1:250.000' if 'BDIA' in camada else '1:5.000.000',
+        fc = {'type': 'FeatureCollection', 'fonte': fonte, 'escala': escala,
               'gerado_em': date.today().isoformat(), 'features': feats}
         arq = os.path.join(saida, f'{tema}.geojson')
         with open(arq, 'w', encoding='utf-8') as fh:
             json.dump(fc, fh, ensure_ascii=False, separators=(',', ':'))
         kb = os.path.getsize(arq) / 1024
-        print(f'{tema}: {len(brutas)} baixadas → {len(feats)} no Acre ({inval} corrigidas), cobre {pct:.1f}%, {kb:.0f} KB')
+        print(f'{tema}: {len(brutas)} baixadas → {len(feats)} no Acre ({inval} corrigidas), {medida}, {kb:.0f} KB')
         for k in campos[:3]:
             vals = {}
             for f in feats:
@@ -255,6 +391,8 @@ def gerar(temas, saida, acre_arq):
                 vals[v] = vals.get(v, 0) + 1
             print(f'   {k}: {len(vals)} valores — {sorted(vals.items(), key=lambda x: -x[1])[:6]}')
         resumo.append((tema, len(feats), kb))
+    if falhas:
+        raise SystemExit('; '.join(falhas))
     return resumo
 
 
@@ -273,6 +411,13 @@ def autoteste():
     b = shape(out[0]['geometry']).bounds
     assert b == (-69.5, -9.5, -69.0, -9.0), b                       # recortado no limite
     assert abs(shape(out[1]['geometry']).bounds[0] - (-69.8)) < 1e-9  # eixo corrigido
+    # nome só com espaços (massas d'água sem nome na ANA) vira ausente
+    out, _ = recortar([{'type': 'Feature', 'properties': {'a': ' '}, 'geometry': mapping(_box(-69.9, -9.9, -69.8, -9.8))}], acre, ['a'])
+    assert out[0]['properties'] == {}, out
+    # ArcGIS: contorno horário com buraco anti-horário
+    esri = {'rings': [[[0, 0], [0, 4], [4, 4], [4, 0], [0, 0]], [[1, 1], [2, 1], [2, 2], [1, 2], [1, 1]]]}
+    assert abs(shape(_esri_para_geojson(esri)).area - 15) < 1e-9
+    assert shape(_esri_para_geojson({'paths': [[[0, 0], [1, 1]]]})).geom_type == 'MultiLineString'
     print('autoteste ok')
 
 
@@ -331,7 +476,7 @@ def main():
     ap.add_argument('--descobrir', action='store_true')
     ap.add_argument('--descobrir-ana', action='store_true')
     ap.add_argument('--autoteste', action='store_true')
-    ap.add_argument('--gerar', nargs='*', help='temas do IBGE (vazio = todos)')
+    ap.add_argument('--gerar', nargs='*', help='temas do IBGE/ANA (vazio = todos)')
     ap.add_argument('--saida', default='data/meio_fisico')
     ap.add_argument('--acre', default='data/acre_estado.geojson')
     a = ap.parse_args()
@@ -345,7 +490,7 @@ def main():
         autoteste()
         return 0
     if a.gerar is not None:
-        gerar(a.gerar or list(TEMAS_IBGE), a.saida, a.acre)
+        gerar(a.gerar or [*TEMAS_IBGE, *TEMAS_ANA], a.saida, a.acre)
         return 0
     ap.print_help()
     return 1

@@ -1264,7 +1264,7 @@ no ⚙ da camada, gravado pelo "Salvar estilo" de sempre.
 
 ## Regra do sistema — Meio físico do Acre no Mapa das UCs (Fase 4, 24/10/2026)
 Aba "Meio Físico" da barra de camadas (`pages/mapa.html`), fonte única
-`js/mapa-meio-fisico.js` (prefixo `mf`). Temas do IBGE: geologia,
+`js/mapa-meio-fisico.js` (prefixo `mf`). 7 temas — IBGE: geologia,
 geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
 `geom_area`, `pedo_area`, `vege_area`) e clima (`CGEO:ANMS2010_03_clima`,
 1:5 milhões).
@@ -1286,10 +1286,24 @@ geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
 - Popup e painel SEMPRE dizem fonte, escala e "mapeamento regional — não
   substitui levantamento de campo". Arquivo só baixa ao ligar o tema;
   preferências em `localStorage['siguc_meio_fisico']`.
-- ANA: o GeoServer dela não existe mais (o nome não resolve) e o de metadados
-  dá 403; os dois servidores ArcGIS (`www.snirh.gov.br/arcgis`,
-  `portal1.snirh.gov.br/server`) respondem — ver a descoberta.
-- Guarda: `tests/mapa-meio-fisico.test.js` (5, página real com o arquivo
+- **ANA** (mesmo arquivo/aba, `TEMAS_ANA` no script): massas d'água
+  (`SNIRH2016/Massa_dagua/0`, 314 no Acre) e micro-regiões hidrográficas
+  (`Divisao_de_bacias/2`, 6 no Acre), do ArcGIS do SNIRH (o GeoServer da ANA
+  não existe mais; o de metadados dá 403). Baixa por QUADRANTES do retângulo
+  (divide em 4 quando bate no teto do servidor; repetido sai pelo id) —
+  consulta por `objectIds` voltava vazia e o MapServer não pagina. Trava =
+  CONTAGEM (baixado ≠ ids do servidor ⇒ nada gravado); a de área só vale
+  para as micro-regiões (massas d'água não recobrem o estado). Geometria do
+  ArcGIS (`f=json`) convertida no script (anel horário = contorno). A ANA não
+  publica escala no serviço: a tela diz "escala não informada pelo serviço",
+  nunca um número inventado.
+- ⚠️ **Rios da ANA NÃO entram**: `Rios_principais/0` devolve só atributos,
+  SEM geometria (medido 24/10/2026, `f=json`); o script falha alto se um
+  servidor fizer isso. Os rios já aparecem pelo WMS do IBGE BC250 (painel
+  Cobertura Vegetal → hidrografia); o WFS desse BC250 (`CCAR:*`) dá HTTP 400.
+- Não confundir as micro-regiões com a "bacia" de texto de
+  `agua_pontos_coleta` (Painel das Bacias): estas são só camada de leitura.
+- Guarda: `tests/mapa-meio-fisico.test.js` (6, página real com o arquivo
   servido por stub). Sem mudança em `pwa/sw.js` (tela de mesa).
 
 ## Regra do sistema — painéis na tela cheia do mapa
