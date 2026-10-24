@@ -302,10 +302,14 @@ def baixar_arcgis(url, campos):
         j = _get_json(f'{url}/query', {'objectIds': ','.join(map(str, ids[i:i + LOTE_IDS])),
                                        'outFields': ','.join(campos), 'outSR': 4326,
                                        'returnGeometry': 'true', 'f': 'json'})
+        antes = len(feats)
         for f in j.get('features') or []:
             gj = _esri_para_geojson(f.get('geometry'))
             if gj:
                 feats.append({'type': 'Feature', 'properties': f.get('attributes') or {}, 'geometry': gj})
+        if i == 0 and len(feats) == antes:
+            # 1º lote vazio: mostrar o que o servidor devolveu (diagnóstico)
+            print(f'{url}: 1º lote sem feição convertida; chaves {list(j)}; início {json.dumps(j)[:600]}')
     return feats, len(ids)
 
 
