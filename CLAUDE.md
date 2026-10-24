@@ -1225,6 +1225,43 @@ anual, misturáveis. Ideia do jurema-webgis, sem código dele.
   servidos por stub). Sem mudança em `pwa/sw.js` (nenhum arquivo tocado está
   em `SHELLS`).
 
+## Regra do sistema — camadas enviadas: popup, cor por atributo e dado pessoal (24/10/2026)
+Fase 3 do plano em `docs/mapa-ucs/plano-medicao-comparacao.md`. Fonte única
+`js/mapa-camadas-config.js` (prefixo `ccf`); `_renderizarCamada` só chama.
+Configuração dentro de `camadas_mapa.style_config` (jsonb que já existia — sem
+migration de schema): `popup = {titulo, campos:[{campo, rotulo, prefixo,
+sufixo, casas}]}` (sem `campos` = mostra tudo, menos os técnicos) e
+`colorirPor = {campo, cores:{valor:cor}}` (vence a paleta por nome; até 12
+classes, o resto cinza "outros"; legenda de tela e impressão por classe). Editor
+no ⚙ da camada, gravado pelo "Salvar estilo" de sempre.
+- Campo técnico de KML/shapefile (`tessellate`, `altitudeMode`, `_siguc_pid`…)
+  nunca aparece. Área/perímetro/comprimento calculados (turf) saem SEMPRE com
+  "Medidas do desenho no mapa — não registrais".
+- **Dado pessoal NUNCA no GeoJSON (migration 367).** Achado ao planejar esta
+  fase: `camadas_mapa` tem SELECT para todo autenticado e o navegador baixa o
+  GeoJSON inteiro — Afluente - Lotes (132 CPFs, 141 nomes), Lago do Amapa -
+  Lotes (115 CPFs, 218 nomes) e AN-SAFS (21 proprietários) estavam expostos.
+  Decisão do usuário: separar no banco. Trigger `trg_camadas_mapa_extrair_pessoais`
+  (BEFORE INSERT/UPDATE OF geojson) move os campos cujo NOME casa com
+  `camadas_mapa_campo_pessoal()` (cpf, cnpj, rg, documento, nome_ocupa*,
+  ocupante*, propriet*, detentor*, titular*) para `camadas_mapa_dados_pessoais`
+  (sem policy) e deixa `_siguc_pid` na feição — vale para todo upload futuro,
+  que continua sendo `.insert()` direto da tela. Leitura só por
+  `camada_dados_pessoais(camada, pid)`: `pode_editar('mapa')` (hoje só
+  super_admin; mais restrito que a policy antiga de edição das camadas, de
+  propósito), CPF/CNPJ por `car_mascarar_documento`, uma linha em
+  `lgpd_acesso_dado_terceiro` (`origem = mapa_camada`). ROPA TRAT-022. Na tela,
+  botão "Ver dados pessoais" no popup; sem permissão, só o aviso.
+- ⚠️ Campo pessoal com nome fora da lista (ex.: "Morador") NÃO é pego — a
+  detecção é pelo nome da coluna. Upload novo com outro nome = ampliar a regex
+  da função (e reaplicar `UPDATE camadas_mapa SET geojson = geojson`).
+- ⚠️ Cópia de segurança `camadas_mapa_backup_367` (RLS sem policy, sem GRANT)
+  guarda o GeoJSON ORIGINAL das 3 camadas, com os CPFs — apagar depois de
+  conferido (`DROP TABLE` no SQL Editor).
+- Guarda: `tests/mapa-camadas-config.test.js` (6, página real; contrafactual
+  conferido — `_siguc_pid` fora da lista de técnicos reprova). Sem mudança em
+  `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de

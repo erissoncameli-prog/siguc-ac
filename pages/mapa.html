@@ -569,6 +569,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/mapa-camadas.js"></script>
 <script src="../js/mapa-medicao.js"></script>
 <script src="../js/mapa-comparar.js"></script>
+<script src="../js/mapa-camadas-config.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
 </head>
@@ -1698,6 +1699,7 @@ function iniciarMapa(){
   _adicionarControleBasemap();
   _adicionarControleTelaCheia();
   if(typeof medMontar === 'function') medMontar(mapaL);
+  if(typeof ccfEstilos === 'function'){ ccfEstilos(); ccfInstalarDadosPessoais(() => db); _ccfLigarEditor(); }
   if(typeof cmpMontar === 'function') cmpMontar(mapaL, {
     // Comparação nunca mexe no painel (decisão do usuário): só avisa o que ficou por baixo
     camadasPorBaixo: () => Object.entries(VEG_LAYERS).filter(([,c]) => c.layer && mapaL.hasLayer(c.layer)).map(([k]) => _CMP_ROTULO_VEG[k] || k),
@@ -2429,30 +2431,27 @@ function _renderizarCamada(c){
   allF.forEach((f,i) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; if(n&&!paletaFixa[n]) paletaFixa[n]=SUBBACIA_PALETTE[i%SUBBACIA_PALETTE.length]; });
   const visF = hidden.size>0 ? allF.filter(f => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; return !hidden.has(n); }) : allF;
   const usePalette = hasNames && allF.length > 1;
+  // Cor por atributo (js/mapa-camadas-config.js) vence a paleta por nome
+  const coresAttr = typeof ccfCoresClasses === 'function' ? ccfCoresClasses(c) : null;
+  const podePessoais = appState.perfil === 'super_admin' || appState.permissoes?.mapa === 'editar';
   c.layer = L.geoJSON({...c.geojson,features:visF},{
     pointToLayer: (feature,latlng) => L.marker(latlng, { icon: L.divIcon({
       className:'',
       html:`<div style="width:14px;height:14px;border-radius:50%;background:${c.cor};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
       iconSize:[14,14], iconAnchor:[7,7]
     })}),
-    style: usePalette
+    style: coresAttr
+      ? (f) => { const fill = ccfCorDaFeicao(c, f.properties, coresAttr); return {color:globalStroke||fill,weight:sw,opacity:.9,fillColor:fill,fillOpacity:fo,dashArray:'5 4'}; }
+      : usePalette
       ? (f) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; const fill=featFill[n]||paletaFixa[n]||'#9ca3af'; const stroke=featStroke[n]||globalStroke||fill; return {color:stroke,weight:sw,opacity:.9,fillColor:fill,fillOpacity:fo,dashArray:'5 4'}; }
       : { color:globalStroke||c.cor, weight:sw, opacity:.9, fillColor:c.cor, fillOpacity:fo, dashArray:'5 4' },
     onEachFeature: (f,layer) => {
       const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||'';
       if(hasNames && n){ layer.bindTooltip(n,{permanent:true,direction:'center',className:'subbacia-label'}); layer.on('add',()=>layer.openTooltip()); }
-      const props = f.properties||{};
-      const linhas = Object.entries(props)
-        .filter(([k,v]) => k!=='name'&&k!=='Name'&&k!=='NAME' && v!==null && v!==undefined && v!=='')
-        .map(([k,v]) => `<div class="cp-row"><strong>${escHtml(k)}:</strong> <span>${escHtml(String(v))}</span></div>`).join('');
-      layer.bindPopup(`
-        <div class="camada-popup">
-          <div class="cp-header" style="background:${c.cor}">🗂 ${escHtml(c.nome)}</div>
-          <div class="cp-layer">
-            ${n?`<div class="cp-layer-nome">${escHtml(n)}</div>`:''}
-            ${linhas || '<div style="color:var(--cinza-400);font-size:11px">Sem informações adicionais</div>'}
-          </div>
-        </div>`, {className:'camada-popup-wrap', maxWidth:340});
+      // Popup configurável + medidas calculadas + dado pessoal sob demanda
+      // (js/mapa-camadas-config.js). Montado ao abrir: o gestor pode ter
+      // acabado de mudar a configuração no editor.
+      layer.bindPopup(() => ccfPopupHTML(c, f, { podeVerPessoais: podePessoais }), {className:'camada-popup-wrap', maxWidth:340});
     }
   });
   c.layer.addTo(mapaL);
@@ -2552,7 +2551,7 @@ function renderCamadasHtml(){
         ${ehAdmin?`<button onclick="removerCamada('${c.id}')" title="Remover"
           style="font-size:11px;padding:1px 5px;border:1px solid #FCA5A5;border-radius:4px;background:#FEF2F2;color:#DC2626;cursor:pointer;flex-shrink:0">✕</button>`:''}
       </div>
-      ${ehAdmin?`<div id="camada-expand-${c.id}" class="camada-expand-body" style="display:none">${featRowsHtml}${styleHtml}</div>`:''}
+      ${ehAdmin?`<div id="camada-expand-${c.id}" class="camada-expand-body" style="display:none">${featRowsHtml}${typeof ccfEditorHTML==='function'?ccfEditorHTML(c):''}${styleHtml}</div>`:''}
     </div>`;
   }
 
@@ -2588,6 +2587,27 @@ function toggleCamada(id, vis){
   localStorage.setItem('siguc_camadas_vis', JSON.stringify(visPref));
   _atualizarLegendaMapa();
   _prefsAgendarSalvamento();
+}
+
+// Editor "Popup / Colorir por atributo" (js/mapa-camadas-config.js): uma
+// delegação só na lista; muda o style_config em memória e redesenha. Gravar
+// continua sendo o "Salvar estilo" de sempre.
+function _ccfLigarEditor(){
+  const el = document.getElementById('bloco-camadas-lista');
+  if(!el || el._ccfLigado) return;
+  el._ccfLigado = true;
+  const tratar = ev => {
+    const t = ev.target, acao = t.dataset && t.dataset.ccfAcao; if(!acao) return;
+    const ed = t.closest('[data-ccf-editor]'); if(!ed) return;
+    const c = camadas.find(x => x.id === ed.dataset.ccfEditor); if(!c) return;
+    if(ev.type === 'input' && !['cor','rotulo','sufixo','casas'].includes(acao)) return;
+    ccfEditar(c, acao, t);
+    if(c.visivel) _renderizarCamada(c);
+    _atualizarLegendaMapa();
+    if(acao === 'colorir'){ renderCamadasHtml(); toggleExpandirCamada(c.id); }
+  };
+  el.addEventListener('change', tratar);
+  el.addEventListener('input', tratar);
 }
 
 function toggleExpandirCamada(id){
@@ -2894,7 +2914,9 @@ function _atualizarLegendaMapa(){
 
   // Camadas personalizadas
   camadas.filter(c=>c.visivel).forEach(c => {
-    itens.push({ simbolo:'rect', cor:c.cor, opacidade:0.4, dash:true, label:c.nome });
+    const porClasse = typeof ccfItensLegenda === 'function' ? ccfItensLegenda(c, 0.5) : null;
+    if(porClasse) itens.push(...porClasse);
+    else itens.push({ simbolo:'rect', cor:c.cor, opacidade:0.4, dash:true, label:c.nome });
   });
 
   CART.legendaAtualizar(itens);
