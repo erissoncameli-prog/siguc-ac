@@ -16,7 +16,10 @@ Decisões do usuário (24/10/2026):
 
 ---
 
-## Fase 1 — Ferramentas de medição
+## Fase 1 — Ferramentas de medição — ENTREGUE (24/10/2026)
+
+Decisão tomada na implementação: ícones em `BICON_PATHS` (regra do projeto),
+com os 5 contadores de `pwa/sw.js` subindo.
 
 ### O que entra
 Barra de 4 botões + limpar, igual em ideia à do Jurema, menos a "diferença de

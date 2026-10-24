@@ -566,6 +566,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/mapa-uc-tipos.js"></script>
 <script src="../js/mapa-assentamentos.js"></script>
 <script src="../js/mapa-linha-tempo.js"></script>
+<script src="../js/mapa-medicao.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
 </head>
@@ -1700,6 +1701,7 @@ function iniciarMapa(){
   _adicionarMiniMapa();
   _adicionarControleBasemap();
   _adicionarControleTelaCheia();
+  if(typeof medMontar === 'function') medMontar(mapaL);
   clusters = L.markerClusterGroup({ maxClusterRadius:40, disableClusteringAtZoom:14 });
   mapaL.addLayer(clusters);
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
@@ -8495,6 +8497,8 @@ function fecharModalProjeto() {
 }
 
 function iniciarDesenho() {
+  // Medição e desenho do leaflet-draw disputam o mesmo clique no mapa
+  if (typeof medDesativar === 'function') medDesativar()
   // Fecha modal temporariamente para ver o mapa
   document.getElementById('proj-overlay').style.display = 'none'
   document.getElementById('proj-draw-area').classList.add('ativo')

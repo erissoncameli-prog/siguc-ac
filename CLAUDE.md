@@ -1158,6 +1158,37 @@ própria) e os controles de cor do PA ficavam abaixo da borda do painel.
 - Guarda: `tests/mapa-areas-aparencia.test.js` (5, página REAL a 1366×768 com stub do
   supabase-js e dos plugins de CDN do Leaflet). Sem mudança em `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — ferramentas de medição do Mapa das UCs (24/10/2026)
+`js/mapa-medicao.js` (prefixo `med`), fonte única; a página só chama
+`medMontar(mapaL)` em `iniciarMapa()`. Coordenada (graus + UTM SIRGAS 2000,
+mesma zona/EPSG da moldura), distância (`turf.length`, haversine sem turf) e
+área + perímetro (`turf.area`, "não registral"). Ideia do jurema-webgis (Cardeal
+Map) — repositório sem licença, nenhum código dele. Plano em
+`docs/mapa-ucs/plano-medicao-comparacao.md`.
+- **Clique de medição nunca abre popup**: com a ferramenta ligada o container
+  ganha `.med-ativa`, que tira o `pointer-events` de `.leaflet-interactive`
+  (SVG) E do `<canvas>` do CAR (o renderer canvas trata o clique no próprio
+  elemento). Desligar a ferramenta devolve o clique às camadas.
+- Duplo clique conclui: `doubleClickZoom` fica desligado só enquanto mede e
+  volta como estava. O 1º clique do duplo clique (< 4 px do último vértice)
+  não vira vértice repetido.
+- Esc/Enter/Backspace em CAPTURA no `document` e só com ferramenta ligada — Esc
+  não pode também sair da tela cheia.
+- ⚠️ **Bug real achado pelo teste**: o painel é redesenhado pelo próprio clique
+  em "Concluir"; o Leaflet só reconhece clique de controle subindo pelos pais
+  do alvo, e com o botão já fora da página o clique virava vértice novo. O
+  handler da barra faz `stopPropagation()` antes de tudo. Vale para qualquer
+  controle Leaflet que reescreva o próprio HTML no clique.
+- `iniciarDesenho()` (projeto de análise, leaflet-draw) desliga a medição antes
+  — os dois disputam o clique no mapa.
+- Nada é gravado. Na impressão (`CART.imprimir`) as medições saem porque são
+  camadas do mapa; a barra some.
+- Ícones `crosshair`, `ruler`, `polygon` entraram em `BICON_PATHS`.
+- Guarda: `tests/mapa-medicao.test.js` (5, página real; contrafactual conferido
+  — sem a regra de `pointer-events` o teste do popup reprova).
+- `pwa/sw.js`: brigadas 275→276, biomonitor 77→78, frota 114→115, agua 44→45,
+  socio 1→2 (só `js/config.js` mudou, e ele está nos 5 shells).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de
