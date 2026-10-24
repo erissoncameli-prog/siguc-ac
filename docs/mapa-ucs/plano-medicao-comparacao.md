@@ -196,10 +196,12 @@ enviadas (`js/mapa-camadas-config.js`) + dado pessoal tirado do GeoJSON
 
 ## Fase 4 — Meio físico — ENTREGUE (24/10/2026)
 IBGE (geologia, geomorfologia, pedologia, vegetação 1:250 mil + clima) e ANA
-(rios principais, massas d'água, micro-regiões hidrográficas), gerados no
-GitHub Actions e desenhados com as funções da Fase 3. Ver a regra no
-CLAUDE.md. Fica para depois, se pedido: ottobacias finas (a camada "Uso da
-Água por Microbacia" do SNIRH tem ~4.700 microbacias no retângulo do Acre).
+(massas d'água, micro-regiões hidrográficas), gerados no GitHub Actions e
+desenhados com as funções da Fase 3. Ver a regra no CLAUDE.md. Rios da ANA
+ficaram de fora (o serviço não devolve geometria; o mapa já tem a
+hidrografia BC250 do IBGE por WMS). Fica para depois, se pedido: ottobacias
+finas (a camada "Uso da Água por Microbacia" do SNIRH tem ~4.700 microbacias
+no retângulo do Acre).
 
 ## Fora deste plano (registrado)
 - GPS + legenda em degradê (Fase 5).

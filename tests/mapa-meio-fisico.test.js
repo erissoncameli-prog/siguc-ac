@@ -27,9 +27,9 @@ const PEDO = { type: 'FeatureCollection', fonte: 'IBGE — BDIA:pedo_area', esca
   { type: 'Feature', geometry: quad(-69.7, -10.0, 0.2), properties: { legenda_2: 'Latossolos Amarelos', ordem: 'LATOSSOLOS', textura: 'argilosa' } },
   { type: 'Feature', geometry: quad(-69.4, -10.0, 0.2), properties: { legenda_2: 'Argissolos Vermelhos', ordem: 'ARGISSOLOS', textura: 'argilosa' } },
 ] };
-const RIOS = { type: 'FeatureCollection', fonte: 'ANA — SNIRH2016/Rios_principais/MapServer/0', features: [
-  { type: 'Feature', geometry: { type: 'LineString', coordinates: [[-70.0, -9.6], [-69.2, -9.4]] }, properties: { NORIOCOMP: 'Rio Acre', DEDOMINIAL: 'Federal', NUAREAMONT: 23456.7 } },
-  { type: 'Feature', geometry: { type: 'LineString', coordinates: [[-69.8, -9.9], [-69.5, -9.7]] }, properties: { NORIOCOMP: 'Igarapé X', DEDOMINIAL: 'Estadual' } },
+const MASSAS = { type: 'FeatureCollection', fonte: 'ANA — SNIRH2016/Massa_dagua/MapServer/0', features: [
+  { type: 'Feature', geometry: quad(-70.0, -9.6, 0.05), properties: { nmoriginal: 'Lagoa Sacado', detipomass: 'Natural' } },
+  { type: 'Feature', geometry: quad(-69.8, -9.6, 0.05), properties: { detipomass: 'Artificial', nmgenerico: 'Barragem' } },
 ] };
 
 async function abrir(page) {
@@ -44,7 +44,7 @@ async function abrir(page) {
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.js', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.js'), contentType: 'application/javascript' }));
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.css', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.css'), contentType: 'text/css' }));
   const pedidos = [];
-  await page.route('**/data/meio_fisico/**', r => { const u = new URL(r.request().url()).pathname; pedidos.push(u); r.fulfill({ json: u.endsWith('/rios.geojson') ? RIOS : PEDO }) });
+  await page.route('**/data/meio_fisico/**', r => { const u = new URL(r.request().url()).pathname; pedidos.push(u); r.fulfill({ json: u.endsWith('/massas_dagua.geojson') ? MASSAS : PEDO }) });
   await page.goto(`${BASE}/pages/mapa.html`);
   await page.waitForFunction(() => typeof renderPagina === 'function' && typeof L !== 'undefined' && typeof mfMontar === 'function');
   await page.evaluate(() => {
@@ -59,18 +59,21 @@ async function abrir(page) {
 
 async function ligarPedologia(page) {
   await page.click('#mlb-btn-meio');
-  await expect(page.locator('[data-mf-tema]')).toHaveCount(8);
+  await expect(page.locator('[data-mf-tema]')).toHaveCount(7);
   await page.locator('[data-mf-tema="pedologia"] [data-mf-acao="ligar"]').check();
   await page.waitForFunction(() => mfAtivos().includes('pedologia'));
 }
 
-test('aba lista os 8 temas (IBGE e ANA) com fonte e escala; nada é baixado antes de ligar', async ({ page }) => {
+test('aba lista os 7 temas (IBGE e ANA) com fonte e escala; nada é baixado antes de ligar', async ({ page }) => {
   const pedidos = await abrir(page);
   await page.click('#mlb-btn-meio');
   const textos = await page.locator('[data-mf-tema] .mf-meta').allInnerTexts();
-  expect(textos.length).toBe(8);
-  expect(textos.every(t => /IBGE|ANA/.test(t) && /1:/.test(t))).toBe(true);
-  expect(textos.filter(t => /ANA/.test(t)).length).toBe(3);
+  expect(textos.length).toBe(7);
+  expect(textos.filter(t => /IBGE/.test(t)).every(t => /1:/.test(t))).toBe(true);
+  // a ANA não publica a escala: a tela diz isso, nunca inventa um número
+  const ana = textos.filter(t => /ANA/.test(t));
+  expect(ana.length).toBe(2);
+  expect(ana.every(t => /escala não informada pelo serviço/.test(t) && !/1:/.test(t))).toBe(true);
   expect(pedidos).toEqual([]);
 });
 
@@ -130,30 +133,26 @@ test('arquivo que falha: aviso no tema e a caixa volta a desmarcada', async ({ p
   await page.unroute('**/data/meio_fisico/**');
   await page.route('**/data/meio_fisico/**', r => r.fulfill({ status: 404, body: '' }));
   await page.click('#mlb-btn-meio');
-  await page.locator('[data-mf-tema="geologia"] [data-mf-acao="ligar"]').check();
+  // click, não check(): com 404 o app desmarca a caixa antes de o check()
+  // conferir o estado, e ele acusa "não mudou" (instabilidade real medida)
+  await page.locator('[data-mf-tema="geologia"] [data-mf-acao="ligar"]').click();
   await expect(page.locator('[data-mf-tema="geologia"] .mf-status')).toHaveText('Não foi possível carregar o arquivo.');
   await expect(page.locator('[data-mf-tema="geologia"] [data-mf-acao="ligar"]')).not.toBeChecked();
 });
 
-test('rios da ANA: só traço (sem preenchimento), contador em trechos, legenda em linha e popup com domínio', async ({ page }) => {
+test('massas d\'água da ANA: cor por tipo, popup sem escala inventada', async ({ page }) => {
   await abrir(page);
   await page.click('#mlb-btn-meio');
-  await page.locator('[data-mf-tema="rios"] [data-mf-acao="ligar"]').check();
-  await page.waitForFunction(() => mfAtivos().includes('rios'));
-  await expect(page.locator('[data-mf-tema="rios"] .mf-status')).toHaveText('2 trechos');
-  const r = await page.evaluate(() => _mf.camadas.rios.layer.getLayers().map(l => ({ fill: l.options.fill, cor: l.options.color })));
-  expect(r.every(x => x.fill === false)).toBe(true);
-  expect(r[0].cor).not.toBe(r[1].cor);        // Federal × Estadual
-  const leg = await page.evaluate(() => mfItensLegenda());
-  expect(leg.every(i => i.simbolo === 'line')).toBe(true);
-  expect(leg.map(i => i.label)).toEqual(expect.arrayContaining(['Rios principais — Federal', 'Rios principais — Estadual']));
-  // opacidade mexe no traço, não no preenchimento
-  await page.evaluate(() => { const i = document.querySelector('[data-mf-tema="rios"] [data-mf-acao="opacidade"]'); i.value = '70'; i.dispatchEvent(new Event('input', { bubbles: true })) });
-  expect(await page.evaluate(() => _mf.camadas.rios.layer.getLayers()[0].options.opacity)).toBe(0.7);
-  await page.evaluate(() => _mf.camadas.rios.layer.getLayers()[0].openPopup());
+  await page.locator('[data-mf-tema="massas_dagua"] [data-mf-acao="ligar"]').check();
+  await page.waitForFunction(() => mfAtivos().includes('massas_dagua'));
+  await expect(page.locator('[data-mf-tema="massas_dagua"] .mf-status')).toHaveText('2 polígonos');
+  const cores = await page.evaluate(() => _mf.camadas.massas_dagua.layer.getLayers().map(l => l.options.fillColor));
+  expect(cores[0]).not.toBe(cores[1]);       // Natural × Artificial
+  const leg = await page.evaluate(() => mfItensLegenda().map(i => i.label));
+  expect(leg).toEqual(expect.arrayContaining(["Massas d'água — Natural", "Massas d'água — Artificial"]));
+  await page.evaluate(() => _mf.camadas.massas_dagua.layer.getLayers()[0].openPopup());
   const t = await page.locator('.leaflet-popup-content').last().innerText();
-  expect(t).toMatch(/rio acre/i);
-  expect(t).toContain('Domínio');
-  expect(t).toContain('Comprimento calculado');
-  expect(t).toContain('ANA');
+  expect(t).toMatch(/lagoa sacado/i);
+  expect(t).toContain('escala não informada pelo serviço');
+  expect(t).not.toMatch(/escala 1:/);
 });
