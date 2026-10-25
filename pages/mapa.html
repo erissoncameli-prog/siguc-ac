@@ -959,7 +959,9 @@ const HIDRO_WMS_LAYERS = 'CCAR:BC250_Massa_Dagua_A,CCAR:BC250_Trecho_Drenagem_L'
 const _CMP_ROTULO_VEG = { mapbiomas:'MapBiomas', prodes:'PRODES anual', prodes_hist:'PRODES acumulado',
   hidrografia:'Hidrografia IBGE', gibs:'NASA GIBS', planet:'Planet / NICFI', sentinel:'Sentinel-2' };
 const VEG_LAYERS = {
-  mapbiomas: { layer:null, make(op){ return L.tileLayer('https://storage.googleapis.com/mapbiomas-public/brasil/collection-8/lclu/coverage/{z}/{x}/{y}.png',{attribution:'MapBiomas Coleção 8',opacity:op/100,maxZoom:22,maxNativeZoom:12}); } },
+  // Coleção 11, ano mais recente. O endereço antigo (collection-8/.../{z}/{x}/{y}.png
+  // direto no bucket) não existe — a camada vinha vazia. Ver js/mapa-camadas.js.
+  mapbiomas: { layer:null, make(op){ return mapaMapbiomasLayer(L, { opacidade: op }); } },
   // PRODES, Planet e Sentinel: fábricas únicas em js/mapa-camadas.js (as
   // mesmas da linha do tempo e da comparação de imagens).
   prodes:    { layer:null, make(op){ return mapaProdesLayer(L, { opacidade: op }); } },
@@ -1897,7 +1899,7 @@ function _renderDropdown(id){
       + foot;
   }
   if(id==='veg') return hdr('🌿 Cobertura Vegetal & Desmatamento') + `
-    ${_vegCard('mapbiomas','MapBiomas Coleção 8','Uso e cobertura do solo. Resolução 30m. Ano base 2023.','#16a34a')}
+    ${_vegCard('mapbiomas','MapBiomas Coleção 11','Uso e cobertura do solo. Resolução 30m. Ano 2025 — outros anos em Comparar imagens.','#16a34a')}
     ${_vegCard('prodes','PRODES — Desmatamento Anual','INPE/TerraBrasilis · Desmatamento incremental por ano.','#dc2626')}
     ${_vegCard('prodes_hist','PRODES — Desmatamento Acumulado','INPE · Desmatamento acumulado até 2008.','#d97706')}
     ${_vegCard('hidrografia','Hidrografia — IBGE (BC250)','Rios e massas d\'água. IBGE · Base Cartográfica 1:250.000.','#2563eb')}
@@ -2917,7 +2919,7 @@ function _atualizarLegendaMapa(){
   if(_hidroLayer) itens.push({ simbolo:'circle', cor:'#0891b2', label:'Estações hidrometeorológicas' });
 
   // Cobertura Vegetal
-  if(VEG_LAYERS.mapbiomas?.layer)  itens.push({ simbolo:'rect', cor:'#16a34a', opacidade:0.7, label:'MapBiomas Coleção 8' });
+  if(VEG_LAYERS.mapbiomas?.layer)  itens.push({ simbolo:'rect', cor:'#16a34a', opacidade:0.7, label:'MapBiomas Coleção 11 (2025)' });
   if(VEG_LAYERS.prodes?.layer)     itens.push({ simbolo:'rect', cor:'#dc2626', opacidade:0.7, label:'PRODES — Desmatamento' });
   if(VEG_LAYERS.prodes_hist?.layer)itens.push({ simbolo:'rect', cor:'#b45309', opacidade:0.7, label:'PRODES — Acumulado' });
   if(VEG_LAYERS.hidrografia?.layer)itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:0.7, label:'Hidrografia — IBGE (rios/água)' });

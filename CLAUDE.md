@@ -1194,7 +1194,8 @@ Map) — repositório sem licença, nenhum código dele. Plano em
 `cmpMontar(mapaL, { camadasPorBaixo, prodesAnos })`. Botão no canto superior
 esquerdo do mapa (vale também no imersivo); divisor arrastável com Planet/NICFI
 mensal, Sentinel-2 (época seca do ano ou cena recente da área visível) e PRODES
-anual, misturáveis. Ideia do jurema-webgis, sem código dele.
+anual, MapBiomas anual, Esri Wayback e Google, misturáveis. Ideia do
+jurema-webgis, sem código dele.
 - **Camadas de uma fonte só**: `mapaPlanetLayer`, `mapaSentinelLayer`,
   `mapaProdesLayer`, `mapaPlanetMosaicos`, `mapaSentinelCenas`
   (`js/mapa-camadas.js`). `pages/mapa.html` passou a carregar esse arquivo e as
@@ -1233,9 +1234,40 @@ anual, misturáveis. Ideia do jurema-webgis, sem código dele.
   acumulado 2007 + anual com `CQL_FILTER=INCLUDE;year<=N`). O polígono de um
   ano só tem ~7 ha em média e cai em lugares diferentes a cada ano — "só o
   ano" × "só o ano" não mostra mudança, e a tela avisa isso.
-- Guarda: `tests/mapa-comparar.test.js` (6, por PIXEL com tiles de cor sólida
-  servidos por stub). Sem mudança em `pwa/sw.js` (nenhum arquivo tocado está
-  em `SHELLS`).
+- **Regra do usuário (25/10/2026): o MAIOR detalhe de tempo que cada fonte
+  tem** — toda data publicada na lista, botões ‹ › para andar data a data,
+  nunca um intervalo fixo ("10 anos" era só exemplo). Sem Planet/Sentinel, abre
+  no MapBiomas 1º ano × último.
+- **MapBiomas por ano** (fonte `mapbiomas`, Coleção 11, 1985–2025): a MapBiomas
+  NÃO publica tiles — só um COG por ano do Brasil inteiro (EPSG:4326, uint8,
+  blocos 512, deflate + predictor 2, 10 versões reduzidas). `api/_mapbiomas-cog.js`
+  lê por faixa de bytes só os blocos do tile e devolve PNG de paleta (zlib do
+  Node, nenhuma dependência; o `_` impede a Vercel de virar função). Rota:
+  `/api/geo?svc=tile&ano=AAAA&z&x&y` (a que já existia). Anos, URL e cores em
+  `data/mapbiomas-col11-legenda.json` — tirado do catálogo STAC OFICIAL
+  (`stac/mapbiomas-brazil/…collection11-coverage`), lido pelo servidor (pintar)
+  e pela tela (legenda): nunca uma 2ª tabela de cores. Coleção nova = trocar
+  esse arquivo. ⚠️ A rota antiga pedia `collection-8/lclu/coverage/{z}/{x}/{y}.png`,
+  que NÃO existe no bucket: o painel Cobertura Vegetal e a estimativa de
+  combustível de `validacao-campo.html` recebiam tile vazio em silêncio desde
+  sempre — corrigidos junto. A Coleção 11 em `initiatives/brasil/collection11/`
+  é LZW SEM versões reduzidas (inviável em zoom baixo); a usada é a do STAC,
+  `initiatives/brazil/lulc/collection_11/coverage/`.
+- **Esri Wayback** (fonte `wayback`, ~200 versões desde 2014): tiles direto da
+  Esri (`img-src https:`); a lista e as "fotos novas nesta área" passam por
+  `/api/geo?svc=wayback` (o CSP não libera o domínio em `connect-src`).
+  `op=mudancas` usa a tilemap da Esri (mesmo método do app Wayback: cada
+  consulta diz em que versão o tile foi publicado e pula para a anterior) e a
+  data de CAPTURA vem da camada de metadados da versão. Versão ≠ foto: duas
+  versões podem mostrar a mesma imagem — a tela agrupa as fotos novas, o passo
+  anda só entre elas e avisa "MESMA foto". Pedido só ao escolher a fonte e no
+  botão "Datas desta área", nunca a cada movimento.
+- **Google** (fonte `google`): só a foto atual — o Google não publica datas
+  antigas por endereço de tile, e a tela diz isso.
+- Guarda: `tests/mapa-comparar.test.js` (9, por PIXEL com tiles de cor sólida
+  servidos por stub) + `tests/mapbiomas-cog.test.js` (5, BigTIFF montado em
+  memória, sem rede; contrafactual conferido — sem desfazer o predictor reprova).
+  Sem mudança em `pwa/sw.js` (nenhum arquivo tocado está em `SHELLS`).
 
 ## Regra do sistema — camadas enviadas: popup, cor por atributo e dado pessoal (24/10/2026)
 Fase 3 do plano em `docs/mapa-ucs/plano-medicao-comparacao.md`. Fonte única

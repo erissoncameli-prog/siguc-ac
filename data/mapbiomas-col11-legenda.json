@@ -1,0 +1,208 @@
+{
+ "_fonte": "MapBiomas Brasil, Coleção 11 — catálogo STAC oficial (classification:classes, pt-BR), https://storage.googleapis.com/mapbiomas-public/stac/mapbiomas-brazil/mapbiomas-brazil-collection11-coverage/collection.pt-BR.json",
+ "_licenca": "CC-BY-4.0",
+ "colecao": 11,
+ "ano_min": 1985,
+ "ano_max": 2025,
+ "url_ano": "https://storage.googleapis.com/mapbiomas-public/initiatives/brazil/lulc/collection_11/coverage/coverage-brazil_classification_{ano}.tif",
+ "classes": [
+  {
+   "valor": 3,
+   "nome": "Formação Florestal",
+   "cor": "#1F8D49",
+   "grupo": "Floresta"
+  },
+  {
+   "valor": 6,
+   "nome": "Floresta Alagável",
+   "cor": "#007785",
+   "grupo": "Floresta"
+  },
+  {
+   "valor": 4,
+   "nome": "Formação Savânica",
+   "cor": "#7DC975",
+   "grupo": "Floresta"
+  },
+  {
+   "valor": 7,
+   "nome": "Savana Alagada (beta)",
+   "cor": "#228C70",
+   "grupo": "Floresta"
+  },
+  {
+   "valor": 5,
+   "nome": "Mangue",
+   "cor": "#04381D",
+   "grupo": "Floresta"
+  },
+  {
+   "valor": 49,
+   "nome": "Restinga Arbórea",
+   "cor": "#02D659",
+   "grupo": "Floresta"
+  },
+  {
+   "valor": 12,
+   "nome": "Formação Campestre",
+   "cor": "#D6BC74",
+   "grupo": "Vegetação Herbácea e Arbustiva"
+  },
+  {
+   "valor": 77,
+   "nome": "Formação Herbáceo Arbustiva (beta)",
+   "cor": "#86B074",
+   "grupo": "Vegetação Herbácea e Arbustiva"
+  },
+  {
+   "valor": 11,
+   "nome": "Campo Alagado e Área Pantanosa",
+   "cor": "#519799",
+   "grupo": "Vegetação Herbácea e Arbustiva"
+  },
+  {
+   "valor": 84,
+   "nome": "Marisma (beta)",
+   "cor": "#81DBBF",
+   "grupo": "Vegetação Herbácea e Arbustiva"
+  },
+  {
+   "valor": 50,
+   "nome": "Restinga Herbácea ou Arbustiva",
+   "cor": "#FFAA5F",
+   "grupo": "Vegetação Herbácea e Arbustiva"
+  },
+  {
+   "valor": 32,
+   "nome": "Apicum",
+   "cor": "#FC8114",
+   "grupo": "Vegetação Herbácea e Arbustiva"
+  },
+  {
+   "valor": 29,
+   "nome": "Afloramento Rochoso",
+   "cor": "#AD5100",
+   "grupo": "Vegetação Herbácea e Arbustiva"
+  },
+  {
+   "valor": 15,
+   "nome": "Pastagem",
+   "cor": "#EDDE8E",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 39,
+   "nome": "Soja",
+   "cor": "#F5B3C8",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 20,
+   "nome": "Cana",
+   "cor": "#DB7093",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 40,
+   "nome": "Arroz",
+   "cor": "#C71585",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 62,
+   "nome": "Algodão (beta)",
+   "cor": "#FF69B4",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 41,
+   "nome": "Outras Lavouras Temporárias",
+   "cor": "#F54CA9",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 46,
+   "nome": "Café",
+   "cor": "#D68FE2",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 47,
+   "nome": "Citrus",
+   "cor": "#9932CC",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 35,
+   "nome": "Dendê",
+   "cor": "#9065D0",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 48,
+   "nome": "Outras Lavouras Perenes",
+   "cor": "#E6CCFF",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 9,
+   "nome": "Silvicultura",
+   "cor": "#7A5900",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 21,
+   "nome": "Mosaico de Usos",
+   "cor": "#FFEFC3",
+   "grupo": "Agropecuária"
+  },
+  {
+   "valor": 23,
+   "nome": "Praia, Duna e Areal",
+   "cor": "#FFA07A",
+   "grupo": "Área não vegetada"
+  },
+  {
+   "valor": 24,
+   "nome": "Área Urbanizada",
+   "cor": "#D4271E",
+   "grupo": "Área não vegetada"
+  },
+  {
+   "valor": 30,
+   "nome": "Mineração",
+   "cor": "#9C0027",
+   "grupo": "Área não vegetada"
+  },
+  {
+   "valor": 75,
+   "nome": "Usina Fotovoltaica",
+   "cor": "#757272",
+   "grupo": "Área não vegetada"
+  },
+  {
+   "valor": 91,
+   "nome": "Parque eólico (beta)",
+   "cor": "#403D3E",
+   "grupo": "Área não vegetada"
+  },
+  {
+   "valor": 25,
+   "nome": "Outras Áreas não Vegetadas",
+   "cor": "#DB4D4F",
+   "grupo": "Área não vegetada"
+  },
+  {
+   "valor": 33,
+   "nome": "Rio, Lago e Oceano",
+   "cor": "#2532E4",
+   "grupo": "Corpo D'água"
+  },
+  {
+   "valor": 31,
+   "nome": "Aquicultura",
+   "cor": "#091077",
+   "grupo": "Corpo D'água"
+  }
+ ]
+}

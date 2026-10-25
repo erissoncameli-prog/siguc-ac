@@ -37,10 +37,20 @@ function pngSolido([r, g, b]) {
   const cru = Buffer.concat(Array.from({ length: 256 }, () => linha))
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), bloco('IHDR', ihdr), bloco('IDAT', zlib.deflateSync(cru)), bloco('IEND', Buffer.alloc(0))])
 }
-const VERMELHO = [220, 20, 20], AZUL = [20, 40, 220]
-const PNG_PLANET = pngSolido(VERMELHO), PNG_S2 = pngSolido(AZUL)
+const VERMELHO = [220, 20, 20], AZUL = [20, 40, 220], VERDE = [20, 160, 60], AMARELO = [230, 200, 40]
+const PNG_PLANET = pngSolido(VERMELHO), PNG_S2 = pngSolido(AZUL), PNG_MB = pngSolido(VERDE), PNG_WB = pngSolido(AMARELO)
+// Wayback falso: 6 versões; nesta área a foto só mudou em 3 delas
+const WB_VERSOES = [
+  { num: 600, data: '2026-09-24' }, { num: 500, data: '2025-06-10' }, { num: 400, data: '2024-03-01' },
+  { num: 300, data: '2021-01-15' }, { num: 200, data: '2018-05-20' }, { num: 100, data: '2014-02-20' },
+]
+const WB_MUDANCAS = [
+  { num: 500, data: '2025-06-10', captura: { data: '2024-08-02', fonte: 'Maxar' } },
+  { num: 300, data: '2021-01-15', captura: { data: '2020-07-11', fonte: 'Maxar' } },
+  { num: 100, data: '2014-02-20', captura: null },
+]
 
-async function abrir(page, { semPlanet = false, s2Motivo = null } = {}) {
+async function abrir(page, { semPlanet = false, s2Motivo = null, pedidos = null } = {}) {
   await page.addInitScript(() => {
     const mk = pend => { const f = function () {}; const p = new Proxy(f, { get(t, k) { if (k === 'then') return pend ? () => {} : r => r({ data: null, error: null }); if (k === 'auth') return mk(true); return mk(pend) }, apply() { return p } }); return p };
     window.supabase = { createClient: () => mk(false) };
@@ -53,8 +63,15 @@ async function abrir(page, { semPlanet = false, s2Motivo = null } = {}) {
   await page.route('**/unpkg.com/**', r => r.abort());
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.js', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.js'), contentType: 'application/javascript' }));
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.css', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.css'), contentType: 'text/css' }));
+  await page.route('**/wayback.maptiles.arcgis.com/**', r => r.fulfill({ body: PNG_WB, contentType: 'image/png' }));
   await page.route('**/api/**', r => {
     const u = new URL(r.request().url());
+    if (pedidos) pedidos.push(u.pathname + u.search);
+    if (u.pathname === '/api/geo' && u.searchParams.get('svc') === 'tile') return r.fulfill({ body: PNG_MB, contentType: 'image/png' });
+    if (u.pathname === '/api/geo' && u.searchParams.get('svc') === 'wayback') {
+      return r.fulfill({ json: u.searchParams.get('op') === 'mudancas'
+        ? { disponivel: true, z: 14, mudancas: WB_MUDANCAS } : { disponivel: true, versoes: WB_VERSOES } });
+    }
     if (u.pathname === '/api/planet' && u.searchParams.get('op') === 'mosaics' && semPlanet) {
       return r.fulfill({ json: { disponivel: false, recente: null, motivo: 'conta-sem-mosaicos', mosaicos: [] } });
     }
@@ -228,20 +245,83 @@ test('no imersivo funciona e Esc sai da comparação sem sair da tela cheia; imp
   await expect(page.locator('.cmp-painel')).toHaveCount(0);
 });
 
-test('Sentinel com credencial recusada: aviso diz a causa; sem Planet, abre em PRODES acumulado', async ({ page }) => {
+test('Sentinel com credencial recusada: aviso diz a causa; PRODES compara o acumulado', async ({ page }) => {
   await abrir(page, { semPlanet: true, s2Motivo: 'token-http-401' });
   await page.click('.cmp-abrir');
-  const anos = await page.evaluate(() => _cmp.prodesAnos);
-  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue(`ate:${anos[0]}`);
-  expect(await page.evaluate(() => _cmp.lados.esq.valor)).toMatch(/^ate:\d{4}$/);
   await expect(page.locator('[data-cmp-fonte="dir"] option[value="sentinel"]')).toContainText('fora do ar');
   await page.selectOption('[data-cmp-fonte="dir"]', 'sentinel');
   await expect(page.locator('[data-cmp-status="dir"]')).toContainText('fora do ar');
   await expect(page.locator('.cmp-avisos')).toContainText('token-http-401');
   await expect(page.locator('.cmp-avisos')).toContainText('CDSE_CLIENT_ID');
+  const anos = await page.evaluate(() => _cmp.prodesAnos);
   // dois lados "só o ano": o aviso explica por que não parece mudar
-  await page.selectOption('[data-cmp-fonte="dir"]', 'prodes');
-  await page.selectOption('[data-cmp-valor="dir"]', `ano:${anos[0]}`);
-  await page.selectOption('[data-cmp-valor="esq"]', `ano:${anos[3]}`);
+  for (const [lado, a] of [['dir', anos[0]], ['esq', anos[3]]]) {
+    await page.selectOption(`[data-cmp-fonte="${lado}"]`, 'prodes');
+    await expect(page.locator(`[data-cmp-valor="${lado}"]`)).toHaveValue(`ate:${anos[0]}`);
+    await page.selectOption(`[data-cmp-valor="${lado}"]`, `ano:${a}`);
+  }
   await expect(page.locator('.cmp-avisos')).toContainText('Desmatado até');
+});
+
+test('sem Planet/Sentinel: abre no MapBiomas no MAIOR intervalo (1º ano × último), todos os anos e passo ‹ ›', async ({ page }) => {
+  const pedidos = [];
+  await abrir(page, { semPlanet: true, s2Motivo: 'token-http-401', pedidos });
+  await page.click('.cmp-abrir');
+  const leg = await page.evaluate(async () => (await fetch('/data/mapbiomas-col11-legenda.json')).json());
+  await expect(page.locator('[data-cmp-valor="esq"]')).toHaveValue(String(leg.ano_min));
+  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue(String(leg.ano_max));
+  expect(await page.locator('[data-cmp-valor="esq"] option').count()).toBe(leg.ano_max - leg.ano_min + 1);
+  await expect(page.locator('.cmp-tag-esq')).toHaveText(`MapBiomas · ${leg.ano_min}`);
+  await esperarTiles(page);
+  // cada lado pede o ANO dele ao servidor
+  expect(pedidos.some(p => p.includes('svc=tile') && p.includes(`ano=${leg.ano_min}`))).toBe(true);
+  expect(pedidos.some(p => p.includes('svc=tile') && p.includes(`ano=${leg.ano_max}`))).toBe(true);
+  // passo: › desabilitado no último ano; ‹ volta um ano; ‹ no 1º ano desabilitado
+  await expect(page.locator('[data-cmp-passo="dir"][data-dir="-1"]')).toBeDisabled();
+  await page.click('[data-cmp-passo="dir"][data-dir="1"]');
+  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue(String(leg.ano_max - 1));
+  await expect(page.locator('[data-cmp-passo="esq"][data-dir="1"]')).toBeDisabled();
+  // legenda com as classes oficiais, nas cores do arquivo único
+  await page.click('.cmp-legenda summary');
+  await expect(page.locator('.cmp-legenda')).toContainText('Formação Florestal');
+  await expect(page.locator('.cmp-legenda')).toContainText('Pastagem');
+  const cor = await page.locator('.cmp-leg-i', { hasText: 'Pastagem' }).locator('.cmp-leg-c').evaluate(e => getComputedStyle(e).backgroundColor);
+  expect(cor).toBe('rgb(237, 222, 142)');
+  await expect(page.locator('[data-cmp-status="esq"]')).toContainText('classificação, não foto');
+});
+
+test('Wayback: lista TODAS as versões, as fotos novas da área com data de captura; passo anda entre fotos novas', async ({ page }) => {
+  const pedidos = [];
+  await abrir(page, { semPlanet: true, s2Motivo: 'token-http-401', pedidos });
+  await page.click('.cmp-abrir');
+  await page.selectOption('[data-cmp-fonte="dir"]', 'wayback');
+  await expect(page.locator('[data-cmp-valor="dir"] optgroup[label="Foto nova nesta área (centro do mapa)"] option')).toHaveCount(3);
+  await expect(page.locator('[data-cmp-valor="dir"] optgroup[label="Todas as versões publicadas"] option')).toHaveCount(WB_VERSOES.length);
+  // mudanças pedidas para o CENTRO do mapa
+  const c = await page.evaluate(() => mapaL.getCenter());
+  const ped = pedidos.find(p => p.includes('op=mudancas'));
+  expect(ped).toContain(`lat=${c.lat.toFixed(5)}`);
+  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue('500');
+  await expect(page.locator('[data-cmp-status="dir"]')).toContainText('Foto capturada em 02/08/2024');
+  await expect(page.locator('.cmp-tag-dir')).toHaveText('Esri · foto 02/08/2024');
+  // ‹ pula direto para a próxima foto NOVA (300), não para a versão 400
+  await page.click('[data-cmp-passo="dir"][data-dir="1"]');
+  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue('300');
+  // tile direto da Esri, na versão escolhida
+  await page.waitForFunction(() => [...document.querySelectorAll('.leaflet-cmpDireita-pane img')].some(i => i.src.includes('/tile/300/')));
+  // duas versões com a MESMA foto nesta área → aviso
+  await page.selectOption('[data-cmp-fonte="esq"]', 'wayback');
+  await page.selectOption('[data-cmp-valor="esq"]', '400');   // versão 400 usa a foto publicada em 300
+  await expect(page.locator('.cmp-avisos')).toContainText('MESMA foto');
+});
+
+test('Google: só a foto atual, e a tela diz que não há data antiga', async ({ page }) => {
+  await abrir(page, { semPlanet: true, s2Motivo: 'token-http-401' });
+  await page.route('**/mt*.google.com/**', r => r.fulfill({ body: PNG_S2, contentType: 'image/png' }));
+  await page.click('.cmp-abrir');
+  await page.selectOption('[data-cmp-fonte="dir"]', 'google');
+  await expect(page.locator('[data-cmp-valor="dir"] option')).toHaveCount(1);
+  await expect(page.locator('[data-cmp-status="dir"]')).toContainText('Esri Wayback');
+  await expect(page.locator('[data-cmp-passo="dir"][data-dir="1"]')).toBeDisabled();
+  await page.waitForFunction(() => _cmp.lados.dir.layer && _cmp.lados.dir.layer._url.includes('lyrs=s'));
 });

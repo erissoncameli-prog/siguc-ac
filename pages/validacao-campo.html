@@ -1963,18 +1963,20 @@ async function _aieBuscarHidrografia(lat, lng, raioM) {
 
 // ── Combustível (MapBiomas) ─────────────────────────────────────────
 // Lê os tiles de uso do solo do MapBiomas via proxy da mesma origem
-// (/api/mapbiomas-tile → Google Cloud Storage), classifica cada célula
-// pela paleta oficial e devolve as áreas NÃO-flamáveis (água, urbano,
-// mineração, solo exposto, praia, rochoso) para subtrair da cápsula.
-// Tiles em Web Mercator (XYZ), zoom nativo 12 (~38 m/px).
-const MAPBIOMAS_TILE = (z, x, y) => `/api/geo?svc=tile&z=${z}&x=${x}&y=${y}&c=8`
+// (/api/geo?svc=tile, desenhado do COG oficial da Coleção 11 — ano mais
+// recente), classifica cada célula pela paleta oficial e devolve as áreas
+// NÃO-flamáveis (água, urbano, mineração, solo exposto, praia, rochoso) para
+// subtrair da cápsula. Tiles em Web Mercator (XYZ), zoom 12 (~38 m/px).
+// ⚠️ Até 10/2026 o servidor pedia tiles da Coleção 8 que não existem no
+// bucket: vinha sempre tile vazio e nada era subtraído, em silêncio.
+const MAPBIOMAS_TILE = (z, x, y) => `/api/geo?svc=tile&z=${z}&x=${x}&y=${y}`
 const MAPBIOMAS_Z = 12
 // Paleta [r,g,b,flamável?] — classes não-flamáveis marcadas false.
 const MAPBIOMAS_PALETA = [
   [31,141,73,  true],  // 3  formação florestal
   [125,201,117,true],  // 4  formação savânica
   [4,56,29,    true],  // 5  mangue
-  [2,105,117,  true],  // 6  floresta alagável
+  [0,119,133,  true],  // 6  floresta alagável
   [122,89,0,   true],  // 9  silvicultura
   [81,151,153, true],  // 11 campo alagado/área úmida
   [214,188,116,true],  // 12 formação campestre
@@ -1990,7 +1992,8 @@ const MAPBIOMAS_PALETA = [
   [156,0,39,   false], // 30 mineração
   [219,77,79,  false], // 25 outra área não vegetada
   [255,160,122,false], // 23 praia/duna/areal
-  [255,170,95, false], // 29 afloramento rochoso
+  [173,81,0,   false], // 29 afloramento rochoso
+  [255,170,95, true],  // 50 restinga herbácea (cores da Coleção 11)
 ]
 function _mbFlamavel(r, g, b) {
   let melhor = 0, dmin = Infinity

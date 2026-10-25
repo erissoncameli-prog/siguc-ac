@@ -1,36 +1,48 @@
-// SIGUC-AC · Proxy geoespacial consolidado — /api/geo?svc=tile|meteo|overpass
-// Um único Serverless Function roteia os três proxies (MapBiomas, Open-Meteo,
-// Overpass) para caber no limite de funções do plano da Vercel. Tudo same-origin,
+// SIGUC-AC · Proxy geoespacial consolidado — /api/geo?svc=tile|meteo|overpass|wayback
+// Um único Serverless Function roteia os proxies (MapBiomas, Open-Meteo,
+// Overpass, Esri Wayback) para caber no limite de funções do plano da Vercel. Tudo same-origin,
 // resolvendo CORS/CSP/service-worker no aparelho.
 
-// ── MapBiomas: tiles de uso do solo (GCS), para classificar combustível ──
-const MB_BASE = 'https://storage.googleapis.com/mapbiomas-public/brasil';
+// ── MapBiomas: uso e cobertura do solo POR ANO (Coleção 11, 1985–2025) ──
+// GET /api/geo?svc=tile&ano=AAAA&z&x&y → PNG 256×256 de paleta, cores oficiais.
+// Antes buscava `collection-8/lclu/coverage/{z}/{x}/{y}.png`, caminho que NÃO
+// existe no bucket da MapBiomas (404 em todo pedido → tile vazio em silêncio).
+// O desenho a partir do COG oficial vive em api/_mapbiomas-cog.js.
+// `c` (coleção) dos chamadores antigos é ignorado; sem `ano` = o mais recente.
+const MB = require('./_mapbiomas-cog.js');
 const TILE_VAZIO = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64'
 );
 
+function tileVazio(res, motivo) {
+  res.status(200).setHeader('Content-Type', 'image/png').setHeader('Cache-Control', 'public, max-age=300')
+     .setHeader('X-Mapbiomas-Status', motivo).send(TILE_VAZIO);
+}
+
 async function handleTile(req, res) {
-  const { z, x, y, c } = req.query;
+  const { z, x, y } = req.query;
   const zi = parseInt(z, 10), xi = parseInt(x, 10), yi = parseInt(y, 10);
   if (!Number.isInteger(zi) || !Number.isInteger(xi) || !Number.isInteger(yi) ||
-      zi < 0 || zi > 22 || xi < 0 || yi < 0) {
+      zi < 0 || zi > 22 || xi < 0 || yi < 0 || xi >= 2 ** zi || yi >= 2 ** zi) {
     res.status(400).json({ error: 'z/x/y inválidos' }); return;
   }
-  const col = (typeof c === 'string' && /^\d{1,2}$/.test(c)) ? c : '8';
-  const url = `${MB_BASE}/collection-${col}/lclu/coverage/${zi}/${xi}/${yi}.png`;
+  const ano = req.query.ano === undefined ? MB.LEGENDA.ano_max : parseInt(req.query.ano, 10);
+  if (!MB.anoValido(ano)) { res.status(400).json({ error: `ano fora da série (${MB.LEGENDA.ano_min}–${MB.LEGENDA.ano_max})` }); return; }
+  // acima do zoom 13 o pixel de 30 m já é maior que o do tile: o Leaflet amplia
+  // o tile do 13 (maxNativeZoom) e nunca pede este — recusa, por garantia.
+  if (zi > 14) { tileVazio(res, 'zoom-acima-do-nativo'); return; }
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'SIGUC-AC/1.0 (SEMA-AC)' } });
-    if (!r.ok) {
-      res.status(200).setHeader('Content-Type', 'image/png').setHeader('Cache-Control', 'public, max-age=300').send(TILE_VAZIO); return;
-    }
-    const buf = Buffer.from(await r.arrayBuffer());
+    const png = await MB.mbTilePng(ano, zi, xi, yi);
     res.status(200)
-       .setHeader('Content-Type', r.headers.get('content-type') || 'image/png')
+       .setHeader('Content-Type', 'image/png')
+       // ano publicado não muda dentro da coleção → cache longo na borda
        .setHeader('Cache-Control', 'public, max-age=86400, s-maxage=2592000, immutable')
-       .send(buf);
-  } catch (_) {
-    res.status(200).setHeader('Content-Type', 'image/png').setHeader('Cache-Control', 'public, max-age=300').send(TILE_VAZIO);
+       .send(png);
+  } catch (err) {
+    const motivo = String((err && err.message) || 'erro').replace(/[^\w.-]/g, '-').slice(0, 60);
+    console.error('[geo] mapbiomas', ano, zi, xi, yi, motivo);
+    tileVazio(res, motivo);
   }
 }
 
@@ -103,6 +115,102 @@ async function handleOverpass(req, res) {
   res.status(504).json({ error: 'todos os espelhos Overpass falharam' });
 }
 
+// ── Esri World Imagery Wayback: versões publicadas da foto de satélite ──
+// GET /api/geo?svc=wayback&op=lista → [{num, data}] (mais recente primeiro)
+// GET /api/geo?svc=wayback&op=mudancas&lat&lng&z → só as versões em que a foto
+//   DAQUELE ponto mudou, com a data de captura quando a Esri informa.
+// Passa pelo servidor porque o CSP do site não libera esses domínios em
+// connect-src (e não deve — são de terceiro); os tiles em si vão direto
+// pelo <img> (img-src https:). Gratuito, sem chave.
+const WB_CONFIG = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
+const WB_TILEMAP = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tilemap';
+let _wbCache = null;
+
+async function wbVersoes() {
+  if (_wbCache && Date.now() - _wbCache.em < 6 * 3600e3) return _wbCache.lista;
+  const r = await fetch(WB_CONFIG, { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`wb-config-${r.status}`);
+  const cfg = await r.json();
+  const lista = Object.entries(cfg).map(([num, v]) => {
+    const m = /(\d{4}-\d{2}-\d{2})/.exec(v.itemTitle || '');
+    return { num: Number(num), data: m ? m[1] : null, meta: v.metadataLayerUrl || null };
+  }).filter(v => v.data).sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : b.num - a.num));
+  _wbCache = { em: Date.now(), lista };
+  return lista;
+}
+
+function wbTileXY(lat, lng, z) {
+  const n = 2 ** z, r = lat * Math.PI / 180;
+  return { x: Math.floor((lng + 180) / 360 * n), y: Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n) };
+}
+
+// Data de captura no ponto (camada de metadados da própria versão). Melhor
+// esforço: o serviço tem uma subcamada por faixa de escala; usa a de maior
+// detalhe que responder com feição.
+async function wbCaptura(metaUrl, lat, lng) {
+  if (!metaUrl) return null;
+  const q = 'query?f=json&returnGeometry=false&spatialRel=esriSpatialRelIntersects&geometryType=esriGeometryPoint'
+    + `&inSR=4326&geometry=${lng},${lat}&outFields=SRC_DATE2,SRC_DATE,NICE_DESC,SRC_RES,SRC_DESC`;
+  for (const camada of [0, 1, 2, 3, 4, 5]) {
+    try {
+      const r = await fetch(`${metaUrl}/${camada}/${q}`, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const a = j && j.features && j.features[0] && j.features[0].attributes;
+      if (!a) continue;
+      const bruto = a.SRC_DATE2 ?? a.SRC_DATE;
+      let data = null;
+      if (typeof bruto === 'number') data = new Date(bruto).toISOString().slice(0, 10);
+      else if (typeof bruto === 'string' && /^\d{8}$/.test(bruto)) data = `${bruto.slice(0, 4)}-${bruto.slice(4, 6)}-${bruto.slice(6, 8)}`;
+      return { data, fonte: a.NICE_DESC || a.SRC_DESC || null, resolucao_m: typeof a.SRC_RES === 'number' ? a.SRC_RES : null };
+    } catch (_) { /* tenta a próxima subcamada */ }
+  }
+  return null;
+}
+
+async function handleWayback(req, res) {
+  try {
+    const lista = await wbVersoes();
+    if (req.query.op !== 'mudancas') {
+      res.status(200).setHeader('Cache-Control', 'public, max-age=3600, s-maxage=21600')
+         .json({ disponivel: true, versoes: lista.map(({ num, data }) => ({ num, data })) });
+      return;
+    }
+    const lat = Number(req.query.lat), lng = Number(req.query.lng);
+    const z = Math.min(17, Math.max(10, parseInt(req.query.z, 10) || 14));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 85 || Math.abs(lng) > 180) {
+      res.status(400).json({ error: 'lat/lng inválidos' }); return;
+    }
+    const { x, y } = wbTileXY(lat, lng, z);
+    // Mesmo método do app Wayback da Esri: a tilemap de uma versão diz em QUAL
+    // versão aquele tile foi publicado pela última vez (select). Pula direto
+    // para a versão anterior a essa — poucas chamadas, uma por troca de foto.
+    const mudancas = [];
+    let i = 0, guarda = 0;
+    while (i < lista.length && guarda++ < 60) {
+      const v = lista[i];
+      const r = await fetch(`${WB_TILEMAP}/${v.num}/${z}/${y}/${x}`, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error(`wb-tilemap-${r.status}`);
+      const j = await r.json();
+      if (!j || !Array.isArray(j.data) || j.data[0] !== 1) break;          // sem foto aqui daqui para trás
+      const num = Array.isArray(j.select) && j.select[0] ? Number(j.select[0]) : v.num;
+      const k = lista.findIndex(w => w.num === num);
+      const dono = k >= 0 ? lista[k] : v;
+      if (!mudancas.some(m => m.num === dono.num)) mudancas.push(dono);
+      i = (k >= 0 ? k : i) + 1;
+    }
+    const comCaptura = await Promise.all(mudancas.map(async m => ({
+      num: m.num, data: m.data, captura: await wbCaptura(m.meta, lat, lng),
+    })));
+    res.status(200).setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400')
+       .json({ disponivel: true, z, mudancas: comCaptura });
+  } catch (err) {
+    const motivo = String((err && err.message) || 'erro').slice(0, 80);
+    console.error('[geo] wayback', motivo);
+    res.status(200).setHeader('Cache-Control', 'public, max-age=120').json({ disponivel: false, motivo });
+  }
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -111,5 +219,6 @@ module.exports = async (req, res) => {
   if (svc === 'tile')     return handleTile(req, res);
   if (svc === 'meteo')    return handleMeteo(req, res);
   if (svc === 'overpass') return handleOverpass(req, res);
-  res.status(400).json({ error: 'svc inválido (use tile|meteo|overpass)' });
+  if (svc === 'wayback')  return handleWayback(req, res);
+  res.status(400).json({ error: 'svc inválido (use tile|meteo|overpass|wayback)' });
 };
