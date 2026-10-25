@@ -1260,7 +1260,10 @@ jurema-webgis, sem código dele.
   consulta diz em que versão o tile foi publicado e pula para a anterior) e a
   data de CAPTURA vem da camada de metadados da versão. Versão ≠ foto: duas
   versões podem mostrar a mesma imagem — a tela agrupa as fotos novas, o passo
-  anda só entre elas e avisa "MESMA foto". Pedido só ao escolher a fonte e no
+  anda só entre elas e avisa "MESMA foto". ⚠️ A tilemap marca troca de tile
+  mesmo com a MESMA foto no ponto (medido em Rio Branco: 14 "mudanças", 9
+  fotos distintas de 2011 a 2025): `_cmpWbFotos` agrupa pela data de captura.
+  Metadados: subcamada `23 − zoom` (vizinhas se vier vazia). Pedido só ao escolher a fonte e no
   botão "Datas desta área", nunca a cada movimento.
 - **Google** (fonte `google`): só a foto atual — o Google não publica datas
   antigas por endereço de tile, e a tela diz isso.

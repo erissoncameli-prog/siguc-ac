@@ -46,6 +46,8 @@ const WB_VERSOES = [
 ]
 const WB_MUDANCAS = [
   { num: 500, data: '2025-06-10', captura: { data: '2024-08-02', fonte: 'Maxar' } },
+  // a Esri republica a MESMA foto (mesma captura) — medido em Rio Branco
+  { num: 400, data: '2024-03-01', captura: { data: '2020-07-11', fonte: 'Maxar' } },
   { num: 300, data: '2021-01-15', captura: { data: '2020-07-11', fonte: 'Maxar' } },
   { num: 100, data: '2014-02-20', captura: null },
 ]
@@ -304,14 +306,18 @@ test('Wayback: lista TODAS as versões, as fotos novas da área com data de capt
   await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue('500');
   await expect(page.locator('[data-cmp-status="dir"]')).toContainText('Foto capturada em 02/08/2024');
   await expect(page.locator('.cmp-tag-dir')).toHaveText('Esri · foto 02/08/2024');
-  // ‹ pula direto para a próxima foto NOVA (300), não para a versão 400
+  // ‹ pula para a próxima foto DIFERENTE (400 — a 300 republica a mesma foto e não aparece de novo)
   await page.click('[data-cmp-passo="dir"][data-dir="1"]');
-  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue('300');
+  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue('400');
+  await expect(page.locator('[data-cmp-status="dir"]')).toContainText('Foto capturada em 11/07/2020');
+  await page.click('[data-cmp-passo="dir"][data-dir="1"]');
+  await expect(page.locator('[data-cmp-valor="dir"]')).toHaveValue('100');
+  await page.click('[data-cmp-passo="dir"][data-dir="-1"]');
   // tile direto da Esri, na versão escolhida
-  await page.waitForFunction(() => [...document.querySelectorAll('.leaflet-cmpDireita-pane img')].some(i => i.src.includes('/tile/300/')));
+  await page.waitForFunction(() => [...document.querySelectorAll('.leaflet-cmpDireita-pane img')].some(i => i.src.includes('/tile/400/')));
   // duas versões com a MESMA foto nesta área → aviso
   await page.selectOption('[data-cmp-fonte="esq"]', 'wayback');
-  await page.selectOption('[data-cmp-valor="esq"]', '400');   // versão 400 usa a foto publicada em 300
+  await page.selectOption('[data-cmp-valor="esq"]', '300');   // a 300 tem a mesma captura da 400
   await expect(page.locator('.cmp-avisos')).toContainText('MESMA foto');
 });
 

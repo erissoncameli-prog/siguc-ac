@@ -143,8 +143,25 @@ async function _cmpWbBuscarMudancas() {
   _cmpAvisos()
 }
 
-// Versão do Wayback cuja FOTO aparece de fato numa versão escolhida: a última
-// mudança local publicada até ela. Duas versões com o mesmo "dono" = mesma foto.
+// Fotos DIFERENTES no centro do mapa. A tilemap da Esri marca troca de tile
+// mesmo quando a foto no ponto é a mesma (medido em Rio Branco: 3 versões com
+// a foto de 19/06/2023) — agrupa pela data de captura e fica com a versão mais
+// recente de cada foto.
+function _cmpWbFotos() {
+  const m = _cmp.wbMud && !_cmp.wbMud.carregando && _cmp.wbMud.mudancas
+  if (!m || !m.length) return []
+  const vistas = new Set(), fotos = []
+  for (const x of m) {
+    const chave = x.captura && x.captura.data ? `c:${x.captura.data}` : `n:${x.num}`
+    if (vistas.has(chave)) continue
+    vistas.add(chave); fotos.push(x)
+  }
+  return fotos
+}
+
+// Foto que aparece de fato numa versão escolhida: a última mudança local
+// publicada até ela, levada à versão que representa aquela foto. Duas versões
+// com o mesmo "dono" = mesma foto.
 function _cmpWbDonoDaFoto(num) {
   const m = _cmp.wbMud && !_cmp.wbMud.carregando && _cmp.wbMud.mudancas
   if (!m || !m.length || !_cmpWbOk()) return null
@@ -152,7 +169,9 @@ function _cmpWbDonoDaFoto(num) {
   const iv = vs.findIndex(v => v.num === Number(num)); if (iv < 0) return null
   // mudancas vem do mais recente para o mais antigo; a 1ª com data ≤ a da versão
   const dv = vs[iv].data
-  return m.find(x => x.data <= dv) || null
+  const d = m.find(x => x.data <= dv); if (!d) return null
+  const c = d.captura && d.captura.data
+  return (c && _cmpWbFotos().find(f => f.captura && f.captura.data === c)) || d
 }
 
 function _cmpPlanetOk() { return !!(_cmp.planet && _cmp.planet.disponivel && _cmp.planet.mosaicos && _cmp.planet.mosaicos.length) }
@@ -191,8 +210,7 @@ function _cmpOpcoes(fonte) {
   if (fonte === 'wayback') {
     if (!_cmpWbOk()) return []
     const op = []
-    const mud = _cmp.wbMud && !_cmp.wbMud.carregando ? _cmp.wbMud.mudancas : []
-    mud.forEach(m => op.push({ valor: `${m.num}`, chave: `m:${m.num}`, grupo: 'Foto nova nesta área (centro do mapa)',
+    _cmpWbFotos().forEach(m => op.push({ valor: `${m.num}`, chave: `m:${m.num}`, grupo: 'Foto nova nesta área (centro do mapa)',
       rotulo: `${m.captura && m.captura.data ? `Foto de ${_cmpDataBR(m.captura.data)}` : `Versão de ${_cmpDataBR(m.data)}`}${m.captura && m.captura.fonte ? ` — ${m.captura.fonte}` : ''}` }))
     _cmp.wb.versoes.forEach(v => op.push({ valor: `${v.num}`, chave: `v:${v.num}`, grupo: 'Todas as versões publicadas',
       rotulo: `Versão de ${_cmpDataBR(v.data)}` }))
