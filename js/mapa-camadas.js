@@ -109,9 +109,11 @@ async function mapaSentinelCenas(bbox) {
 
 // ── PRODES (WMS TerraBrasilis) ───────────────────────────────────────
 // { ano } recorta o desmatamento anual por CQL (year=N); { acumulado:true }
-// = camada do acumulado até 2007. Mesma camada que prodes_resumo_ano lê.
+// = camada do acumulado até 2007; { ate:N } = TUDO o que foi desmatado até
+// o ano N (acumulado 2007 + anuais <= N, CQL por camada separado por ';').
+// Mesma camada que prodes_resumo_ano lê.
 const MAPA_PRODES_WMS = 'https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms';
-function mapaProdesLayer(L, { ano, acumulado, opacidade, ...extra } = {}) {
+function mapaProdesLayer(L, { ano, ate, acumulado, opacidade, ...extra } = {}) {
   const o = {
     layers: acumulado ? 'prodes-amazon-nb:accumulated_deforestation_2007_biome'
                       : 'prodes-amazon-nb:yearly_deforestation_biome',
@@ -121,7 +123,11 @@ function mapaProdesLayer(L, { ano, acumulado, opacidade, ...extra } = {}) {
     maxZoom: 22, maxNativeZoom: 15,
     ...extra,
   };
-  if (ano && !acumulado) o.CQL_FILTER = `year=${ano}`;
+  if (ate) {
+    o.layers = 'prodes-amazon-nb:accumulated_deforestation_2007_biome,prodes-amazon-nb:yearly_deforestation_biome';
+    o.CQL_FILTER = `INCLUDE;year<=${Number(ate)}`;
+    o.attribution = 'PRODES/INPE';
+  } else if (ano && !acumulado) o.CQL_FILTER = `year=${ano}`;
   return L.tileLayer.wms(MAPA_PRODES_WMS, o);
 }
 
@@ -138,4 +144,72 @@ function mapaGibsLayer(L, camadaId, data, opacidade) {
       errorTileUrl: MAPA_TILE_VAZIO,
     }
   );
+}
+
+// ── MapBiomas — uso e cobertura do solo POR ANO (Coleção 11) ────────
+// Tiles desenhados pelo nosso servidor a partir do COG oficial
+// (/api/geo?svc=tile, api/_mapbiomas-cog.js) — a MapBiomas não publica
+// tiles prontos. Legenda/cores/anos em data/mapbiomas-col11-legenda.json,
+// o MESMO arquivo que o servidor usa para pintar (nunca uma 2ª tabela).
+const MAPA_MB_LEGENDA_URL = '/data/mapbiomas-col11-legenda.json';
+let _mapaMbLegenda = null;
+async function mapaMapbiomasLegenda() {
+  if (_mapaMbLegenda) return _mapaMbLegenda;
+  try {
+    const r = await fetch(MAPA_MB_LEGENDA_URL, { signal: AbortSignal.timeout(15000) });
+    _mapaMbLegenda = await r.json();
+  } catch (_) {
+    _mapaMbLegenda = null;
+  }
+  return _mapaMbLegenda;
+}
+function mapaMapbiomasLayer(L, { ano, opacidade, ...extra } = {}) {
+  const q = ano ? `&ano=${encodeURIComponent(ano)}` : '';
+  return L.tileLayer(`/api/geo?svc=tile${q}&z={z}&x={x}&y={y}`, {
+    attribution: 'MapBiomas Coleção 11 (CC BY 4.0)',
+    opacity: (opacidade ?? 80) / 100,
+    maxZoom: 22, maxNativeZoom: 13,        // pixel de 30 m ≈ zoom 12–13
+    errorTileUrl: MAPA_TILE_VAZIO,
+    ...extra,
+  });
+}
+
+// ── Esri World Imagery Wayback (foto de satélite, versões desde 2014) ──
+// Tiles direto da Esri (img-src https:); a LISTA de versões e as mudanças
+// num ponto passam por /api/geo?svc=wayback (o CSP não libera o domínio em
+// connect-src). Gratuito, sem chave.
+let _mapaWbCache = null;
+async function mapaWaybackVersoes() {
+  if (_mapaWbCache) return _mapaWbCache;
+  try {
+    const r = await fetch('/api/geo?svc=wayback&op=lista', { signal: AbortSignal.timeout(15000) });
+    _mapaWbCache = await r.json();
+  } catch (_) {
+    _mapaWbCache = { disponivel: false, motivo: 'rede', versoes: [] };
+  }
+  return _mapaWbCache;
+}
+// Só as versões em que a foto DAQUELE ponto mudou (com data de captura).
+async function mapaWaybackMudancas(lat, lng, z) {
+  try {
+    const r = await fetch(`/api/geo?svc=wayback&op=mudancas&lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&z=${z}`,
+      { signal: AbortSignal.timeout(30000) });
+    return await r.json();
+  } catch (_) {
+    return { disponivel: false, motivo: 'rede', mudancas: [] };
+  }
+}
+function mapaWaybackLayer(L, num, { opacidade, ...extra } = {}) {
+  return L.tileLayer(
+    `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${encodeURIComponent(num)}/{z}/{y}/{x}`,
+    { attribution: 'Esri World Imagery Wayback', opacity: (opacidade ?? 100) / 100,
+      maxZoom: 22, maxNativeZoom: 19, errorTileUrl: MAPA_TILE_VAZIO, ...extra });
+}
+
+// Google Satélite como CAMADA (a base do mapa é outra coisa): só a foto atual
+// — o Google não publica datas antigas por endereço de tile.
+function mapaGoogleSateliteLayer(L, { opacidade, ...extra } = {}) {
+  return L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    { attribution: 'Google Satélite', subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      opacity: (opacidade ?? 100) / 100, maxZoom: 22, errorTileUrl: MAPA_TILE_VAZIO, ...extra });
 }

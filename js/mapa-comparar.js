@@ -1,6 +1,9 @@
 // ── SIGUC — Comparação de imagens (divisor arrastável) ─────────────
-// Duas imagens lado a lado no Mapa das UCs: Planet/NICFI mensal,
-// Sentinel-2 (época seca do ano ou cena do dia) e PRODES anual. Fonte
+// Duas imagens lado a lado no Mapa das UCs: MapBiomas (uso do solo, todo
+// ano desde 1985), Esri Wayback (foto, cada versão desde 2014), Google (foto
+// atual), Planet/NICFI mensal, Sentinel-2 (época seca do ano ou cena do dia)
+// e PRODES. Regra do usuário: o MAIOR detalhe de tempo que cada fonte tem —
+// toda data publicada na lista, passo ‹ › entre elas, nunca um intervalo fixo. Fonte
 // única (prefixo `cmp`); a página só chama cmpMontar(mapa, opts). Ideia
 // vista no jurema-webgis (Cardeal Map) — nenhum código dele.
 // Plano: docs/mapa-ucs/plano-medicao-comparacao.md (Fase 2).
@@ -23,10 +26,25 @@
 
 const CMP_PANE = { esq: 'cmpEsquerda', dir: 'cmpDireita' }
 const CMP_FONTES = {
-  planet:   'Planet / NICFI (mensal)',
-  sentinel: 'Sentinel-2',
-  prodes:   'PRODES — desmatamento anual',
+  mapbiomas: 'MapBiomas — uso do solo (anual, 1985→)',
+  wayback:   'Esri Wayback — foto (versões desde 2014)',
+  google:    'Google — foto atual',
+  planet:    'Planet / NICFI (mensal)',
+  sentinel:  'Sentinel-2',
+  prodes:    'PRODES — desmatamento',
 }
+
+// Motivo devolvido por /api/sentinel?bbox= → frase para quem usa o mapa.
+// Credencial recusada é problema do servidor, não da área nem do período:
+// sem isto a tela só mostrava o mapa base e parecia "imagem escura".
+function _cmpS2MotivoTexto(m) {
+  if (!m) return ''
+  if (m === 'sem-credenciais') return 'Sentinel-2 desligado: o servidor não tem as credenciais do Copernicus (CDSE_CLIENT_ID/CDSE_CLIENT_SECRET na Vercel).'
+  if (/^token-http-(400|401|403)$/.test(m)) return `Sentinel-2 fora do ar: o Copernicus recusou a credencial do servidor (${m}). É preciso gerar um novo cliente OAuth no Copernicus Data Space e atualizar CDSE_CLIENT_ID/CDSE_CLIENT_SECRET na Vercel.`
+  if (m === 'rede') return 'Sentinel-2 sem resposta agora (rede). Tente de novo em instantes.'
+  return `Sentinel-2 indisponível no momento (${m}).`
+}
+function _cmpS2Falha() { const c = _cmp.cenas; return c && !c.disponivel && c.motivo ? c.motivo : '' }
 const CMP_S2_ANO_MIN = 2017     // mesmo piso da linha do tempo (TL_S2_ANO_MIN)
 const CMP_PRODES_ANO_MIN = 2008
 
@@ -35,6 +53,9 @@ const _cmp = {
   lados: { esq: null, dir: null },   // { fonte, valor, layer, carregando, ok, erros }
   el: {},                             // divisor, painel, botão
   planet: null, prodesAnos: null, cenas: null,
+  mb: null,                           // legenda/anos do MapBiomas (data/mapbiomas-col11-legenda.json)
+  wb: null,                           // { versoes:[{num,data}] } do Wayback
+  wbMud: null,                        // { lat, lng, z, mudancas:[{num,data,captura}] } — pedido mais recente
   arrasto: null,
 }
 
@@ -81,6 +102,76 @@ async function _cmpCarregarListas() {
     }
     _cmp.prodesAnos = [...new Set(anos.map(Number))].sort((a, b) => b - a)
   }
+  // a mesma consulta lista as cenas recentes E diz se o Sentinel responde
+  const tarefas = []
+  if (!_cmp.cenas && typeof mapaSentinelCenas === 'function' && _cmp.mapa) {
+    const b = _cmp.mapa.getBounds()
+    tarefas.push(mapaSentinelCenas([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]).then(c => { _cmp.cenas = c }))
+  }
+  if (!_cmp.mb && typeof mapaMapbiomasLegenda === 'function') tarefas.push(mapaMapbiomasLegenda().then(m => { _cmp.mb = m }))
+  if (!_cmp.wb && typeof mapaWaybackVersoes === 'function') tarefas.push(mapaWaybackVersoes().then(w => { _cmp.wb = w }))
+  await Promise.all(tarefas)
+}
+
+function _cmpMbOk() { return !!(_cmp.mb && _cmp.mb.ano_min && _cmp.mb.ano_max) }
+function _cmpWbOk() { return !!(_cmp.wb && _cmp.wb.disponivel && _cmp.wb.versoes && _cmp.wb.versoes.length) }
+
+// Wayback: versões em que a foto DO CENTRO do mapa mudou. Pedido ao escolher
+// a fonte e no botão "Datas desta área" — nunca a cada movimento do mapa.
+async function _cmpWbBuscarMudancas() {
+  if (typeof mapaWaybackMudancas !== 'function' || !_cmp.mapa) return
+  const c = _cmp.mapa.getCenter()
+  const z = Math.max(12, Math.min(17, Math.round(_cmp.mapa.getZoom())))
+  const pedido = { lat: c.lat, lng: c.lng, z, carregando: true, mudancas: [] }
+  _cmp.wbMud = pedido
+  for (const k of ['esq', 'dir']) if (_cmp.lados[k] && _cmp.lados[k].fonte === 'wayback') _cmpStatus(k)
+  const r = await mapaWaybackMudancas(c.lat, c.lng, z)
+  if (_cmp.wbMud !== pedido) return                         // outro pedido mais novo
+  pedido.carregando = false
+  pedido.disponivel = !!(r && r.disponivel)
+  pedido.mudancas = (r && r.mudancas) || []
+  if (!_cmp.ativo) return
+  for (const k of ['esq', 'dir']) {
+    const l = _cmp.lados[k]; if (!l || l.fonte !== 'wayback') continue
+    // a versão escolhida antes da lista chegar passa para a que PUBLICOU a
+    // foto que ela mostra (mesma imagem) — assim o passo ‹ › anda entre fotos
+    const d = _cmpWbDonoDaFoto(l.valor)
+    if (d && String(d.num) !== l.valor) { l.valor = String(d.num); _cmpSincSeletores(k); _cmpAplicar(k) }
+    else { _cmpSincSeletores(k); _cmpStatus(k) }
+  }
+  _cmpRotulos()
+  _cmpAvisos()
+}
+
+// Fotos DIFERENTES no centro do mapa. A tilemap da Esri marca troca de tile
+// mesmo quando a foto no ponto é a mesma (medido em Rio Branco: 3 versões com
+// a foto de 19/06/2023) — agrupa pela data de captura e fica com a versão mais
+// recente de cada foto.
+function _cmpWbFotos() {
+  const m = _cmp.wbMud && !_cmp.wbMud.carregando && _cmp.wbMud.mudancas
+  if (!m || !m.length) return []
+  const vistas = new Set(), fotos = []
+  for (const x of m) {
+    const chave = x.captura && x.captura.data ? `c:${x.captura.data}` : `n:${x.num}`
+    if (vistas.has(chave)) continue
+    vistas.add(chave); fotos.push(x)
+  }
+  return fotos
+}
+
+// Foto que aparece de fato numa versão escolhida: a última mudança local
+// publicada até ela, levada à versão que representa aquela foto. Duas versões
+// com o mesmo "dono" = mesma foto.
+function _cmpWbDonoDaFoto(num) {
+  const m = _cmp.wbMud && !_cmp.wbMud.carregando && _cmp.wbMud.mudancas
+  if (!m || !m.length || !_cmpWbOk()) return null
+  const vs = _cmp.wb.versoes
+  const iv = vs.findIndex(v => v.num === Number(num)); if (iv < 0) return null
+  // mudancas vem do mais recente para o mais antigo; a 1ª com data ≤ a da versão
+  const dv = vs[iv].data
+  const d = m.find(x => x.data <= dv); if (!d) return null
+  const c = d.captura && d.captura.data
+  return (c && _cmpWbFotos().find(f => f.captura && f.captura.data === c)) || d
 }
 
 function _cmpPlanetOk() { return !!(_cmp.planet && _cmp.planet.disponivel && _cmp.planet.mosaicos && _cmp.planet.mosaicos.length) }
@@ -101,8 +192,44 @@ function _cmpOpcoes(fonte) {
       rotulo: `${_cmpDataBR(d.data)} — nuvens ${Math.round(d.nuvem)}%`, grupo: 'Cenas recentes na área visível' }))
     return op
   }
-  if (fonte === 'prodes') return _cmp.prodesAnos.map(a => ({ valor: String(a), rotulo: `Desmatamento ${a}` }))
+  // "Acumulado até N" é o que mostra a MUDANÇA entre dois anos; o polígono
+  // de um ano só tem em média ~7 ha e some na escala do município.
+  if (fonte === 'prodes') return [
+    ..._cmp.prodesAnos.map(a => ({ valor: `ate:${a}`, rotulo: `Desmatado até ${a}`, grupo: 'Acumulado (tudo até o ano)' })),
+    ..._cmp.prodesAnos.map(a => ({ valor: `ano:${a}`, rotulo: `Só o ano ${a} (ago/${a - 1}–jul/${a})`, grupo: 'Só o desmatamento do ano' })),
+  ]
+  // Todos os anos publicados — a regra é o maior detalhe de tempo disponível.
+  if (fonte === 'mapbiomas') {
+    if (!_cmpMbOk()) return []
+    const op = []
+    for (let a = _cmp.mb.ano_max; a >= _cmp.mb.ano_min; a--) op.push({ valor: String(a), rotulo: String(a) })
+    return op
+  }
+  // Todas as versões; as que trocaram a foto do centro do mapa vêm num grupo
+  // próprio, em cima, com a data em que a imagem foi CAPTURADA (≠ publicada).
+  if (fonte === 'wayback') {
+    if (!_cmpWbOk()) return []
+    const op = []
+    _cmpWbFotos().forEach(m => op.push({ valor: `${m.num}`, chave: `m:${m.num}`, grupo: 'Foto nova nesta área (centro do mapa)',
+      rotulo: `${m.captura && m.captura.data ? `Foto de ${_cmpDataBR(m.captura.data)}` : `Versão de ${_cmpDataBR(m.data)}`}${m.captura && m.captura.fonte ? ` — ${m.captura.fonte}` : ''}` }))
+    _cmp.wb.versoes.forEach(v => op.push({ valor: `${v.num}`, chave: `v:${v.num}`, grupo: 'Todas as versões publicadas',
+      rotulo: `Versão de ${_cmpDataBR(v.data)}` }))
+    return op
+  }
+  if (fonte === 'google') return [{ valor: 'atual', rotulo: 'Foto atual (o Google não publica datas antigas)' }]
   return []
+}
+
+// Valores distintos, na ordem da lista, para os botões ‹ › (passo no tempo).
+// No Wayback o passo anda só entre as fotos novas da área, quando já se sabe
+// quais são — andar versão a versão repetiria a mesma foto.
+function _cmpSequencia(fonte) {
+  const op = _cmpOpcoes(fonte)
+  if (fonte === 'wayback') {
+    const mud = op.filter(o => o.chave && o.chave.startsWith('m:'))
+    if (mud.length > 1) return mud.map(o => o.valor)
+  }
+  return [...new Set(op.map(o => o.valor))]
 }
 
 function _cmpDataBR(iso) { const [y, m, d] = String(iso).split('-'); return `${d}/${m}/${y}` }
@@ -116,11 +243,29 @@ function _cmpRotuloCurto(lado) {
   if (l.fonte === 'sentinel') {
     return l.valor.startsWith('ano:') ? `Sentinel-2 · seca ${l.valor.slice(4)}` : `Sentinel-2 · ${_cmpDataBR(l.valor.slice(5))}`
   }
-  return `PRODES ${l.valor}`
+  if (l.fonte === 'mapbiomas') return `MapBiomas · ${l.valor}`
+  if (l.fonte === 'google') return 'Google · atual'
+  if (l.fonte === 'wayback') {
+    const d = _cmpWbDonoDaFoto(l.valor)
+    if (d && d.captura && d.captura.data) return `Esri · foto ${_cmpDataBR(d.captura.data)}`
+    const v = _cmpWbOk() && _cmp.wb.versoes.find(x => x.num === Number(l.valor))
+    return `Esri · versão ${v ? _cmpDataBR(v.data) : l.valor}`
+  }
+  const [modo, ano] = _cmpProdesValor(l.valor)
+  return modo === 'ate' ? `PRODES · até ${ano}` : `PRODES · só ${ano}`
+}
+
+// 'ate:2020' | 'ano:2020' | '2020' (formato antigo = só o ano)
+function _cmpProdesValor(v) {
+  const m = String(v).match(/^(ate|ano):(\d{4})$/)
+  return m ? [m[1], Number(m[2])] : ['ano', Number(v)]
 }
 
 // Padrão: Planet mais recente × o mesmo mês 2 anos antes; sem Planet,
-// Sentinel do ano passado × 4 anos antes.
+// Sentinel do ano passado × 4 anos antes; sem os dois (o caso de hoje), o
+// MapBiomas no MAIOR intervalo que existe (1º ano × último) — decisão do
+// usuário: a regra é o maior detalhe de tempo, nunca um intervalo fixo.
+// Sem MapBiomas, PRODES acumulado (o mais antigo × o mais recente).
 function _cmpPadrao() {
   if (_cmpPlanetOk()) {
     const ms = _cmp.planet.mosaicos   // mais recente primeiro
@@ -128,6 +273,13 @@ function _cmpPadrao() {
     const alvo = dir.data ? `${Number(dir.data.slice(0, 4)) - 2}${dir.data.slice(4, 7)}` : null
     const esq = (alvo && ms.find(m => (m.data || '').slice(0, 7) === alvo)) || ms[Math.min(ms.length - 1, 24)]
     return { esq: { fonte: 'planet', valor: esq.name }, dir: { fonte: 'planet', valor: dir.name } }
+  }
+  if (_cmpS2Falha() && _cmpMbOk()) {
+    return { esq: { fonte: 'mapbiomas', valor: String(_cmp.mb.ano_min) }, dir: { fonte: 'mapbiomas', valor: String(_cmp.mb.ano_max) } }
+  }
+  if (_cmpS2Falha() && _cmp.prodesAnos.length) {
+    const ps = _cmp.prodesAnos   // mais recente primeiro
+    return { esq: { fonte: 'prodes', valor: `ate:${ps[ps.length - 1]}` }, dir: { fonte: 'prodes', valor: `ate:${ps[0]}` } }
   }
   const a = new Date().getFullYear() - 1
   return { esq: { fonte: 'sentinel', valor: `ano:${a - 4}` }, dir: { fonte: 'sentinel', valor: `ano:${a}` } }
@@ -191,7 +343,13 @@ function _cmpCriarCamada(lado) {
       ? mapaSentinelLayer(L, { ano: Number(l.valor.slice(4)), opacidade: 100, pane })
       : mapaSentinelLayer(L, { data: l.valor.slice(5), nuvem: 100, opacidade: 100, pane })
   }
-  return mapaProdesLayer(L, { ano: Number(l.valor), opacidade: 85, pane })
+  if (l.fonte === 'mapbiomas') return mapaMapbiomasLayer(L, { ano: Number(l.valor), opacidade: 100, pane })
+  if (l.fonte === 'wayback') return mapaWaybackLayer(L, l.valor, { pane })
+  if (l.fonte === 'google') return mapaGoogleSateliteLayer(L, { pane })
+  const [modo, ano] = _cmpProdesValor(l.valor)
+  return modo === 'ate'
+    ? mapaProdesLayer(L, { ate: ano, opacidade: 85, pane })
+    : mapaProdesLayer(L, { ano, opacidade: 85, pane })
 }
 
 function _cmpAplicar(lado) {
@@ -207,6 +365,7 @@ function _cmpAplicar(lado) {
   l.layer = lay.addTo(_cmp.mapa)
   _cmpStatus(lado)
   _cmpRotulos()
+  _cmpLegenda()
   _cmpAvisos()
 }
 
@@ -252,19 +411,27 @@ function _cmpMontarDom() {
       <div class="cmp-lado" data-lado="${k}">
         <div class="cmp-lado-tit">${k === 'esq' ? 'Esquerda' : 'Direita'}</div>
         <select class="cmp-sel" data-cmp-fonte="${k}" aria-label="Fonte da imagem — ${k === 'esq' ? 'esquerda' : 'direita'}">
-          ${Object.entries(CMP_FONTES).map(([f, r]) => `<option value="${f}"${f === 'planet' && !_cmpPlanetOk() ? ' disabled' : ''}>${r}${f === 'planet' && !_cmpPlanetOk() ? ' (indisponível)' : ''}</option>`).join('')}
+          ${Object.entries(CMP_FONTES).map(([f, r]) => `<option value="${f}"${f === 'planet' && !_cmpPlanetOk() ? ' disabled' : ''}>${r}${f === 'planet' && !_cmpPlanetOk() ? ' (indisponível)' : f === 'sentinel' && _cmpS2Falha() ? ' (fora do ar)' : ''}</option>`).join('')}
         </select>
-        <select class="cmp-sel" data-cmp-valor="${k}" aria-label="Data da imagem — ${k === 'esq' ? 'esquerda' : 'direita'}"></select>
+        <div class="cmp-data">
+          <button type="button" class="cmp-passo" data-cmp-passo="${k}" data-dir="1" title="Data anterior" aria-label="Data anterior — ${k === 'esq' ? 'esquerda' : 'direita'}">‹</button>
+          <select class="cmp-sel" data-cmp-valor="${k}" aria-label="Data da imagem — ${k === 'esq' ? 'esquerda' : 'direita'}"></select>
+          <button type="button" class="cmp-passo" data-cmp-passo="${k}" data-dir="-1" title="Data seguinte" aria-label="Data seguinte — ${k === 'esq' ? 'esquerda' : 'direita'}">›</button>
+        </div>
         <div class="cmp-status" data-cmp-status="${k}" role="status" aria-live="polite"></div>
       </div>`).join('')}</div>
+    <div class="cmp-legenda" hidden></div>
     <div class="cmp-avisos" role="status" aria-live="polite"></div>`
   L.DomEvent.disableClickPropagation(p)
   L.DomEvent.disableScrollPropagation(p)
   p.addEventListener('click', ev => {
     ev.stopPropagation()
+    const ps = ev.target.closest('[data-cmp-passo]')
+    if (ps) { _cmpPasso(ps.dataset.cmpPasso, Number(ps.dataset.dir)); return }
     const b = ev.target.closest('[data-cmp-acao]'); if (!b) return
     if (b.dataset.cmpAcao === 'sair') cmpSair()
     else if (b.dataset.cmpAcao === 'inverter') _cmpInverter()
+    else if (b.dataset.cmpAcao === 'wb-area') _cmpWbBuscarMudancas()
   })
   p.addEventListener('change', ev => {
     const f = ev.target.dataset.cmpFonte, v = ev.target.dataset.cmpValor
@@ -291,6 +458,51 @@ function _cmpSincSeletores(lado) {
   if (l.fonte === 'sentinel' && !_cmp.cenas) h += '<option disabled>Buscando cenas recentes…</option>'
   sel.innerHTML = h || '<option value="">— sem imagem —</option>'
   if (l.valor && op.some(o => o.valor === l.valor)) sel.value = l.valor
+  _cmpSincPassos(lado)
+}
+
+// ‹ volta no tempo (data mais antiga), › avança. As listas vêm do mais
+// recente para o mais antigo, por isso ‹ = índice +1.
+function _cmpPasso(lado, dir) {
+  const l = _cmp.lados[lado]; if (!l) return
+  const seq = _cmpSequencia(l.fonte)
+  const i = seq.indexOf(l.valor)
+  const j = i < 0 ? 0 : i + dir
+  if (j < 0 || j >= seq.length) return
+  l.valor = seq[j]
+  _cmpSincSeletores(lado)
+  _cmpAplicar(lado)
+}
+
+function _cmpSincPassos(lado) {
+  const p = _cmp.el.painel; if (!p) return
+  const l = _cmp.lados[lado]
+  const seq = _cmpSequencia(l.fonte), i = seq.indexOf(l.valor)
+  for (const b of p.querySelectorAll(`[data-cmp-passo="${lado}"]`)) {
+    const j = i + Number(b.dataset.dir)
+    b.disabled = seq.length < 2 || i < 0 || j < 0 || j >= seq.length
+  }
+}
+
+// Legenda do MapBiomas: só aparece com a fonte num dos lados; agrupada pelo
+// 1º nível oficial (Floresta, Agropecuária…) para caber no painel; as cores
+// são as do arquivo que o servidor usa para pintar.
+function _cmpLegenda() {
+  const p = _cmp.el.painel; if (!p) return
+  const el = p.querySelector('.cmp-legenda')
+  const usa = ['esq', 'dir'].some(k => _cmp.lados[k] && _cmp.lados[k].fonte === 'mapbiomas')
+  if (!usa || !_cmpMbOk()) { el.hidden = true; el.innerHTML = ''; return }
+  const grupos = []
+  for (const c of _cmp.mb.classes) {
+    let g = grupos.find(x => x.nome === c.grupo)
+    if (!g) grupos.push(g = { nome: c.grupo || 'Outros', classes: [] })
+    g.classes.push(c)
+  }
+  el.hidden = false
+  el.innerHTML = `<details><summary>Legenda do MapBiomas (Coleção ${_cmpEsc(_cmp.mb.colecao)})</summary>
+    <div class="cmp-leg-grupos">${grupos.map(g => `<div class="cmp-leg-g"><div class="cmp-leg-gt">${_cmpEsc(g.nome)}</div>${g.classes.map(c =>
+      `<div class="cmp-leg-i"><span class="cmp-leg-c" style="background:${_cmpEsc(c.cor)}"></span>${_cmpEsc(c.nome)}</div>`).join('')}</div>`).join('')}</div>
+    <p class="cmp-leg-nota">Mapa de uso e cobertura do solo (classificação de imagens Landsat, 30 m), não fotografia. Fonte: MapBiomas, CC BY 4.0.</p></details>`
 }
 
 function _cmpEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') }
@@ -304,6 +516,7 @@ async function _cmpTrocarFonte(lado, fonte) {
   l.valor = fonte === 'sentinel' && op.some(o => o.valor === s2Padrao) ? s2Padrao : (op.length ? op[0].valor : '')
   _cmpSincSeletores(lado)
   _cmpAplicar(lado)
+  if (fonte === 'wayback' && !_cmp.wbMud) _cmpWbBuscarMudancas()
   if (fonte === 'sentinel' && !_cmp.cenas && typeof mapaSentinelCenas === 'function') {
     const b = _cmp.mapa.getBounds()
     _cmp.cenas = await mapaSentinelCenas([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()])
@@ -326,11 +539,30 @@ function _cmpStatus(lado) {
   const el = p.querySelector(`[data-cmp-status="${lado}"]`)
   let t = '', cls = ''
   if (!l.valor) { t = 'Sem imagem disponível para esta fonte.'; cls = 'erro' }
+  else if (l.fonte === 'sentinel' && _cmpS2Falha()) { t = 'Sem imagem: o servidor do Sentinel-2 está fora do ar (ver aviso abaixo).'; cls = 'erro' }
   else if (l.carregando) t = 'Carregando imagem…'
   else if (l.erros && !l.ok) { t = 'Imagem indisponível nesta área. Escolha outro período.'; cls = 'erro' }
   else if (l.erros) { t = 'Parte da área visível está sem imagem.'; cls = 'aviso' }
-  else if (l.fonte === 'prodes') t = 'Polígonos sobre o mapa base (transparente fora deles).'
-  el.textContent = t
+  else if (l.fonte === 'prodes') t = _cmpProdesValor(l.valor)[0] === 'ate'
+    ? 'Polígonos de tudo o que foi desmatado até o ano, sobre o mapa base.'
+    : 'Só o desmatamento detectado neste ano — polígonos pequenos: aproxime o zoom.'
+  else if (l.fonte === 'mapbiomas') t = `Uso do solo em ${l.valor} (MapBiomas, 30 m) — classificação, não foto.`
+  else if (l.fonte === 'google') t = 'Foto atual do Google, sem data publicada. Para datas antigas use o Esri Wayback.'
+  let html = ''
+  if (l.fonte === 'wayback' && l.valor) {
+    const d = _cmpWbDonoDaFoto(l.valor), m = _cmp.wbMud
+    const v = _cmpWbOk() && _cmp.wb.versoes.find(x => x.num === Number(l.valor))
+    if (!cls && !l.carregando) {
+      t = d && d.captura && d.captura.data
+        ? `Foto capturada em ${_cmpDataBR(d.captura.data)}${d.captura.fonte ? ` (${d.captura.fonte})` : ''}, no centro do mapa. Versão publicada em ${v ? _cmpDataBR(v.data) : '—'}.`
+        : `Versão publicada em ${v ? _cmpDataBR(v.data) : '—'} — a foto pode ser mais antiga que a versão.`
+    }
+    const estado = !m ? '' : m.carregando ? ' Buscando as datas de foto desta área…'
+      : m.disponivel === false ? ' Não foi possível listar as fotos desta área; a lista mostra todas as versões.' : ''
+    html = `${_cmpEsc(t)}${_cmpEsc(estado)} <button type="button" class="cmp-link" data-cmp-acao="wb-area">Datas desta área</button>`
+  }
+  if (html) el.innerHTML = html
+  else el.textContent = t
   el.className = 'cmp-status' + (cls ? ' ' + cls : '')
 }
 
@@ -339,6 +571,13 @@ function _cmpAvisos() {
   const av = []
   const a = _cmp.lados.esq, b = _cmp.lados.dir
   if (a && b && a.fonte === b.fonte && a.valor === b.valor) av.push('Mesma imagem nos dois lados.')
+  else if (a && b && a.fonte === 'wayback' && b.fonte === 'wayback') {
+    const da = _cmpWbDonoDaFoto(a.valor), db = _cmpWbDonoDaFoto(b.valor)
+    if (da && db && da.num === db.num) av.push('As duas versões do Wayback mostram a MESMA foto nesta área (a Esri não trocou a imagem entre elas). Use o grupo "Foto nova nesta área" para escolher datas diferentes de verdade.')
+  }
+  if (_cmpS2Falha() && ((a && a.fonte === 'sentinel') || (b && b.fonte === 'sentinel'))) av.push(_cmpS2MotivoTexto(_cmpS2Falha()))
+  if (a && b && a.fonte === 'prodes' && b.fonte === 'prodes' && _cmpProdesValor(a.valor)[0] === 'ano' && _cmpProdesValor(b.valor)[0] === 'ano')
+    av.push('Cada lado mostra só o desmatamento daquele ano, em lugares diferentes. Para ver o que mudou, use "Desmatado até" nos dois lados.')
   let baixo = []
   try { baixo = (_cmp.opts.camadasPorBaixo && _cmp.opts.camadasPorBaixo()) || [] } catch (_) {}
   if (baixo.length) av.push(`Ligadas no painel e por baixo da comparação (aparecem só onde a imagem não cobre): ${baixo.join(', ')}. Ajuste em Cobertura Vegetal, se quiser.`)
@@ -445,6 +684,19 @@ function _cmpEstilos() {
 .cmp-lado-tit{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#4b5563;}
 .cmp-sel{width:100%;min-height:28px;font:inherit;font-size:11.5px;padding:3px 6px;border:1px solid #cbd5d0;border-radius:6px;background:#fff;}
 .cmp-status{font-size:10.5px;color:#4b5563;min-height:14px;}
+.cmp-data{display:flex;gap:4px;align-items:center;margin-top:4px;}
+.cmp-data .cmp-sel{flex:1;min-width:0;}
+.cmp-passo{flex:0 0 auto;width:28px;height:28px;padding:0;border:1px solid #cbd5d0;border-radius:6px;background:#fff;color:#1F4E2C;font:700 15px/1 'DM Sans',sans-serif;cursor:pointer;}
+.cmp-passo:hover:not(:disabled){background:#f4f6f5;}
+.cmp-passo:disabled{opacity:.4;cursor:default;}
+.cmp-link{border:0;background:none;padding:0;color:#1F4E2C;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;}
+.cmp-legenda{margin-top:6px;font-size:11px;}
+.cmp-legenda summary{cursor:pointer;font-weight:600;color:#1F4E2C;}
+.cmp-leg-grupos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 10px;max-height:150px;overflow:auto;margin-top:6px;}
+.cmp-leg-gt{font-weight:700;font-size:10.5px;color:#374151;margin-bottom:2px;}
+.cmp-leg-i{display:flex;align-items:center;gap:5px;font-size:10.5px;line-height:1.35;}
+.cmp-leg-c{flex:0 0 12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.25);}
+.cmp-leg-nota{margin:6px 0 0;color:#6b7280;font-size:10px;}
 .cmp-status.erro{color:#B91C1C;}
 .cmp-status.aviso{color:#92400E;}
 .cmp-avisos p{margin:6px 0 0;padding:5px 8px;border-radius:6px;background:#FEF3C7;color:#78350F;font-size:11px;}

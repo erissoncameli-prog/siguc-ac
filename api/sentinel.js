@@ -75,10 +75,12 @@ function _tileParaBBox3857(z, x, y){
 
 const EVALSCRIPT_COR_REAL = `//VERSION=3
 function setup() {
-  return { input: ["B02","B03","B04"], output: { bands: 3 } };
+  return { input: ["B02","B03","B04","dataMask"], output: { bands: 4 } };
 }
 function evaluatePixel(s) {
-  return [s.B04 * 2.5, s.B03 * 2.5, s.B02 * 2.5];
+  // dataMask no alfa: fora da faixa do satélite (cena de UM dia cobre só
+  // parte do tile) o pixel sai transparente, não preto.
+  return [s.B04 * 2.5, s.B03 * 2.5, s.B02 * 2.5, s.dataMask];
 }`;
 
 async function _tiles(req, res){
@@ -158,8 +160,12 @@ async function _tiles(req, res){
          ? 'public, max-age=3600, s-maxage=86400'
          : 'public, max-age=86400, s-maxage=2592000, immutable')
        .send(buf);
-  } catch(_){
-    tileVazio(res, 'erro');
+  } catch(err){
+    // a causa vai no cabeçalho (ex.: token-http-401 = credencial do CDSE
+    // recusada) e no log da Vercel — "erro" sozinho não dizia nada.
+    const motivo = String((err && err.message) || 'erro').replace(/[^\w.-]/g, '-').slice(0, 60);
+    console.error('[sentinel] tile', motivo);
+    tileVazio(res, motivo);
   }
 }
 
