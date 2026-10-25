@@ -1353,6 +1353,30 @@ geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
 - Guarda: `tests/mapa-meio-fisico.test.js` (6, página real com o arquivo
   servido por stub). Sem mudança em `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — ZEE do Acre no Mapa das UCs (25/10/2026)
+Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
+`js/mapa-zee.js` (prefixo `zee`). Plano e fontes em `docs/mapa-ucs/plano-zee.md`.
+- **Ainda SEM o arquivo vetorial** (pedido à SEMA): sem `data/zee/manifesto.json`
+  a aba diz "ainda não foi recebido", desabilita as caixas e segue oferecendo os
+  documentos. Nunca mostrar camada vazia sem explicação.
+- Dados SÓ por `scripts/zee_acre.py` (workflow `.github/workflows/zee-acre.yml`,
+  modos descobrir/inspecionar/converter — `*.ac.gov.br` e o Drive dão 403 nas
+  sessões; o runner alcança). Travas: sem `.prj` para; feição sem zona para;
+  cobertura fora de 95–105% do Acre não grava. Nomes das zonas vivem SÓ no script
+  (`ZONAS`, Lei 1.904/2007); o mapa lê o que vem no arquivo.
+- **Fase II e Fase III nunca juntas** no mapa (mesmas cores, polígonos
+  sobrepostos). Situação legal sempre escrita: só a Fase II tem lei.
+- Cor por zona em Okabe-Ito (`ZEE_ZONA_COR`); subzona = tons da cor da zona.
+  Pane `zeePane` z 360 (Meio Físico 350 < ZEE < overlayPane 400) — a Zona 2
+  coincide com UCs/TIs, cujo contorno fica por cima.
+- Documentos: `data/zee/documentos.json` (links públicos, nova aba,
+  `noopener noreferrer`; o SIGUC não copia o PDF — o volume da Fase I tem 163 MB).
+  Documento novo = uma linha no JSON.
+- Guarda: `tests/mapa-zee.test.js` (6, página real; contrafactual conferido —
+  pane acima do overlay e link sem `noreferrer` reprovam).
+  `tests/mapa-barra-camadas.test.js` passou a contar 11 abas.
+- Sem mudança em `pwa/sw.js` (tela de mesa; ícone `map` já existia).
+
 ## Regra do sistema — Minha localização e legenda em degradê no Mapa das UCs (Fase 5, 24/10/2026)
 Fecha o plano em `docs/mapa-ucs/plano-medicao-comparacao.md`.
 - **Minha localização = `js/mapa-gps.js`** (prefixo `gps`), fonte única; a

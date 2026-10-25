@@ -1,0 +1,47 @@
+{
+  "_leia": "Documentos do ZEE do Acre exibidos na aba ZEE do Mapa das UCs (js/mapa-zee.js). Documento novo = uma linha aqui, sem código. Só link PÚBLICO: o usuário abre direto da origem (a SEMA continua dona do arquivo; nada é copiado para o SIGUC).",
+  "documentos": [
+    {
+      "titulo": "Acervo do ZEE do Acre (pasta da SEMA)",
+      "descricao": "Pasta pública da SEMA no Google Drive com os volumes e mapas do Zoneamento Ecológico-Econômico.",
+      "tipo": "pasta",
+      "origem": "SEMA-AC · Google Drive",
+      "url": "https://drive.google.com/drive/folders/1K3MH1K6fenD7_e33EH1biwRS_ykU2RWa"
+    },
+    {
+      "titulo": "ZEE Fase I — Aspectos Socioeconômicos e Ocupação Territorial (Volume 2)",
+      "descricao": "Documento técnico da Fase I (1999–2000), base cartográfica 1:1.000.000. Arquivo grande (163 MB).",
+      "tipo": "pdf",
+      "origem": "SEMA-AC · Google Drive",
+      "url": "https://drive.google.com/file/d/11RBrSnotFQKGEELlL2WVC_ThZib12AnG/view"
+    },
+    {
+      "titulo": "ZEE do Acre — página oficial",
+      "descricao": "Histórico das fases, Mapa de Gestão da Fase II (1:250.000) e consulta pública da Fase III.",
+      "tipo": "pagina",
+      "origem": "SEMA-AC",
+      "url": "https://sema.ac.gov.br/zee-acre/"
+    },
+    {
+      "titulo": "Repositório do ZEE/AC",
+      "descricao": "Documentos das três fases reunidos pela SEMA.",
+      "tipo": "pagina",
+      "origem": "SEMA-AC",
+      "url": "https://sema.ac.gov.br/zee-ac-repositorio/"
+    },
+    {
+      "titulo": "ZEE Fase III",
+      "descricao": "Resumo executivo do documento síntese e mapa de subsídio à gestão territorial e ambiental.",
+      "tipo": "pagina",
+      "origem": "SEMA-AC",
+      "url": "https://sema.ac.gov.br/zee-fase-iii/"
+    },
+    {
+      "titulo": "Lei Estadual nº 1.904, de 5 de junho de 2007",
+      "descricao": "Institui o ZEE do Acre (Fase II) como instrumento de gestão — zonas, subzonas e diretrizes.",
+      "tipo": "lei",
+      "origem": "Normas Brasil (texto da lei)",
+      "url": "https://www.normasbrasil.com.br/norma/lei-1904-2007-ac_115825.html"
+    }
+  ]
+}

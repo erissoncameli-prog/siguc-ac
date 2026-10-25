@@ -141,6 +141,6 @@ test('posição antiga salva (de quando flutuava) é ignorada e apagada; sem al�
 test('abas sem emoji: ícone SVG em todas', async ({ page }) => {
   await abrir(page, 1366, 768);
   const r = await page.evaluate(() => [...document.querySelectorAll('.mlb-tab')].map(t => ({ svg: !!t.querySelector('svg.bico'), emoji: /\p{Extended_Pictographic}/u.test(t.textContent) })));
-  expect(r.length).toBe(10);
+  expect(r.length).toBe(11);
   for (const t of r) { expect(t.svg).toBe(true); expect(t.emoji).toBe(false); }
 });

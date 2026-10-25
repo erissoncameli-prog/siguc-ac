@@ -585,6 +585,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/mapa-comparar.js"></script>
 <script src="../js/mapa-camadas-config.js"></script>
 <script src="../js/mapa-meio-fisico.js"></script>
+<script src="../js/mapa-zee.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
 </head>
@@ -1257,6 +1258,7 @@ function renderPagina(){
           <button type="button" class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">${bico('leaf')} Cobertura Vegetal</button>
           <button type="button" class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">${bico('home')} CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
           <button type="button" class="mlb-tab" id="mlb-btn-meio" onclick="toggleLayerBar('meio')">${bico('layers')} Meio Físico <span class="mlb-badge" id="meio-count-badge" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-zee" onclick="toggleLayerBar('zee')">${bico('map')} ZEE <span class="mlb-badge" id="zee-count-badge" style="display:none">0</span></button>
           <button type="button" class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">${bico('shield')} Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span> <span class="mlb-badge" id="pa-count-badge" title="Projetos de Assentamento" style="display:none">0</span></button>
           <button type="button" class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">${bico('flame')} Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
           <button type="button" class="mlb-tab" id="mlb-btn-hidro" onclick="toggleLayerBar('hidro')">${bico('droplet')} Rec. Hídricos <span class="mlb-badge" id="hidro-count-badge" style="display:none">0</span></button>
@@ -1729,6 +1731,11 @@ function iniciarMapa(){
     const b = document.getElementById('meio-count-badge'), n = mfAtivos().length;
     if(b){ b.textContent = n; b.style.display = n ? '' : 'none'; }
   } }); }
+  if(typeof zeeMontar === 'function'){ zeeEstilos(); zeeMontar(mapaL, { aoMudar: () => {
+    _atualizarLegendaMapa();
+    const b = document.getElementById('zee-count-badge'), n = zeeAtiva() ? 1 : 0;
+    if(b){ b.textContent = n; b.style.display = n ? '' : 'none'; }
+  } }); }
   if(typeof cmpMontar === 'function') cmpMontar(mapaL, {
     // Comparação nunca mexe no painel (decisão do usuário): só avisa o que ficou por baixo
     camadasPorBaixo: () => Object.entries(VEG_LAYERS).filter(([,c]) => c.layer && mapaL.hasLayer(c.layer)).map(([k]) => _CMP_ROTULO_VEG[k] || k),
@@ -1840,6 +1847,7 @@ function toggleLayerBar(id){
     areasAtualizarCabecalhos();
   }
   if(id === 'meio' && typeof mfLigarPainel === 'function') mfLigarPainel(document.getElementById('mf-painel'));
+  if(id === 'zee' && typeof zeeLigarPainel === 'function') zeeLigarPainel(document.getElementById('zee-painel'));
   // Cobertura Vegetal: carrega os mosaicos Planet/NICFI e as datas Sentinel-2.
   if(id === 'veg'){
     const chk = document.getElementById('veg-planet-chk');
@@ -2184,6 +2192,8 @@ function _renderDropdown(id){
     </div>
   ` + foot;
   // Meio físico (IBGE): conteúdo e delegação em js/mapa-meio-fisico.js
+  // ZEE do Acre: conteúdo, documentos e delegação em js/mapa-zee.js
+  if(id==='zee') return hdr('Zoneamento Ecológico-Econômico — ZEE') + `<div id="zee-painel" style="display:flex;flex-direction:column;gap:8px">${typeof zeePainelHTML==='function'?zeePainelHTML():''}</div>` + foot;
   if(id==='meio') return hdr('Meio Físico — IBGE') + `<div id="mf-painel" style="display:flex;flex-direction:column;gap:8px">${typeof mfPainelHTML==='function'?mfPainelHTML():''}</div>` + foot;
   if(id==='acre') return hdr('🗺 Delimitação do Estado do Acre') + `
     <div style="display:flex;align-items:flex-start;gap:10px;padding:4px 0 10px">
@@ -2948,6 +2958,7 @@ function _atualizarLegendaMapa(){
 
   // Camadas personalizadas
   if(typeof mfItensLegenda === 'function') itens.push(...mfItensLegenda());
+  if(typeof zeeItensLegenda === 'function') itens.push(...zeeItensLegenda());
   camadas.filter(c=>c.visivel).forEach(c => {
     const porClasse = typeof ccfItensLegenda === 'function' ? ccfItensLegenda(c, 0.5) : null;
     if(porClasse) itens.push(...porClasse);
