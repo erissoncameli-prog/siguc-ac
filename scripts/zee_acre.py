@@ -97,6 +97,7 @@ AGOL_BUSCAS = ['zoneamento ecológico econômico acre', 'ZEE Acre', 'ZEE AC gest
 # Wayback Machine: os shapefiles que o i3Geo do MMA e o antigo portal do ZEE
 # do Acre (seiam.ac.gov.br, citado no ZEE_AC.pdf) publicavam podem ter sido
 # arquivados — os servidores originais saíram do ar.
+UZEE_ACRE = ['geonode:acre_aptidao_agric']
 WAYBACK_DOMINIOS = ['mapas.mma.gov.br', 'seiam.ac.gov.br', 'www.seiam.ac.gov.br', 'semapi.acre.gov.br',
                     'sema.ac.gov.br', 'www.amazonia.cnptia.embrapa.br', 'zeeamazonia.mma.gov.br']
 ARQ_GEO = re.compile(r'\.(zip|rar|7z|shp|kmz|kml|gpkg|geojson|dbf)(\?|$)', re.I)
@@ -420,6 +421,10 @@ def descobrir():
                 if TEMA_ZEE.search(nome) or TEMA_ZEE.search(titulo):
                     print(f'   {nome} — {titulo}')
 
+    print('\n== GeoInfo/Embrapa — camadas temáticas do UZEE no Acre (atributos e amostra)')
+    for camada in UZEE_ACRE:
+        _amostra_wfs('https://geoinfo.dados.embrapa.br/geoserver/ows', camada)
+
     print('\n== Wayback Machine (arquivos geográficos arquivados)')
     for dom in WAYBACK_DOMINIOS:
         r = _get('http://web.archive.org/cdx/search/cdx', params={
@@ -449,6 +454,33 @@ def descobrir():
         for it in itens:
             if TEMA_ZEE.search(it.get('title', '') + ' ' + ' '.join(it.get('tags') or [])):
                 print(f"   [{it.get('type')}] {it.get('title')} — {it.get('owner')} — {it.get('url') or 'https://www.arcgis.com/home/item.html?id=' + it.get('id', '')}")
+
+
+def _amostra_wfs(url, camada):
+    """Atributos, contagem, CRS e valores distintos (texto) de uma camada WFS."""
+    r = _get(url, params={'service': 'WFS', 'version': '2.0.0', 'request': 'DescribeFeatureType', 'typeNames': camada})
+    if r is not None:
+        campos = re.findall(r'<(?:xsd:)?element[^>]*name="([^"]+)"[^>]*type="([^"]+)"', r.text)
+        print(f'{camada}: atributos {[(n, t) for n, t in campos]}')
+    r = _get(url, params={'service': 'WFS', 'version': '2.0.0', 'request': 'GetFeature', 'typeNames': camada,
+                          'outputFormat': 'application/json', 'srsName': 'EPSG:4326', 'count': 3000})
+    if r is None or r.status_code != 200:
+        print(f'   GetFeature: HTTP {getattr(r, "status_code", "-")}')
+        return
+    j = r.json()
+    feats = j.get('features') or []
+    print(f'   {len(feats)} feições (numberMatched={j.get("numberMatched")}, totalFeatures={j.get("totalFeatures")}), '
+          f'crs={j.get("crs")}, {len(r.content) // 1024} KB')
+    if feats:
+        g = shape(feats[0]['geometry'])
+        print(f'   geometria {g.geom_type}, bounds da 1ª: {[round(x, 3) for x in g.bounds]}')
+        for k in feats[0]['properties']:
+            vals = {}
+            for f in feats:
+                v = f['properties'].get(k)
+                vals[v] = vals.get(v, 0) + 1
+            top = sorted(vals.items(), key=lambda x: -x[1])[:15]
+            print(f'   {k}: {len(vals)} valores — {top}')
 
 
 def _camadas_cap(xml):
