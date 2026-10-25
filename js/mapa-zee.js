@@ -84,7 +84,8 @@ async function zeeDocumentos() {
   if (_zee.docs !== undefined) return _zee.docs
   try {
     const r = await fetch(ZEE_BASE + 'documentos.json')
-    _zee.docs = r.ok ? ((await r.json()).documentos || []) : null
+    const j = r.ok ? await r.json() : null
+    _zee.docs = j ? { acervo: j.acervo || null, grupos: (j.grupos || []).filter(g => (g.documentos || []).length) } : null
   } catch (_) { _zee.docs = null }
   return _zee.docs
 }
@@ -281,15 +282,23 @@ function _zeeCamadasHTML() {
 
 const _ZEE_DOC_ICONE = { pasta: 'paperclip', pdf: 'download', lei: 'file-text', pagina: 'file-text' }
 
+function _zeeDocHTML(d) {
+  return `<li><a href="${_zeeEsc(d.url)}" target="_blank" rel="noopener noreferrer" class="zee-doc">
+      <span class="zee-doc-ico">${_zeeIcone(_ZEE_DOC_ICONE[d.tipo] || 'file-text')}</span>
+      <span class="zee-doc-txt"><strong>${_zeeEsc(d.titulo)}</strong>
+        ${d.descricao ? `<span>${_zeeEsc(d.descricao)}</span>` : ''}</span></a></li>`
+}
+
+// Acervo (pasta inteira) no topo; grupos recolhidos, com contagem — são
+// ~70 documentos, e uma lista corrida empurraria as camadas para fora.
 function _zeeDocsHTML() {
   if (_zee.docs === undefined) return '<div class="zee-meta">Carregando documentos…</div>'
   if (!_zee.docs) return '<div class="zee-meta zee-erro">Não foi possível carregar a lista de documentos.</div>'
-  return `<ul class="zee-docs">${_zee.docs.map(d => `<li>
-    <a href="${_zeeEsc(d.url)}" target="_blank" rel="noopener noreferrer" class="zee-doc">
-      <span class="zee-doc-ico">${_zeeIcone(_ZEE_DOC_ICONE[d.tipo] || 'file-text')}</span>
-      <span class="zee-doc-txt"><strong>${_zeeEsc(d.titulo)}</strong>
-        ${d.descricao ? `<span>${_zeeEsc(d.descricao)}</span>` : ''}
-        <em>${_zeeEsc(d.origem || '')} · abre em nova aba</em></span></a></li>`).join('')}</ul>`
+  const { acervo, grupos } = _zee.docs
+  return (acervo ? `<ul class="zee-docs">${_zeeDocHTML(acervo)}</ul>` : '') +
+    grupos.map(g => `<details class="zee-grupo"><summary>${_zeeEsc(g.titulo)} <span class="zee-grupo-n">${g.documentos.length}</span></summary>
+      <ul class="zee-docs">${g.documentos.map(_zeeDocHTML).join('')}</ul></details>`).join('') +
+    '<div class="zee-meta">Os arquivos abrem no site oficial da SEMA (ou na pasta da SEMA no Drive), em nova aba.</div>'
 }
 
 // Corpo da aba "ZEE" da barra de camadas. Desenha o que já se sabe e
@@ -354,7 +363,12 @@ function zeeEstilos() {
 .zee-doc-txt{display:flex;flex-direction:column;gap:2px;font-size:11px;min-width:0;}
 .zee-doc-txt strong{font-size:11.5px;color:var(--cinza-800,#1f2937);}
 .zee-doc-txt span{color:var(--cinza-600,#4b5563);}
-.zee-doc-txt em{font-style:normal;font-size:10px;color:var(--cinza-500,#6b7280);}
+.zee-grupo{border:1px solid var(--borda,#e5e7eb);border-radius:8px;padding:0 9px;}
+.zee-grupo summary{cursor:pointer;font-size:11.5px;font-weight:600;color:var(--cinza-800,#1f2937);min-height:32px;display:flex;align-items:center;gap:6px;}
+.zee-grupo[open] summary{border-bottom:1px solid var(--borda,#e5e7eb);margin-bottom:6px;}
+.zee-grupo[open] .zee-docs{padding-bottom:8px;}
+.zee-grupo-n{font-size:10px;font-weight:600;background:#F1F5F9;color:var(--cinza-600,#4b5563);border-radius:999px;padding:1px 7px;}
+.zee-grupo summary:focus-visible{outline:2px solid #C9A84C;outline-offset:1px;border-radius:4px;}
 .zee-cab input:focus-visible,.zee-ctrl select:focus-visible,.zee-ctrl input:focus-visible,.zee-doc:focus-visible{outline:2px solid #C9A84C;outline-offset:1px;}
 .zee-fonte{font-size:10.5px;color:var(--cinza-500,#6b7280);margin:6px 12px 8px;display:flex;flex-direction:column;gap:4px;}
 `

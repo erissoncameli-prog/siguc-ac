@@ -21,7 +21,8 @@ if (fs.existsSync(CHROMIUM_PATH)) test.use({ launchOptions: { executablePath: CH
 test.use({ viewport: { width: 1366, height: 768 } });
 const BASE = process.env.BASE_URL || process.env.TEST_BASE_URL || 'http://localhost:5500';
 const VENDOR = path.join(__dirname, 'fixtures', 'vendor');
-const DOCS = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'zee', 'documentos.json'), 'utf8')).documentos;
+const DOCJ = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'zee', 'documentos.json'), 'utf8'));
+const DOCS = [DOCJ.acervo, ...DOCJ.grupos.flatMap(g => g.documentos)];
 
 const quad = (x, y, d) => ({ type: 'Polygon', coordinates: [[[x, y], [x + d, y], [x + d, y + d], [x, y + d], [x, y]]] });
 const Z1 = 'Zona 1 — Consolidação de sistemas de produção sustentáveis';
@@ -73,6 +74,7 @@ async function abrirAba(page) {
   await page.click('#mlb-btn-zee');
   await expect(page.locator('[data-zee-camada]')).toHaveCount(2);
   await expect(page.locator('#zee-docs .zee-doc')).toHaveCount(DOCS.length);
+  await expect(page.locator('#zee-docs details.zee-grupo')).toHaveCount(DOCJ.grupos.length);
 }
 
 async function ligar(page, id) {
@@ -94,7 +96,15 @@ test('sem o arquivo vetorial: aviso, nada para ligar, documentos para baixar', a
   const links = await page.locator('#zee-docs a').evaluateAll(as => as.map(a => ({ href: a.href, alvo: a.target, rel: a.rel })));
   expect(links.map(l => l.href)).toEqual(DOCS.map(d => d.url));
   expect(links.every(l => l.alvo === '_blank' && /noopener/.test(l.rel) && /noreferrer/.test(l.rel))).toBe(true);
-  expect(links.map(l => l.href)).toContain('https://drive.google.com/drive/folders/1K3MH1K6fenD7_e33EH1biwRS_ykU2RWa');
+  expect(links[0].href).toBe('https://drive.google.com/drive/folders/1K3MH1K6fenD7_e33EH1biwRS_ykU2RWa');
+  // a lei do ZEE está entre os documentos, no site oficial da SEMA
+  expect(links.map(l => l.href)).toContain('https://sema.ac.gov.br/wp-content/uploads/2025/05/Lei_n._1.904_de_5_de_junho_de_2007_Lei_do_ZEE.pdf');
+  // só endereço oficial: site da SEMA ou o Drive da SEMA
+  expect(links.every(l => /^https:\/\/(sema\.ac\.gov\.br|drive\.google\.com)\//.test(l.href))).toBe(true);
+  // grupos nascem recolhidos e abrem no clique
+  await expect(page.locator('#zee-docs details.zee-grupo[open]')).toHaveCount(0);
+  await page.locator('#zee-docs details.zee-grupo summary').first().click();
+  await expect(page.locator('#zee-docs details.zee-grupo').first().locator('a').first()).toBeVisible();
   // nenhum geojson baixado — e a barra/legenda não ganham nada
   expect(pedidos.filter(p => p !== 'manifesto')).toEqual([]);
   await expect(page.locator('#zee-count-badge')).toBeHidden();

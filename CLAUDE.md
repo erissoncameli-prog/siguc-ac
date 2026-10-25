@@ -1369,9 +1369,11 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
 - Cor por zona em Okabe-Ito (`ZEE_ZONA_COR`); subzona = tons da cor da zona.
   Pane `zeePane` z 360 (Meio Físico 350 < ZEE < overlayPane 400) — a Zona 2
   coincide com UCs/TIs, cujo contorno fica por cima.
-- Documentos: `data/zee/documentos.json` (links públicos, nova aba,
-  `noopener noreferrer`; o SIGUC não copia o PDF — o volume da Fase I tem 163 MB).
-  Documento novo = uma linha no JSON.
+- Documentos: `data/zee/documentos.json` — acervo (pasta da SEMA no Drive) + 69
+  PDFs em 8 grupos recolhíveis, com link do site OFICIAL da SEMA (Drive só para o
+  que não está lá). Nova aba, `noopener noreferrer`; o SIGUC não copia o PDF.
+  Documento novo = uma linha no JSON. A pasta e o site só têm PDF — nenhum
+  arquivo vetorial (conferido pelo `descobrir`, 25/10/2026).
 - Guarda: `tests/mapa-zee.test.js` (6, página real; contrafactual conferido —
   pane acima do overlay e link sem `noreferrer` reprovam).
   `tests/mapa-barra-camadas.test.js` passou a contar 11 abas.

@@ -1,47 +1,407 @@
 {
-  "_leia": "Documentos do ZEE do Acre exibidos na aba ZEE do Mapa das UCs (js/mapa-zee.js). Documento novo = uma linha aqui, sem código. Só link PÚBLICO: o usuário abre direto da origem (a SEMA continua dona do arquivo; nada é copiado para o SIGUC).",
-  "documentos": [
+ "_leia": "Documentos do ZEE do Acre exibidos na aba ZEE do Mapa das UCs (js/mapa-zee.js). Lista conferida pelo modo descobrir de scripts/zee_acre.py (25/10/2026) contra a pasta da SEMA no Drive e o repositório do ZEE no site da SEMA. Só link PÚBLICO e oficial (site da SEMA; Drive da SEMA quando o arquivo só existe lá): o SIGUC não copia o PDF. Documento novo = uma linha aqui, sem código.",
+ "acervo": {
+  "titulo": "Acervo completo do ZEE (pasta da SEMA)",
+  "descricao": "Pasta pública da SEMA no Google Drive, com as 10 seções do acervo.",
+  "url": "https://drive.google.com/drive/folders/1K3MH1K6fenD7_e33EH1biwRS_ykU2RWa",
+  "tipo": "pasta"
+ },
+ "grupos": [
+  {
+   "titulo": "Lei e aprovações",
+   "documentos": [
     {
-      "titulo": "Acervo do ZEE do Acre (pasta da SEMA)",
-      "descricao": "Pasta pública da SEMA no Google Drive com os volumes e mapas do Zoneamento Ecológico-Econômico.",
-      "tipo": "pasta",
-      "origem": "SEMA-AC · Google Drive",
-      "url": "https://drive.google.com/drive/folders/1K3MH1K6fenD7_e33EH1biwRS_ykU2RWa"
+     "titulo": "Lei Estadual nº 1.904, de 5 de junho de 2007 — Lei do ZEE",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Lei_n._1.904_de_5_de_junho_de_2007_Lei_do_ZEE.pdf",
+     "tipo": "lei",
+     "descricao": "Institui o ZEE do Acre (Fase II): zonas, subzonas e diretrizes."
     },
     {
-      "titulo": "ZEE Fase I — Aspectos Socioeconômicos e Ocupação Territorial (Volume 2)",
-      "descricao": "Documento técnico da Fase I (1999–2000), base cartográfica 1:1.000.000. Arquivo grande (163 MB).",
-      "tipo": "pdf",
-      "origem": "SEMA-AC · Google Drive",
-      "url": "https://drive.google.com/file/d/11RBrSnotFQKGEELlL2WVC_ThZib12AnG/view"
+     "titulo": "Lei Estadual nº 2.006, de 9 de junho de 2008",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Lei_n._2.006_de_9_de_junho_de_2008_Altera_art._32_da_Lei_do_ZEE.pdf",
+     "tipo": "lei",
+     "descricao": "Altera o art. 32 da Lei do ZEE."
     },
     {
-      "titulo": "ZEE do Acre — página oficial",
-      "descricao": "Histórico das fases, Mapa de Gestão da Fase II (1:250.000) e consulta pública da Fase III.",
-      "tipo": "pagina",
-      "origem": "SEMA-AC",
-      "url": "https://sema.ac.gov.br/zee-acre/"
+     "titulo": "Recomendação CONAMA nº 007, de 28/05/2008",
+     "url": "https://drive.google.com/file/d/1n4nPDIml0xRP1HMOcgnhLGvULUcP-TWX/view",
+     "tipo": "lei",
+     "descricao": "Aprova o ZEE do Acre."
     },
     {
-      "titulo": "Repositório do ZEE/AC",
-      "descricao": "Documentos das três fases reunidos pela SEMA.",
-      "tipo": "pagina",
-      "origem": "SEMA-AC",
-      "url": "https://sema.ac.gov.br/zee-ac-repositorio/"
+     "titulo": "Decreto Presidencial nº 6.469, de 30/05/2008",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Dec._Pres._N_6.469_de_30.05.2008_Adota_recomedacao_CONAMA_007_de_2008.pdf",
+     "tipo": "lei",
+     "descricao": "Adota a Recomendação CONAMA nº 007/2008."
     },
     {
-      "titulo": "ZEE Fase III",
-      "descricao": "Resumo executivo do documento síntese e mapa de subsídio à gestão territorial e ambiental.",
-      "tipo": "pagina",
-      "origem": "SEMA-AC",
-      "url": "https://sema.ac.gov.br/zee-fase-iii/"
+     "titulo": "Resolução CEMACT nº 003, de 29/11/2005",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Resolucao_CEMACT_N_003_de_29.11.2005_Aprovacao_de_documentos_do_ZEE_Fase_II.pdf",
+     "tipo": "lei",
+     "descricao": "Aprova os documentos da Fase II."
     },
     {
-      "titulo": "Lei Estadual nº 1.904, de 5 de junho de 2007",
-      "descricao": "Institui o ZEE do Acre (Fase II) como instrumento de gestão — zonas, subzonas e diretrizes.",
-      "tipo": "lei",
-      "origem": "Normas Brasil (texto da lei)",
-      "url": "https://www.normasbrasil.com.br/norma/lei-1904-2007-ac_115825.html"
+     "titulo": "Resolução CEMACT nº 003, de 29/11/2001",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Resolucao_CEMACT_N_003_de_29.11.2001_Aprovacao_de_documentos_do_ZEE_Fase_I.pdf",
+     "tipo": "lei",
+     "descricao": "Aprova os documentos da Fase I."
+    },
+    {
+     "titulo": "Ata do CEMACT — apresentação final dos produtos da Fase II",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/ATA_CEMACT_Apresentacao_Final_dos_produtos_do_ZEE_Fase_II.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Parecer nº 179/2007 — CONJUR/MMA",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Parecer_179_de_2007_ConjurMMA_Parecer_favoravel_a_Lei_do_ZEE_AC.pdf",
+     "tipo": "pdf",
+     "descricao": "Parecer favorável à Lei do ZEE."
+    },
+    {
+     "titulo": "Nota Técnica nº 127/2007 e Parecer nº 209/2007 — MAPA",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Nota_Tecnica_127_de_2007_Parecer_209_de_2007_MAPA_favoravel_ao_ZEE_AC.pdf",
+     "tipo": "pdf",
+     "descricao": "Manifestação favorável do Ministério da Agricultura."
+    },
+    {
+     "titulo": "Nota Técnica DZT/MMA sobre o ZEE do Acre",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/NOTA_TECNICA_DZT_ZEE_AC.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Ata da XIII reunião da CCZEE — apresentação do ZEE do Acre",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/ATA_XIII_CCZEE_Apresentacao_do_ZEE_AC.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Apresentação ao MMA",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Apresentacao_MMA.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "CONAMA, 88ª reunião — convocação",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/1.Convocacao_88_Reuniao_Ordinaria_do_CONAMA_recomendacao_do_ZEE.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "CONAMA, 88ª reunião — pauta",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/2.Pauta_88_Reuniao_Ordinaria_do_CONAMA_recomendacao_do_ZEE.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "CONAMA, 88ª reunião — transcrição das falas",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/3.Transcricao_das_falas_88_Reuniao_Ordinaria_do_CONAMA_recomendacao_do_ZEE.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "CONAMA, 88ª reunião — resultados",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/4.Resultados_88_Reuniao_Ordinaria_do_CONAMA_recomendacao_do_ZEE.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Proposta de recomendação do ZEE à Presidência da República",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/5.Proposta_de_Recomendacao_do_ZEE_a_Presidencia_da_Republica.pdf",
+     "tipo": "pdf"
     }
-  ]
+   ]
+  },
+  {
+   "titulo": "Fase II — Síntese e Mapa de Gestão (1:250.000)",
+   "documentos": [
+    {
+     "titulo": "Documento Síntese do ZEE Fase II",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Documento_Sintese.pdf",
+     "tipo": "pdf",
+     "descricao": "Eixos recursos naturais, socioeconomia e cultural-político; descrição das zonas, subzonas e diretrizes de uso."
+    },
+    {
+     "titulo": "Mapa de Subsídios à Gestão Territorial",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/SUBSIDIOS_A_GESTAO_TERRITORIAL.pdf",
+     "tipo": "pdf",
+     "descricao": "Mapa de gestão em PDF (imagem — não é o arquivo vetorial)."
+    },
+    {
+     "titulo": "Sinopse geral do ZEE",
+     "url": "https://drive.google.com/file/d/1lr24mQyh6Cc-NIq16SyoxzsNsgH79zDy/view",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "O ZEE do Acre — apresentação das fases e produtos",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/ZEE_AC.pdf",
+     "tipo": "pdf"
+    }
+   ]
+  },
+  {
+   "titulo": "Fase II — Mapas temáticos",
+   "documentos": [
+    {
+     "titulo": "Aptidão agroflorestal",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/APTIDAO.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cobertura vegetal e uso da terra",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/COBERTURA.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Estrutura fundiária",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/ESTRUTURA.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Geologia",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/GEOLOGIA.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Geomorfologia",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/GEOMORFOLOGIA.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Potencial madeireiro",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/MADEIREIRO.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Político-administrativo",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/POLITICO.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "SEANP — Sistema Estadual de Áreas Naturais Protegidas",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/SEANP.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Solos",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/SOLOS.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Vegetação",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/VEGETACAO.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Vulnerabilidade ambiental",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/VULNERABILIDADE.pdf",
+     "tipo": "pdf"
+    }
+   ]
+  },
+  {
+   "titulo": "Fase II — Livros temáticos",
+   "documentos": [
+    {
+     "titulo": "Volume 1 — Filosofia do ZEE",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Livro_Tematico_ZEE_Filosofia_do_ZEE_Volume_1.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Volume 2 — Recursos naturais",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Livro_Tematico_ZEE_Recursos_Naturais_Volume_2.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Volume 3 — Biodiversidade",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Livro_Tematico_ZEE_Biodiversidade_Volume_3.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Volume 4 — Cultural-político",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Livro_Tematico_ZEE_Cultural_Politico_Volume_4.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Volume 5 — Aspectos socioeconômicos",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Livro_Tematico_ZEE_Aspectos_socioeconomicos_Volume_5.pdf",
+     "tipo": "pdf"
+    }
+   ]
+  },
+  {
+   "titulo": "Fase III",
+   "documentos": [
+    {
+     "titulo": "Resumo executivo do ZEE Acre — Fase III",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2021/12/COMPLETO-Resumo-Executivo-do-ZEE-Acre-Fase-III_V16_WEB.pdf",
+     "tipo": "pdf",
+     "descricao": "Documento-síntese da Fase III (desenvolvimento de baixas emissões)."
+    },
+    {
+     "titulo": "ZEE-I (página da Fase III)",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2022/02/ZEE-I.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "ZEE-II (página da Fase III)",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2022/02/ZEE-II.pdf",
+     "tipo": "pdf"
+    }
+   ]
+  },
+  {
+   "titulo": "Fase I (1999–2000, 1:1.000.000)",
+   "documentos": [
+    {
+     "titulo": "Volume 1 — Recursos naturais e meio ambiente",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Vol.-1_Recursos_Naturais_e_Meio_Ambiente.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Volume 2 — Aspectos socioeconômicos e ocupação territorial",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Vol.-2_Aspectos_Socioeconomicos.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Volume 3 — Indicativos para a gestão territorial do Acre",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Vol.-3_Indicativos_para_gestao_territorial_do_Acre.pdf",
+     "tipo": "pdf"
+    }
+   ]
+  },
+  {
+   "titulo": "Guia para o uso da terra acreana com sabedoria",
+   "documentos": [
+    {
+     "titulo": "Guia — resumo educativo, Fase I",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Guia_para_Uso_da_Terra_Acreana_com_Sabedoria_Resumo_Educativo_Fase_I.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Guia — resumo educativo, Fase II",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Guia_para_Uso_da_Terra_Acreana_com_Sabedoria_Resumo_Educativo_Fase_II.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Mapa político-administrativo 2010",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Mapa_Politico_Administrativo_2010.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Áreas protegidas",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Areas_Protegidas.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Bacias hidrográficas",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Bcias_Hidrograficas.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Densidade populacional 2010",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Densidade_Pop._2010.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Estrutura fundiária",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Estrutura_Fundiaria.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Geologia",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Geologia.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Geomorfologia",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Geomorfologia.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Solos",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Solos.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Terras indígenas",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Terras_Indigenas.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Unidades de conservação",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Unidades_Conservacao.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Cartograma — Vegetação",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Vegetacao.pdf",
+     "tipo": "pdf"
+    }
+   ]
+  },
+  {
+   "titulo": "Outras publicações e ZEE nacional",
+   "documentos": [
+    {
+     "titulo": "Aspectos legais e institucionais do ZEE",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Aspectos_legais_e_institucionais_do_ZEE.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Zoneamento da produção",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Zoneamento_da_Producao.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "O ZEE e o Programa de Valorização do Ativo Ambiental",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/O_ZEE_-e_o_Programa_de_Valorizacao_do_Ativo.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Histórico do desmatamento no Acre",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Historico_Desmatamento_no_Acre.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Alternativas de utilização de áreas alteradas — caderno parte I",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Caderno_parte_I.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Alternativas de utilização de áreas alteradas — caderno parte II",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Caderno_parte_II.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Potencial de caça",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Potencial_de_caca.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Plantas daninhas em pastagens do Acre",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Plantas_Daninhas_em_pastagens_do_Acre.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Perfil dos participantes das oficinas do eixo cultural-político",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Perfil_Participantes_das_Oficinas_do_Eixo_Cultural_Politico.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Revista SPS",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Revista_SPS.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Diretrizes metodológicas do ZEE Brasil (MMA)",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Diretrizes_metodologicas_ZEE_Brasil.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Caderno de referência — subsídios ao debate (ZEE nacional)",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Caderno_de_Referencia_Subsidios_ao_Debate.pdf",
+     "tipo": "pdf"
+    },
+    {
+     "titulo": "Seminário de avaliação da metodologia do ZEE",
+     "url": "https://sema.ac.gov.br/wp-content/uploads/2025/05/Seminario_Avaliacao_da_Metodologia_do_ZEE.pdf",
+     "tipo": "pdf"
+    }
+   ]
+  }
+ ]
 }

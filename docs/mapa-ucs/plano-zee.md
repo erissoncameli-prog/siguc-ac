@@ -28,8 +28,15 @@ SEMA** — é ele que destrava a camada.
 
 - Pasta pública da SEMA no Drive (`O_ZONEAMENTO_ECOLOGICO_ECONOMICO_DO_ACRE_ZEE`,
   dona `sema.acre856@gmail.com`, id `1K3MH1K6fenD7_e33EH1biwRS_ykU2RWa`).
-  Visível nesta sessão: só o *Volume 2 — Aspectos Socioeconômicos* da Fase I
-  (PDF, 163 MB). O resto da pasta é listado pelo modo `descobrir` do workflow.
+  **Listada pelo modo `descobrir` do workflow em 25/10/2026**: 10 seções
+  (outras publicações, ZEE nacional, ZEE Acre, Fase I, Fase II, livros
+  temáticos, mapas temáticos, guia do uso da terra, arcabouço técnico-jurídico,
+  sinopse) e ~65 PDFs. **Nenhum arquivo vetorial** (.shp/.zip/.gpkg/.kmz).
+- O repositório do ZEE no site da SEMA (`/zee-ac-repositorio/`) publica os
+  MESMOS PDFs com link direto (`/wp-content/uploads/2025/05/…`); a página da
+  Fase III tem o resumo executivo. É para lá que os links apontam.
+- INDE: nenhuma camada de ZEE do Acre (só zoneamentos de UCs do RJ e afins);
+  o workspace MMA não tem ZEE.
 - sema.ac.gov.br/zee-acre, /zee-ac-repositorio, /zee-fase-iii.
 - GeoServer da INDE/MMA — a descoberta procura camadas com zee/zoneamento/acre.
 - ⚠️ `*.ac.gov.br`, `drive.google.com`, a INDE e o FAOLEX respondem 403/DNS
@@ -80,6 +87,8 @@ SEMA** — é ele que destrava a camada.
 ## Pendências
 
 - O arquivo vetorial (pedir ao Núcleo de ZEE da SEMA o conteúdo do "CD
-  Documento final" da Fase II, com `.prj`).
+  Documento final" da Fase II, com `.prj`). Não está na pasta pública nem no
+  site. O `SUBSIDIOS_A_GESTAO_TERRITORIAL.pdf` é imagem do mapa: vetorizar a
+  partir dele não serve (deformação e perda de precisão em 1:250 mil).
 - Nomes e diretrizes das subzonas (anexos da Lei 1.904/2007).
 - Depois: subzona do ZEE no relatório "CAR na UC" e no relatório do imóvel.
