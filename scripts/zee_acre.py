@@ -424,6 +424,7 @@ def descobrir():
     print('\n== GeoInfo/Embrapa — camadas temáticas do UZEE no Acre (atributos e amostra)')
     for camada in UZEE_ACRE:
         _amostra_wfs('https://geoinfo.dados.embrapa.br/geoserver/ows', camada)
+        _legenda_geonode('https://geoinfo.dados.embrapa.br', camada)
 
     print('\n== Wayback Machine (arquivos geográficos arquivados)')
     for dom in WAYBACK_DOMINIOS:
@@ -481,6 +482,41 @@ def _amostra_wfs(url, camada):
                 vals[v] = vals.get(v, 0) + 1
             top = sorted(vals.items(), key=lambda x: -x[1])[:15]
             print(f'   {k}: {len(vals)} valores — {top}')
+
+
+def _legenda_geonode(base, camada):
+    """Legenda por extenso: regras do estilo SLD (título de cada classe) e o
+    resumo/metadados do GeoNode — a sigla da classe nunca é adivinhada."""
+    r = _get(base + '/geoserver/ows', params={'service': 'WMS', 'version': '1.1.1', 'request': 'GetStyles', 'layers': camada})
+    if r is not None:
+        print(f'   GetStyles → HTTP {r.status_code}, {len(r.content)} bytes')
+        for nome, titulo in re.findall(r'<(?:\w+:)?Rule>\s*<(?:\w+:)?Name>([^<]*)</(?:\w+:)?Name>\s*(?:<(?:\w+:)?Title>([^<]*)</)?', r.text):
+            print(f'      regra: {nome!r} — {titulo!r}')
+        for lit in sorted(set(re.findall(r'<(?:\w+:)?Literal>([^<]*)</', r.text))):
+            print(f'      literal: {lit!r}')
+    r = _get(base + '/geoserver/ows', params={'service': 'WMS', 'version': '1.1.1', 'request': 'GetLegendGraphic',
+                                               'layer': camada, 'format': 'application/json'})
+    if r is not None and r.status_code == 200:
+        print(f'   GetLegendGraphic(json): {r.text[:3000]}')
+    nome = camada.split(':')[-1]
+    for url in (f'{base}/api/v2/datasets', f'{base}/api/v2/layers', f'{base}/api/layers/'):
+        r = _get(url, params={'filter{alternate}': camada} if 'v2' in url else {'alternate': camada})
+        if r is None or r.status_code != 200:
+            continue
+        try:
+            j = r.json()
+        except ValueError:
+            continue
+        itens = j.get('datasets') or j.get('layers') or j.get('objects') or []
+        for it in itens[:1]:
+            for k in ('title', 'abstract', 'purpose', 'supplemental_information', 'data_quality_statement', 'attribution', 'date', 'detail_url'):
+                if it.get(k):
+                    print(f'   {k}: {str(it[k])[:1500]}')
+            for at in (it.get('attribute_set') or []):
+                print(f"   atributo: {at.get('attribute')} — {at.get('attribute_label')} — {at.get('description')}")
+        if itens:
+            break
+    print(f'   página: {base}/catalogue/#/dataset/ (procurar {nome})')
 
 
 def _camadas_cap(xml):
