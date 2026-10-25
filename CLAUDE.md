@@ -1394,6 +1394,33 @@ Fecha o plano em `docs/mapa-ucs/plano-medicao-comparacao.md`.
 - `pwa/sw.js`: brigadas 276→277, biomonitor 78→79, frota 115→116, agua 45→46,
   socio 2→3 (só `js/config.js` — o ícone novo — está nos shells).
 
+## Regra do sistema — barra de camadas do Mapa das UCs: faixa fixa no topo (25/10/2026)
+`pages/mapa.html`, `#mapa-layerbar`. Pedido do usuário: a barra flutuava (arrastável
+pela alça ⋮⋮, posição salva em `siguc_lb_pos` e em `preferencias_mapa.dados.lb_pos`)
+e, no tamanho normal, quebrava em 2–3 linhas. Agora é UMA faixa:
+- **Mora na `.mapa-coluna`** (coluna nova em volta do `#mapa`): tem a largura do mapa
+  e fica numa linha própria ACIMA dele, sem cobri-lo — nenhum controle do Leaflet
+  precisou descer. Sem arrasto: `siguc_lb_pos` é apagada no init e `lb_pos` não é
+  mais salvo nem aplicado.
+- **Uma linha, rola de lado** (`.mlb-tabs`, `flex:1 1 0; width:0`): setas ‹ › só do
+  lado que tem aba escondida, esmaecido (`mask-image`) na borda, roda do mouse rola
+  de lado, aba aberta/focada rola até ficar à vista (`_layerbarMostrarAba`).
+  ⚠️ **`width:0` não é enfeite**: sem ele a largura intrínseca das abas em `nowrap`
+  sobe pela cadeia de itens flex (`.main-content` tem `min-width:auto`) e a PÁGINA
+  inteira rolava de lado (1.971px em 1366px) — achado pelo teste.
+- **Menu da aba** (`#mlb-dropdown`) abre colado na aba e limitado à largura do mapa
+  (`_layerbarPosicionarDropdown`, refeito na rolagem e por `ResizeObserver`). Exceção:
+  com "Aparência" aberta (`.mlb-estreito`) vai para a borda esquerda, de onde
+  `apAoAlternar` enquadra a camada à direita do painel.
+- **Tela cheia usa a mesma faixa** em vidro; Exibição/Imprimir/Sair
+  (`.mapa-fs-controls`) moram DENTRO da `#mapa-layerbar`, na mesma linha à direita
+  (no celular continuam fixos embaixo). Clique neles fecha o menu da aba.
+- Abas com ícone `bico()` (sem emoji); ícones novos em `BICON_PATHS`:
+  `chevron-left`, `chevron-right`, `droplet`, `building`.
+- Guarda: `tests/mapa-barra-camadas.test.js` (10 — 1366/768/390 px × normal/tela cheia).
+- `pwa/sw.js`: brigadas 277→278, biomonitor 79→80, frota 116→117, agua 46→47,
+  socio 3→4 (só `js/config.js` — os ícones — está nos shells).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de

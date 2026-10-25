@@ -14,6 +14,8 @@
 .mapa-wrapper{display:flex;flex-direction:column;gap:10px;height:calc(100vh - 108px);min-height:500px;}
 .mapa-topbar{display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
 .mapa-container{display:flex;gap:12px;flex:1;min-height:0;}
+/* Coluna do mapa: faixa de camadas em cima, mapa embaixo — a faixa tem a largura do mapa */
+.mapa-coluna{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px;}
 #mapa{flex:1;border-radius:var(--raio-lg);border:1px solid var(--borda);z-index:0;min-height:0;}
 .mapa-painel{width:268px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding-right:2px;scrollbar-width:none;-ms-overflow-style:none;}
 .mapa-painel::-webkit-scrollbar{display:none;}
@@ -28,15 +30,28 @@
 .filtro-bloco-body{padding:8px 12px 10px;}
 .filtro-item{display:flex;align-items:flex-start;gap:7px;padding:4px 0;font-size:12px;color:var(--cinza-700);}
 .filtro-item input[type=checkbox]{accent-color:#1F4E2C;width:13px;height:13px;cursor:pointer;flex-shrink:0;margin-top:2px;}
-/* Barra de camadas */
-.mapa-layerbar{position:relative;flex-shrink:0;}
-.mlb-tabs{display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
-.mlb-tab{display:flex;align-items:center;gap:5px;padding:5px 12px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;background:#fff;border:1px solid var(--borda);border-radius:6px;cursor:pointer;color:var(--cinza-600);transition:all .15s;white-space:nowrap;line-height:1;}
+/* Barra de camadas — faixa FIXA no topo do mapa, uma linha só. Quando as abas
+   não cabem, a faixa rola de lado (setas ‹ › nas pontas + esmaecido na borda);
+   nunca quebra em várias linhas, nunca flutua, nunca é arrastada. */
+.mapa-layerbar{position:relative;flex-shrink:0;display:flex;align-items:center;gap:8px;min-width:0;}
+.mlb-trilho{position:relative;flex:1;min-width:0;display:flex;align-items:center;gap:2px;background:#fff;border:1px solid var(--borda);border-radius:10px;padding:4px;}
+.mlb-tabs{display:flex;gap:4px;align-items:center;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;flex:1 1 0;width:0;min-width:0;scroll-behavior:smooth;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 var(--mlb-fade-esq,0px),#000 calc(100% - var(--mlb-fade-dir,0px)),transparent 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 var(--mlb-fade-esq,0px),#000 calc(100% - var(--mlb-fade-dir,0px)),transparent 100%);}
+.mlb-tabs::-webkit-scrollbar{display:none;}
+.mlb-trilho.rola-esq .mlb-tabs{--mlb-fade-esq:22px;}
+.mlb-trilho.rola-dir .mlb-tabs{--mlb-fade-dir:22px;}
+.mlb-seta{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:7px;background:var(--cinza-50);color:#1F4E2C;cursor:pointer;font-size:16px;padding:0;}
+.mlb-seta[hidden]{display:none;}
+.mlb-seta:hover{background:var(--cinza-100);}
+@media(prefers-reduced-motion:reduce){.mlb-tabs{scroll-behavior:auto;}}
+.mlb-tab .bico{font-size:13px;}
+.mlb-tab{min-height:28px;flex-shrink:0;display:flex;align-items:center;gap:5px;padding:5px 12px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;background:#fff;border:1px solid var(--borda);border-radius:6px;cursor:pointer;color:var(--cinza-600);transition:all .15s;white-space:nowrap;line-height:1;}
 .mlb-tab:hover{background:var(--cinza-50);border-color:var(--cinza-300);}
 .mlb-tab.ativo{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
 .mlb-badge{font-size:9px;background:rgba(255,255,255,.25);border-radius:99px;padding:1px 5px;font-weight:700;}
 .mlb-tab:not(.ativo) .mlb-badge{background:#eff6ff;color:#1d4ed8;}
-.mlb-dropdown{position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid var(--borda);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:320px;max-width:640px;overflow:hidden;animation:mlb-in .15s ease;}
+.mlb-dropdown{position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid var(--borda);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:min(320px,100%);max-width:min(640px,100%);overflow:hidden;animation:mlb-in .15s ease;}
 @keyframes mlb-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .mlb-dropdown-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--cinza-50);border-bottom:1px solid var(--borda);}
 .mlb-dropdown-title{font-size:11px;font-weight:700;color:var(--cinza-700);text-transform:uppercase;letter-spacing:.06em;}
@@ -302,9 +317,6 @@
 .drag-grip:hover{color:var(--cinza-500);}
 .drag-grip:active{cursor:grabbing;}
 .drag-grip svg{pointer-events:none;}
-#mapa-layerbar.lb-flutuante{position:fixed!important;transform:none!important;z-index:1400!important;background:rgba(255,255,255,.97);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:12px;padding:5px 8px;box-shadow:0 6px 28px rgba(0,0,0,.22);border:1px solid rgba(0,0,0,.1);}
-#mapa-layerbar.lb-flutuante .mlb-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
-#mapa-layerbar.lb-flutuante .mlb-tabs::-webkit-scrollbar{display:none;}
 #tl-drag-handle{width:calc(100% + 32px);height:18px;margin:-11px -16px 3px;display:flex;align-items:center;justify-content:center;cursor:grab;color:var(--cinza-300);border-radius:14px 14px 0 0;user-select:none;transition:color .15s;background:transparent;}
 #tl-drag-handle:hover{color:var(--cinza-500);background:rgba(0,0,0,.02);}
 #tl-drag-handle:active{cursor:grabbing;}
@@ -437,12 +449,14 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 .mapa-wrapper.imersivo .mapa-topbar{display:none;}
 .mapa-wrapper.imersivo .mapa-container{gap:0;}
 .mapa-wrapper.imersivo #mapa{border-radius:14px;}
-/* Barra de camadas → dock glass no topo-centro */
-.mapa-wrapper.imersivo .mapa-layerbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:1200;max-width:calc(100vw - 600px);min-width:0;}
-.mapa-wrapper.imersivo .mlb-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);border:1px solid rgba(255,255,255,.6);box-shadow:0 10px 36px rgba(10,26,15,.30);border-radius:14px;padding:7px 9px;gap:5px;}
-.mapa-wrapper.imersivo .mlb-tabs::-webkit-scrollbar{display:none;}
-/* Cluster de ações flutuantes (topo-direita) */
-.mapa-wrapper.imersivo .mapa-fs-controls{display:flex;position:absolute;top:14px;right:14px;z-index:1250;gap:8px;}
+/* Barra de camadas no imersivo: a MESMA faixa, em vidro, de ponta a ponta no
+   topo, numa linha própria acima do mapa (não o cobre). As ações da tela cheia
+   (Exibição, Imprimir, Sair) entram na mesma linha, à direita. */
+.mapa-wrapper.imersivo .mapa-coluna{gap:10px;}
+.mapa-wrapper.imersivo .mapa-layerbar{z-index:1200;}
+.mapa-wrapper.imersivo .mlb-trilho{background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);border:1px solid rgba(255,255,255,.6);box-shadow:0 10px 36px rgba(10,26,15,.30);border-radius:14px;padding:5px 7px;}
+.mapa-wrapper.imersivo .mlb-tabs{gap:5px;}
+.mapa-wrapper.imersivo .mapa-fs-controls{display:flex;flex-shrink:0;z-index:1250;gap:8px;}
 .mapa-fs-btn{display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);border:1px solid rgba(255,255,255,.6);box-shadow:0 8px 28px rgba(10,26,15,.26);border-radius:11px;color:#1F4E2C;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .16s;white-space:nowrap;}
 .mapa-fs-btn:hover{background:rgba(255,255,255,.94);transform:translateY(-1px);}
 .mapa-fs-btn.icon-only{width:38px;padding:0;justify-content:center;}
@@ -461,8 +475,7 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 .mapa-wrapper.imersivo .mapa-painel{width:100%;flex:1;padding:10px 12px 14px;overflow-y:auto;}
 .mapa-wrapper.imersivo #mapa-scrollbar-outer{display:none;}
 @media(max-width:768px){
-  .mapa-wrapper.imersivo .mapa-layerbar{max-width:calc(100vw - 28px);left:14px;transform:none;top:12px;}
-  .mapa-wrapper.imersivo .mapa-fs-controls{top:auto;bottom:14px;right:14px;}
+  .mapa-wrapper.imersivo .mapa-fs-controls{position:fixed;bottom:14px;right:14px;}
   .mapa-wrapper.imersivo .mapa-painel-wrap{top:auto;left:14px;right:14px;width:auto;bottom:62px;max-height:60vh;}
 }
 /* ── Painel Camadas ──────────────────────────────────────────── */
@@ -1234,25 +1247,34 @@ function renderPagina(){
       </button>
     </div>
 
-    <!-- Barra de camadas -->
-    <div class="mapa-layerbar" id="mapa-layerbar">
-      <div class="mlb-tabs">
-        <div class="drag-grip" id="lb-drag-grip" title="Arrastar · duplo clique para redefinir posição"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2.5" r="1.3"/><circle cx="7" cy="2.5" r="1.3"/><circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="3" cy="11.5" r="1.3"/><circle cx="7" cy="11.5" r="1.3"/></svg></div>
-        <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
-        <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-meio" onclick="toggleLayerBar('meio')">${bico('layers')} Meio Físico <span class="mlb-badge" id="meio-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span> <span class="mlb-badge" id="pa-count-badge" title="Projetos de Assentamento" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-hidro" onclick="toggleLayerBar('hidro')">💧 Rec. Hídricos <span class="mlb-badge" id="hidro-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
-        <button class="mlb-tab" id="mlb-btn-acre" onclick="toggleLayerBar('acre')">🗺 Delimitação do Acre</button>
-      </div>
-      <div class="mlb-dropdown" id="mlb-dropdown" style="display:none"></div>
-    </div>
-
     <div class="mapa-container">
+      <div class="mapa-coluna">
+      <!-- Barra de camadas: faixa fixa no topo do mapa, uma linha, rola de lado -->
+      <div class="mapa-layerbar" id="mapa-layerbar">
+        <div class="mlb-trilho">
+          <button type="button" class="mlb-seta mlb-seta-esq" id="mlb-seta-esq" aria-label="Ver camadas anteriores" title="Camadas anteriores" hidden>${bico('chevron-left')}</button>
+          <div class="mlb-tabs" id="mlb-tabs" role="toolbar" aria-label="Camadas do mapa">
+          <button type="button" class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">${bico('leaf')} Cobertura Vegetal</button>
+          <button type="button" class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">${bico('home')} CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-meio" onclick="toggleLayerBar('meio')">${bico('layers')} Meio Físico <span class="mlb-badge" id="meio-count-badge" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">${bico('shield')} Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span> <span class="mlb-badge" id="pa-count-badge" title="Projetos de Assentamento" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">${bico('flame')} Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-hidro" onclick="toggleLayerBar('hidro')">${bico('droplet')} Rec. Hídricos <span class="mlb-badge" id="hidro-count-badge" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">${bico('users')} Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">${bico('polygon')} Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
+          <button type="button" class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">${bico('building')} Municípios</button>
+          <button type="button" class="mlb-tab" id="mlb-btn-acre" onclick="toggleLayerBar('acre')">${bico('map')} Delimitação do Acre</button>
+          </div>
+          <button type="button" class="mlb-seta mlb-seta-dir" id="mlb-seta-dir" aria-label="Ver mais camadas" title="Mais camadas" hidden>${bico('chevron-right')}</button>
+        </div>
+        <!-- Ações da tela cheia: só aparecem no imersivo, na mesma linha da faixa -->
+        <div class="mapa-fs-controls">
+          <button class="mapa-fs-btn" id="btn-fs-exibicao" onclick="toggleDrawerExibicao()" title="Exibição e filtros">${bico('sliders')} Exibição</button>
+          <button class="mapa-fs-btn icon-only" onclick="CART.imprimir('Mapa das Unidades de Conservação — Acre')" title="Imprimir / exportar">${bico('printer')}</button>
+          <button class="mapa-fs-btn sair" onclick="sairTelaCheia()" title="Sair da tela cheia (Esc)">${bico('minimize')} Sair</button>
+        </div>
+        <div class="mlb-dropdown" id="mlb-dropdown" style="display:none"></div>
+      </div>
       <!-- MAPA -->
       <div id="mapa" style="position:relative">
 
@@ -1460,6 +1482,7 @@ function renderPagina(){
           </div>
         </div>
       </div>
+      </div><!-- /.mapa-coluna -->
 
       <!-- PAINEL FILTROS -->
       <div class="mapa-painel-wrap" id="mapa-painel-wrap">
@@ -1549,12 +1572,6 @@ function renderPagina(){
       </div>
     </div>
 
-    <!-- Controles flutuantes (modo tela cheia) -->
-    <div class="mapa-fs-controls">
-      <button class="mapa-fs-btn" id="btn-fs-exibicao" onclick="toggleDrawerExibicao()" title="Exibição e filtros">${bico('sliders')} Exibição</button>
-      <button class="mapa-fs-btn icon-only" onclick="CART.imprimir('Mapa das Unidades de Conservação — Acre')" title="Imprimir / exportar">${bico('printer')}</button>
-      <button class="mapa-fs-btn sair" onclick="sairTelaCheia()" title="Sair da tela cheia (Esc)">${bico('minimize')} Sair</button>
-    </div>
   </div>
   <div class="mapa-backdrop" id="mapa-backdrop" onclick="fecharPainelMobile()"></div>
   <button class="btn-filtros-mobile" onclick="abrirPainelMobile()">
@@ -1723,7 +1740,7 @@ function iniciarMapa(){
   requestAnimationFrame(() => mapaL.invalidateSize());
   mapaL.on('click', onMapaClick);
   _iniciarDragCard('uc-stats-card','uc-stats-card');
-  _iniciarDragLayerbar();
+  _iniciarLayerbar();
   _iniciarDragTimeline();
   // Elementos cartográficos obrigatórios
   CART.init(mapaL);
@@ -1797,6 +1814,8 @@ function toggleLayerBar(id){
   dd.innerHTML = _renderDropdown(id);
   dd.classList.remove('mlb-estreito');
   dd.style.display = '';
+  _layerbarMostrarAba(document.getElementById('mlb-btn-'+id));
+  _layerbarPosicionarDropdown();
   // Ao abrir a aba Áreas Territoriais, sincroniza os controles (UC e TI)
   // com o estado atual mantido nas variáveis.
   if((id === 'uc' || id === 'areas') && _ucGeojson) {
@@ -1866,7 +1885,7 @@ function toggleLayerBar(id){
 }
 document.addEventListener('click', e => {
   const lb = document.getElementById('mapa-layerbar');
-  if(lb && !lb.contains(e.target)){ document.getElementById('mlb-dropdown').style.display='none'; _layerBarAtiva=null; document.querySelectorAll('.mlb-tab').forEach(t=>t.classList.remove('ativo')); }
+  if(lb && (!lb.contains(e.target) || e.target.closest('.mapa-fs-controls'))){ document.getElementById('mlb-dropdown').style.display='none'; _layerBarAtiva=null; document.querySelectorAll('.mlb-tab').forEach(t=>t.classList.remove('ativo')); }
 });
 
 function _renderDropdown(id){
@@ -4510,6 +4529,7 @@ function areasAbrir(k){
   document.querySelectorAll('.areas-sec-body[hidden] .ap-bloco[open]').forEach(d => { d.open = false; });
   if(abrir){ alvo.hidden = false; document.querySelector(`[aria-controls="areas-sec-${k}"]`)?.setAttribute('aria-expanded','true'); }
   document.getElementById('mlb-dropdown')?.classList.toggle('mlb-estreito', !!document.querySelector('#mlb-dropdown .ap-bloco[open]'));
+  _layerbarPosicionarDropdown();
   try{ localStorage.setItem('siguc_areas_sec', abrir ? k : ''); }catch(e){}
 }
 // Cabeçalho de cada seção: chave liga/desliga, nº no mapa e amostra da cor
@@ -5141,63 +5161,65 @@ function _iniciarDragEditor(){
   document.addEventListener('mouseup', () => { drag=false; card.style.cursor=''; });
 }
 
-// ─── Drag da barra de camadas ────────────────────────────────────────────────
-function _iniciarDragLayerbar(){
+// ─── Barra de camadas: faixa fixa, rolagem lateral ──────────────────────────
+// Uma linha só no topo do mapa. Quando as abas não cabem: setas ‹ › nas pontas
+// (só do lado que tem aba escondida), esmaecido na borda, roda do mouse rola de
+// lado e a aba aberta/focada rola até ficar inteira à vista. Sem arrasto: a
+// posição antiga salva ('siguc_lb_pos', de quando a barra flutuava) é apagada.
+function _iniciarLayerbar(){
+  try{ localStorage.removeItem('siguc_lb_pos'); }catch(e){}
+  const trilho = document.querySelector('#mapa-layerbar .mlb-trilho');
+  const tabs = document.getElementById('mlb-tabs');
+  const esq = document.getElementById('mlb-seta-esq');
+  const dir = document.getElementById('mlb-seta-dir');
+  if(!trilho || !tabs) return;
+  const atualizar = () => {
+    const max = tabs.scrollWidth - tabs.clientWidth;
+    const temEsq = tabs.scrollLeft > 1, temDir = tabs.scrollLeft < max - 1;
+    if(esq) esq.hidden = !temEsq;
+    if(dir) dir.hidden = !temDir;
+    trilho.classList.toggle('rola-esq', temEsq);
+    trilho.classList.toggle('rola-dir', temDir);
+  };
+  const passo = () => Math.max(120, tabs.clientWidth * 0.7);
+  esq?.addEventListener('click', ev => { ev.stopPropagation(); tabs.scrollBy({ left: -passo() }); });
+  dir?.addEventListener('click', ev => { ev.stopPropagation(); tabs.scrollBy({ left: passo() }); });
+  tabs.addEventListener('scroll', () => { atualizar(); _layerbarPosicionarDropdown(); }, { passive: true });
+  // Roda vertical do mouse vira rolagem lateral (só quando há o que rolar)
+  tabs.addEventListener('wheel', ev => {
+    if(tabs.scrollWidth <= tabs.clientWidth || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return;
+    tabs.scrollLeft += ev.deltaY; ev.preventDefault();
+  }, { passive: false });
+  tabs.addEventListener('focusin', ev => { const t = ev.target.closest('.mlb-tab'); if(t) _layerbarMostrarAba(t); });
+  if(typeof ResizeObserver === 'function'){
+    const ro = new ResizeObserver(() => { atualizar(); _layerbarPosicionarDropdown(); });
+    ro.observe(tabs);
+    const dd = document.getElementById('mlb-dropdown'); if(dd) ro.observe(dd);   // menu que muda de largura (Aparência)
+  }
+  window.addEventListener('resize', atualizar);
+  atualizar();
+}
+function _layerbarMostrarAba(tab){
+  const tabs = document.getElementById('mlb-tabs'); if(!tabs || !tab) return;
+  const folga = 24, ini = tab.offsetLeft - tabs.offsetLeft, fim = ini + tab.offsetWidth;
+  if(ini - folga < tabs.scrollLeft) tabs.scrollLeft = Math.max(0, ini - folga);
+  else if(fim + folga > tabs.scrollLeft + tabs.clientWidth) tabs.scrollLeft = fim + folga - tabs.clientWidth;
+}
+// Menu da aba colado embaixo da aba clicada, sem passar da largura do mapa
+// (aba no fim da faixa abre o menu alinhado à direita).
+function _layerbarPosicionarDropdown(){
+  const dd = document.getElementById('mlb-dropdown');
   const lb = document.getElementById('mapa-layerbar');
-  const handle = document.getElementById('lb-drag-grip');
-  if(!lb || !handle) return;
-  const LS = 'siguc_lb_pos';
-  let drag=false, sx=0, sy=0, ox=0, oy=0;
-
-  function aplicarPos(x,y){
-    const maxX = window.innerWidth  - lb.offsetWidth;
-    const maxY = window.innerHeight - lb.offsetHeight;
-    lb.style.left = Math.max(0,Math.min(x,maxX))+'px';
-    lb.style.top  = Math.max(0,Math.min(y,maxY))+'px';
-  }
-
-  // Restaurar posição salva
-  try{
-    const s = JSON.parse(localStorage.getItem(LS)||'null');
-    if(s){ lb.classList.add('lb-flutuante'); lb.style.left=s.x+'px'; lb.style.top=s.y+'px'; }
-  }catch(e){}
-
-  handle.addEventListener('mousedown', e=>{
-    if(e.button!==0) return;
-    if(!lb.classList.contains('lb-flutuante')){
-      const r=lb.getBoundingClientRect();
-      lb.classList.add('lb-flutuante');
-      lb.style.left=r.left+'px'; lb.style.top=r.top+'px';
-    }
-    drag=true; sx=e.clientX; sy=e.clientY;
-    ox=parseFloat(lb.style.left)||0; oy=parseFloat(lb.style.top)||0;
-    handle.style.cursor='grabbing'; e.preventDefault(); e.stopPropagation();
-  });
-  // Touch
-  handle.addEventListener('touchstart', e=>{
-    const t=e.touches[0];
-    if(!lb.classList.contains('lb-flutuante')){
-      const r=lb.getBoundingClientRect(); lb.classList.add('lb-flutuante'); lb.style.left=r.left+'px'; lb.style.top=r.top+'px';
-    }
-    drag=true; sx=t.clientX; sy=t.clientY;
-    ox=parseFloat(lb.style.left)||0; oy=parseFloat(lb.style.top)||0; e.preventDefault();
-  },{passive:false});
-
-  document.addEventListener('mousemove', e=>{ if(!drag) return; aplicarPos(ox+(e.clientX-sx), oy+(e.clientY-sy)); });
-  document.addEventListener('touchmove', e=>{ if(!drag) return; const t=e.touches[0]; aplicarPos(ox+(t.clientX-sx), oy+(t.clientY-sy)); e.preventDefault(); },{passive:false});
-
-  function fimDrag(){
-    if(!drag) return; drag=false; handle.style.cursor='grab';
-    try{ localStorage.setItem(LS, JSON.stringify({x:parseFloat(lb.style.left),y:parseFloat(lb.style.top)})); }catch(e){}
-    _prefsAgendarSalvamento();
-  }
-  document.addEventListener('mouseup', fimDrag);
-  document.addEventListener('touchend', fimDrag);
-
-  handle.addEventListener('dblclick', ()=>{
-    lb.classList.remove('lb-flutuante'); lb.style.left=''; lb.style.top='';
-    try{ localStorage.removeItem(LS); }catch(e){}
-  });
+  if(!dd || !lb || dd.style.display === 'none' || !_layerBarAtiva) return;
+  const tab = document.getElementById('mlb-btn-' + _layerBarAtiva);
+  if(!tab) return;
+  // Aparência aberta (menu estreito): o menu vai para a borda esquerda do mapa,
+  // que é de onde apAoAlternar enquadra a camada "à direita do painel".
+  if(dd.classList.contains('mlb-estreito')){ dd.style.left = '0px'; return; }
+  const rl = lb.getBoundingClientRect(), rt = tab.getBoundingClientRect();
+  const larg = dd.offsetWidth;
+  const x = Math.max(0, Math.min(rt.left - rl.left, rl.width - larg));
+  dd.style.left = x + 'px';
 }
 
 // ─── Drag da linha do tempo ───────────────────────────────────────────────────
@@ -9043,7 +9065,6 @@ function _prefsCapturar(){
     pa:          typeof paPrefsCapturar==='function' ? paPrefsCapturar() : {},
     acre:        _acreEstilo || {},
     camadas_vis: (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}'); }catch(e){ return {}; } })(),
-    lb_pos:      (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_lb_pos')||'null'); }catch(e){ return null; } })(),
     tl_pos:      (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_tl_pos')||'null'); }catch(e){ return null; } })(),
     car_width:   (()=>{ const v=localStorage.getItem('siguc_car_panel_width'); return v?parseInt(v):null; })(),
   };
@@ -9086,10 +9107,8 @@ function _prefsAplicar(dados){
   if(dados.camadas_vis && Object.keys(dados.camadas_vis).length){
     try{ localStorage.setItem('siguc_camadas_vis', JSON.stringify(dados.camadas_vis)); }catch(e){}
   }
-  // Posição da layerbar
-  if(dados.lb_pos){
-    try{ localStorage.setItem('siguc_lb_pos', JSON.stringify(dados.lb_pos)); }catch(e){}
-  }
+  // dados.lb_pos (posição da barra quando ela flutuava) é ignorado de propósito:
+  // a barra agora é fixa no topo do mapa.
   // Posição da timeline
   if(dados.tl_pos){
     try{ localStorage.setItem('siguc_tl_pos', JSON.stringify(dados.tl_pos)); }catch(e){}
