@@ -182,6 +182,7 @@ document.addEventListener('input', ev => {
 function apAoAlternar(det) {
   const dd = det.closest('.mlb-dropdown');
   if (dd) dd.classList.toggle('mlb-estreito', !!dd.querySelector('.ap-bloco[open]'));
+  if (typeof window._layerbarPosicionarDropdown === 'function') window._layerbarPosicionarDropdown();
   if (!det.open || typeof mapaL === 'undefined' || !mapaL) return;
   const camada = AP_CAMADAS[det.dataset.apChave]?.();
   if (!camada || typeof camada.getBounds !== 'function') return;
