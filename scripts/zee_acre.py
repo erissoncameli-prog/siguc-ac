@@ -94,6 +94,12 @@ I3GEO = [
 ]
 # ArcGIS Online: itens públicos (camada hospedada ou serviço) com o ZEE do Acre.
 AGOL_BUSCAS = ['zoneamento ecológico econômico acre', 'ZEE Acre', 'ZEE AC gestão territorial']
+# Wayback Machine: os shapefiles que o i3Geo do MMA e o antigo portal do ZEE
+# do Acre (seiam.ac.gov.br, citado no ZEE_AC.pdf) publicavam podem ter sido
+# arquivados — os servidores originais saíram do ar.
+WAYBACK_DOMINIOS = ['mapas.mma.gov.br', 'seiam.ac.gov.br', 'www.seiam.ac.gov.br', 'semapi.acre.gov.br',
+                    'sema.ac.gov.br', 'www.amazonia.cnptia.embrapa.br', 'zeeamazonia.mma.gov.br']
+ARQ_GEO = re.compile(r'\.(zip|rar|7z|shp|kmz|kml|gpkg|geojson|dbf)(\?|$)', re.I)
 LINK_DADO = re.compile(r'href="([^"]+?(?:\.zip|\.rar|\.7z|\.shp|\.kmz|\.kml|\.gpkg|\.geojson|\.pdf|drive\.google\.com[^"]*|'
                        r'geoserver[^"]*|/wms[^"]*|/wfs[^"]*))"', re.I)
 TEMA_ZEE = re.compile(r'zee|zoneamento|acre|uzee|gest[aã]o.?territ', re.I)
@@ -413,6 +419,25 @@ def descobrir():
             for nome, titulo in cam:
                 if TEMA_ZEE.search(nome) or TEMA_ZEE.search(titulo):
                     print(f'   {nome} — {titulo}')
+
+    print('\n== Wayback Machine (arquivos geográficos arquivados)')
+    for dom in WAYBACK_DOMINIOS:
+        r = _get('http://web.archive.org/cdx/search/cdx', params={
+            'url': dom + '/*', 'output': 'json', 'fl': 'timestamp,original,statuscode,length',
+            'collapse': 'urlkey', 'filter': 'statuscode:200', 'limit': 50000})
+        if r is None or r.status_code != 200:
+            print(f'   {dom}: HTTP {getattr(r, "status_code", "-")}')
+            continue
+        try:
+            linhas = r.json()[1:]
+        except ValueError:
+            print(f'   {dom}: resposta não-JSON ({len(r.content)} bytes)')
+            continue
+        geo = [l for l in linhas if ARQ_GEO.search(l[1])]
+        zee = [l for l in geo if re.search(r'zee|zonea|gest|acre|_ac\b|subzon', l[1], re.I)]
+        print(f'   {dom}: {len(linhas)} URLs arquivadas, {len(geo)} arquivos geográficos, {len(zee)} com cara de ZEE')
+        for ts, url, _, tam in (zee or geo)[:60]:
+            print(f'      {ts} {tam:>9} https://web.archive.org/web/{ts}id_/{url}')
 
     print('\n== ArcGIS Online (itens públicos)')
     for q in AGOL_BUSCAS:
