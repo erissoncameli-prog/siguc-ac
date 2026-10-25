@@ -153,6 +153,15 @@ TEMAS_IBGE = {
                                            'nm_contat', 'nm_pretet', 'clas_domi']),
     'clima': (CGEO, 'CGEO:ANMS2010_03_clima', ['umida_seca', 'temperat']),
 }
+# Embrapa GeoInfo: camada temática do projeto UZEE-AML (unificação dos ZEE
+# da Amazônia Legal) — o único dado do ZEE do Acre ainda publicado como
+# serviço (o Mapa de Gestão não está em lugar nenhum; ver
+# docs/mapa-ucs/plano-zee.md). Atributo único, conferido pela descoberta do
+# scripts/zee_acre.py (25/10/2026): class_apt, 6 valores, 257 polígonos.
+GEOINFO = 'https://geoinfo.dados.embrapa.br/geoserver/ows'
+TEMAS_EMBRAPA = {
+    'aptidao_agricola': (GEOINFO, 'geonode:acre_aptidao_agric', ['class_apt']),
+}
 CASAS = 5            # ~1 m: muito mais fino que a escala da fonte
 TOLERANCIA = 0.0004  # ~45 m: abaixo do que 1:250 mil resolve (~125 m no papel a 0,5 mm)
 PAGINA_WFS = 1000
@@ -357,6 +366,12 @@ def gerar(temas, saida, acre_arq):
             trava = 'cobertura'
             fonte = f'IBGE — {camada}'
             escala = '1:250.000' if 'BDIA' in camada else '1:5.000.000'
+        elif tema in TEMAS_EMBRAPA:
+            url, camada, campos = TEMAS_EMBRAPA[tema]
+            brutas = baixar_wfs(url, camada)
+            trava = 'cobertura'
+            fonte = f'Embrapa — GeoInfo, projeto UZEE-AML ({camada})'
+            escala = None  # o serviço não publica a escala; nunca inventar
         else:
             url, campos, trava = TEMAS_ANA[tema]
             brutas, esperado = baixar_arcgis(url, campos)
@@ -490,7 +505,7 @@ def main():
         autoteste()
         return 0
     if a.gerar is not None:
-        gerar(a.gerar or [*TEMAS_IBGE, *TEMAS_ANA], a.saida, a.acre)
+        gerar(a.gerar or [*TEMAS_IBGE, *TEMAS_EMBRAPA, *TEMAS_ANA], a.saida, a.acre)
         return 0
     ap.print_help()
     return 1
