@@ -144,25 +144,30 @@ function wbTileXY(lat, lng, z) {
   return { x: Math.floor((lng + 180) / 360 * n), y: Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n) };
 }
 
-// Data de captura no ponto (camada de metadados da própria versão). Melhor
-// esforço: o serviço tem uma subcamada por faixa de escala; usa a de maior
-// detalhe que responder com feição.
-async function wbCaptura(metaUrl, lat, lng) {
+// Data de captura no ponto (camada de metadados da própria versão). O
+// serviço tem uma subcamada por zoom — id = 23 − zoom (0 = zoom 23, o mais
+// detalhado), como no app Wayback da Esri; em área remota a subcamada do zoom
+// pode vir vazia, então tenta as vizinhas (mais grossas primeiro).
+async function wbCaptura(metaUrl, lat, lng, z) {
   if (!metaUrl) return null;
   const q = 'query?f=json&returnGeometry=false&spatialRel=esriSpatialRelIntersects&geometryType=esriGeometryPoint'
-    + `&inSR=4326&geometry=${lng},${lat}&outFields=SRC_DATE2,SRC_DATE,NICE_DESC,SRC_RES,SRC_DESC`;
-  for (const camada of [0, 1, 2, 3, 4, 5]) {
+    + `&inSR=4326&geometry=${lng},${lat}&outFields=*`;
+  const base = Math.max(0, Math.min(13, 23 - z));
+  const camadas = [base, base + 1, base + 2, base - 1, base + 3].filter(c => c >= 0 && c <= 13);
+  for (const camada of camadas) {
     try {
       const r = await fetch(`${metaUrl}/${camada}/${q}`, { signal: AbortSignal.timeout(8000) });
       if (!r.ok) continue;
       const j = await r.json();
       const a = j && j.features && j.features[0] && j.features[0].attributes;
       if (!a) continue;
-      const bruto = a.SRC_DATE2 ?? a.SRC_DATE;
+      const bruto = a.SRC_DATE2 ?? a.SRC_DATE ?? a.src_date2 ?? a.src_date;
       let data = null;
       if (typeof bruto === 'number') data = new Date(bruto).toISOString().slice(0, 10);
       else if (typeof bruto === 'string' && /^\d{8}$/.test(bruto)) data = `${bruto.slice(0, 4)}-${bruto.slice(4, 6)}-${bruto.slice(6, 8)}`;
-      return { data, fonte: a.NICE_DESC || a.SRC_DESC || null, resolucao_m: typeof a.SRC_RES === 'number' ? a.SRC_RES : null };
+      if (!data) continue;
+      const res = a.SAMP_RES ?? a.SRC_RES;
+      return { data, fonte: a.NICE_DESC || a.SRC_DESC || a.NICE_NAME || null, resolucao_m: typeof res === 'number' ? res : null };
     } catch (_) { /* tenta a próxima subcamada */ }
   }
   return null;
@@ -200,7 +205,7 @@ async function handleWayback(req, res) {
       i = (k >= 0 ? k : i) + 1;
     }
     const comCaptura = await Promise.all(mudancas.map(async m => ({
-      num: m.num, data: m.data, captura: await wbCaptura(m.meta, lat, lng),
+      num: m.num, data: m.data, captura: await wbCaptura(m.meta, lat, lng, z),
     })));
     res.status(200).setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400')
        .json({ disponivel: true, z, mudancas: comCaptura });
