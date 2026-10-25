@@ -82,10 +82,21 @@ PAGINAS = [
 GEOSERVERS = [
     'https://geoservicos.inde.gov.br/geoserver/ows',
     'https://geoservicos.inde.gov.br/geoserver/MMA/ows',
+    'https://geoinfo.dados.embrapa.br/geoserver/ows',   # GeoInfo/Embrapa (sucessor do SIAGEO?)
 ]
+# i3Geo que reuniram os ZEE estaduais da Amazônia Legal em shapefile:
+# SIAGEO (Embrapa + MMA, projeto UZEE-AML, ~650 camadas de 9 estados) e o
+# i3Geo do MMA ("Mapa Integrado dos ZEE estaduais", com download em KMZ/SHP).
+I3GEO = [
+    'http://www.amazonia.cnptia.embrapa.br/i3geo',
+    'https://www.amazonia.cnptia.embrapa.br/i3geo',
+    'http://mapas.mma.gov.br/i3geo',
+]
+# ArcGIS Online: itens públicos (camada hospedada ou serviço) com o ZEE do Acre.
+AGOL_BUSCAS = ['zoneamento ecológico econômico acre', 'ZEE Acre', 'ZEE AC gestão territorial']
 LINK_DADO = re.compile(r'href="([^"]+?(?:\.zip|\.rar|\.7z|\.shp|\.kmz|\.kml|\.gpkg|\.geojson|\.pdf|drive\.google\.com[^"]*|'
                        r'geoserver[^"]*|/wms[^"]*|/wfs[^"]*))"', re.I)
-TEMA_ZEE = re.compile(r'zee|zoneamento|acre', re.I)
+TEMA_ZEE = re.compile(r'zee|zoneamento|acre|uzee|gest[aã]o.?territ', re.I)
 
 
 # ── leitura do código de zona/subzona ────────────────────────────────────
@@ -379,9 +390,48 @@ def descobrir():
         if r is None:
             continue
         print(f'{url} → HTTP {r.status_code}, {len(r.content) // 1024} KB')
-        for nome, titulo in re.findall(r'<(?:wfs:)?Name>([^<]+)</(?:wfs:)?Name>\s*<(?:wfs:)?Title>([^<]*)</', r.text):
+        for nome, titulo in _camadas_cap(r.text):
             if TEMA_ZEE.search(nome) or TEMA_ZEE.search(titulo):
                 print(f'   {nome} — {titulo}')
+
+    print('\n== i3Geo (SIAGEO/Embrapa e MMA) — temas com zee/zoneamento/acre')
+    for base in I3GEO:
+        r = _get(base + '/ogc.php', params={'lista': 'temas'})
+        if r is not None:
+            print(f'{base}/ogc.php?lista=temas → HTTP {r.status_code}, {len(r.content) // 1024} KB')
+            vistos = set()
+            for cod, txt in re.findall(r'tema=([\w.-]+)[^>]*>([^<]{0,160})', r.text):
+                if (TEMA_ZEE.search(cod) or TEMA_ZEE.search(txt)) and cod not in vistos:
+                    vistos.add(cod)
+                    print(f'   tema={cod} — {txt.strip()}')
+            for lin in re.findall(r'[^\n<>]{0,120}(?:zee|zoneamento)[^\n<>]{0,120}', r.text, re.I)[:40]:
+                print(f'   … {lin.strip()}')
+        r = _get(base + '/ogc.php', params={'service': 'WMS', 'request': 'GetCapabilities', 'version': '1.1.1'})
+        if r is not None:
+            cam = _camadas_cap(r.text)
+            print(f'{base}/ogc.php GetCapabilities → HTTP {r.status_code}, {len(r.content) // 1024} KB, {len(cam)} camadas')
+            for nome, titulo in cam:
+                if TEMA_ZEE.search(nome) or TEMA_ZEE.search(titulo):
+                    print(f'   {nome} — {titulo}')
+
+    print('\n== ArcGIS Online (itens públicos)')
+    for q in AGOL_BUSCAS:
+        r = _get('https://www.arcgis.com/sharing/rest/search', params={'q': q, 'f': 'json', 'num': 50})
+        if r is None or r.status_code != 200:
+            continue
+        itens = r.json().get('results', [])
+        print(f'"{q}" → {len(itens)} item(ns)')
+        for it in itens:
+            if TEMA_ZEE.search(it.get('title', '') + ' ' + ' '.join(it.get('tags') or [])):
+                print(f"   [{it.get('type')}] {it.get('title')} — {it.get('owner')} — {it.get('url') or 'https://www.arcgis.com/home/item.html?id=' + it.get('id', '')}")
+
+
+def _camadas_cap(xml):
+    """(nome, título) de cada camada de um GetCapabilities WMS/WFS, nas duas
+    ordens em que os servidores escrevem."""
+    a = re.findall(r'<(?:wfs:)?Name>([^<]+)</(?:wfs:)?Name>\s*<(?:wfs:)?Title>([^<]*)</', xml)
+    b = [(n, t) for t, n in re.findall(r'<(?:wfs:)?Title>([^<]*)</(?:wfs:)?Title>\s*<(?:wfs:)?Name>([^<]+)</', xml)]
+    return a + b
 
 
 # ── autoteste (sem rede) ─────────────────────────────────────────────────
