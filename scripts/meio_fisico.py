@@ -369,7 +369,15 @@ def gerar(temas, saida, acre_arq):
         elif tema in TEMAS_EMBRAPA:
             url, camada, campos = TEMAS_EMBRAPA[tema]
             brutas = baixar_wfs(url, camada)
-            trava = 'cobertura'
+            # Cobre só as regiões de consolidação e expansão do MacroZEE (~47%
+            # do Acre, medido em 25/10/2026) — a trava de área não se aplica;
+            # vale a de contagem (baixado == total do servidor).
+            trava = 'contagem'
+            esperado = contar(url, camada)
+            if str(len(brutas)) != str(esperado):
+                falhas.append(f'{tema}: {len(brutas)} baixadas de {esperado} — arquivo NÃO gravado')
+                print(falhas[-1])
+                continue
             fonte = f'Embrapa — GeoInfo, projeto UZEE-AML ({camada})'
             escala = None  # o serviço não publica a escala; nunca inventar
         else:
@@ -393,7 +401,7 @@ def gerar(temas, saida, acre_arq):
         if trava == 'cobertura' and (pct < 95 or pct > 105):
             raise SystemExit(f'{tema}: cobre {pct:.1f}% da área do Acre — arquivo NÃO gravado')
         fc = {'type': 'FeatureCollection', 'fonte': fonte, 'escala': escala,
-              'gerado_em': date.today().isoformat(), 'features': feats}
+              'gerado_em': date.today().isoformat(), 'cobertura_pct': round(pct, 1), 'features': feats}
         arq = os.path.join(saida, f'{tema}.geojson')
         with open(arq, 'w', encoding='utf-8') as fh:
             json.dump(fc, fh, ensure_ascii=False, separators=(',', ':'))

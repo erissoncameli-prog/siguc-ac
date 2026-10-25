@@ -1348,6 +1348,11 @@ geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
   SEM geometria (medido 24/10/2026, `f=json`); o script falha alto se um
   servidor fizer isso. Os rios já aparecem pelo WMS do IBGE BC250 (painel
   Cobertura Vegetal → hidrografia); o WFS desse BC250 (`CCAR:*`) dá HTTP 400.
+- **Aptidão agrícola — ZEE/UZEE** (Embrapa GeoInfo, `geonode:acre_aptidao_agric`,
+  `TEMAS_EMBRAPA` no script, 25/10/2026): cobre só as regiões de consolidação e
+  expansão do MacroZEE (~47% do Acre) — trava de CONTAGEM, não de área. Sem legenda
+  por extenso na fonte: a classe sai com o código (B/P, B/A, R/P, R/A, N/R) e o
+  painel/popup dizem isso (`nota` do tema). Nunca rotular por suposição.
 - Não confundir as micro-regiões com a "bacia" de texto de
   `agua_pontos_coleta` (Painel das Bacias): estas são só camada de leitura.
 - Guarda: `tests/mapa-meio-fisico.test.js` (6, página real com o arquivo

@@ -61,9 +61,17 @@ Conclusão: o arquivo vetorial do Mapa de Gestão hoje só existe na SEMA
 (Núcleo de ZEE) — e talvez na Embrapa Informática Agropecuária, que coordenou
 o SIAGEO (equipe de João Vila). Pedir a um dos dois.
 
-Extra disponível, se interessar: `geonode:acre_aptidao_agric` (WFS da
-GeoInfo/Embrapa) — solos/aptidão agrícola do UZEE para o Acre, 2017. É camada
-temática do ZEE, não o Mapa de Gestão.
+**Camada entregue enquanto o Mapa de Gestão não chega**: `geonode:acre_aptidao_agric`
+(WFS da GeoInfo/Embrapa, projeto UZEE-AML, 2017) virou o tema "Aptidão agrícola —
+ZEE/UZEE" da aba Meio Físico (`data/meio_fisico/aptidao_agricola.geojson`, gerado
+por `scripts/meio_fisico.py`). Conferido na fonte (metadados do GeoNode,
+dataset 1301): 257 polígonos, atributo único `class_apt` (B/P 175, B/A 48, R/P 17,
+R/A 12, N/R 4, agua 1); cobre só as regiões de consolidação e expansão do MacroZEE
+(47,2% do Acre) — por isso a trava é de CONTAGEM, não de área. **A Embrapa não
+publica a legenda por extenso** (estilo de uma cor só, GetLegendGraphic sem
+regras): a tela mostra o código da fonte e diz isso. Quando o significado for
+confirmado (ex.: Documento Síntese, mapa APTIDAO.pdf), entra como rótulo — nunca
+antes.
 
 ## O que foi entregue (sem o dado vetorial)
 

@@ -66,6 +66,16 @@ const MF_TEMAS = {
     popup: { titulo: 'temperat', campos: [
       { campo: 'temperat', rotulo: 'Classificação térmica' }, { campo: 'umida_seca', rotulo: 'Umidade / meses secos' }] },
   },
+  // Único dado do ZEE do Acre ainda publicado como serviço (projeto UZEE-AML;
+  // o Mapa de Gestão não está em lugar nenhum — docs/mapa-ucs/plano-zee.md).
+  // A Embrapa não publica a legenda por extenso: a classe sai com o código
+  // da fonte, nunca com um significado suposto.
+  aptidao_agricola: {
+    rotulo: 'Aptidão agrícola — ZEE/UZEE', fonte: 'Embrapa — GeoInfo, projeto UZEE-AML (2017)', escala: null, cor: '#6B8E23',
+    nota: 'Cobre só as regiões de consolidação e expansão do MacroZEE (cerca de metade do Acre). A Embrapa não publica a legenda por extenso: as classes aparecem com o código da fonte (B/P, B/A, R/P, R/A, N/R).',
+    colorir: ['class_apt'],
+    popup: { titulo: 'class_apt', campos: [] },
+  },
   massas_dagua: {
     rotulo: 'Massas d\'água', fonte: 'ANA — SNIRH (massas d\'água)', escala: null, cor: '#0E7490',
     colorir: ['detipomass', 'dedominial', 'nuareaha'],
@@ -152,7 +162,7 @@ function _mfDesenhar(tema) {
     pane: MF_PANE,
     style: f => { const cor = cores ? ccfCorDaFeicao(c, f.properties, cores) : t.cor; return { color: cor, weight: 0.6, opacity: 0.9, fillColor: cor, fillOpacity: op } },
     onEachFeature: (f, layer) => layer.bindPopup(() =>
-      ccfPopupHTML(c, f, {}) + `<div class="mf-fonte">${ccfEsc(t.fonte)} · ${ccfEsc(_mfEscala(t))}. Mapeamento regional — não substitui levantamento de campo.</div>`,
+      ccfPopupHTML(c, f, {}) + `<div class="mf-fonte">${t.nota ? `<div class="mf-nota-tema">${ccfEsc(t.nota)}</div>` : ''}${ccfEsc(t.fonte)} · ${ccfEsc(_mfEscala(t))}. Mapeamento regional — não substitui levantamento de campo.</div>`,
       { className: 'camada-popup-wrap', maxWidth: 360 }),
   }).addTo(_mf.mapa)
 }
@@ -222,7 +232,7 @@ const _MF_ROTULO_CAMPO = {
   nm_regiao: 'Região', compartimento: 'Compartimento', ordem: 'Ordem do solo', legenda_2: 'Classe detalhada',
   subordem: 'Subordem', textura: 'Textura', leg_sup: 'Cobertura dominante', nm_uantr: 'Uso antrópico',
   temperat: 'Temperatura', umida_seca: 'Umidade', 
-  detipomass: 'Tipo', dedominial: 'Domínio', nuareaha: 'Área (degradê)', DMI_NM: 'Micro-região',
+  class_apt: 'Classe (código da fonte)', detipomass: 'Tipo', dedominial: 'Domínio', nuareaha: 'Área (degradê)', DMI_NM: 'Micro-região',
 }
 
 // Corpo da aba "Meio Físico" da barra de camadas.
@@ -236,12 +246,13 @@ function mfPainelHTML() {
         <span class="mf-amostra" style="background:${t.cor}"></span><span class="mf-nome">${ccfEsc(t.rotulo)}</span>
         <span class="mf-status" role="status" aria-live="polite">${on && _mf.camadas[k].camada ? _mfUnidade(_mf.camadas[k].camada.geojson.features.length) : ''}</span></label>
       <div class="mf-meta">${ccfEsc(t.fonte)} · ${ccfEsc(_mfEscala(t))}</div>
+      ${t.nota ? `<div class="mf-nota-tema">${ccfEsc(t.nota)}</div>` : ''}
       <div class="mf-ctrl">
         <label>Colorir por <select data-mf-acao="colorir">${t.colorir.map(c => `<option value="${c}"${c === campo ? ' selected' : ''}>${ccfEsc(_MF_ROTULO_CAMPO[c] || c)}</option>`).join('')}</select></label>
         <label>Opacidade <input type="range" min="0" max="100" step="5" value="${op}" data-mf-acao="opacidade" aria-label="Opacidade de ${ccfEsc(t.rotulo)}"></label>
       </div>
     </div>`
-  }).join('') + `<div class="mf-nota">Mapeamento regional do IBGE e da ANA, recortado pelo limite do Acre. Use para leitura de contexto; não substitui levantamento de campo.</div>`
+  }).join('') + `<div class="mf-nota">Mapeamento regional do IBGE, da ANA e da Embrapa, recortado pelo limite do Acre. Use para leitura de contexto; não substitui levantamento de campo.</div>`
 }
 
 // Delegação no contêiner da aba (o HTML é refeito a cada abertura).
@@ -279,6 +290,7 @@ function mfEstilos() {
 .mf-ctrl select{min-height:26px;font-size:11px;border:1px solid var(--borda,#d1d5db);border-radius:5px;background:#fff;max-width:170px;}
 .mf-ctrl input[type=range]{width:90px;accent-color:#1F4E2C;}
 .mf-ctrl select:focus-visible,.mf-ctrl input:focus-visible,.mf-cab input:focus-visible{outline:2px solid #C9A84C;outline-offset:1px;}
+.mf-nota-tema{font-size:10.5px;line-height:1.4;color:#92400E;background:#FFFBEB;border-radius:4px;padding:3px 6px;}
 .mf-nota,.mf-fonte{font-size:10.5px;color:var(--cinza-500,#6b7280);}
 .mf-fonte{margin:6px 12px 8px;}
 `
