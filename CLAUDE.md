@@ -1348,10 +1348,41 @@ geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
   SEM geometria (medido 24/10/2026, `f=json`); o script falha alto se um
   servidor fizer isso. Os rios já aparecem pelo WMS do IBGE BC250 (painel
   Cobertura Vegetal → hidrografia); o WFS desse BC250 (`CCAR:*`) dá HTTP 400.
+- **Aptidão agrícola — ZEE/UZEE** (Embrapa GeoInfo, `geonode:acre_aptidao_agric`,
+  `TEMAS_EMBRAPA` no script, 25/10/2026): cobre só as regiões de consolidação e
+  expansão do MacroZEE (~47% do Acre) — trava de CONTAGEM, não de área. Sem legenda
+  por extenso na fonte: a classe sai com o código (B/P, B/A, R/P, R/A, N/R) e o
+  painel/popup dizem isso (`nota` do tema). Nunca rotular por suposição.
 - Não confundir as micro-regiões com a "bacia" de texto de
   `agua_pontos_coleta` (Painel das Bacias): estas são só camada de leitura.
 - Guarda: `tests/mapa-meio-fisico.test.js` (6, página real com o arquivo
   servido por stub). Sem mudança em `pwa/sw.js` (tela de mesa).
+
+## Regra do sistema — ZEE do Acre no Mapa das UCs (25/10/2026)
+Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
+`js/mapa-zee.js` (prefixo `zee`). Plano e fontes em `docs/mapa-ucs/plano-zee.md`.
+- **Ainda SEM o arquivo vetorial** (pedido à SEMA): sem `data/zee/manifesto.json`
+  a aba diz "ainda não foi recebido", desabilita as caixas e segue oferecendo os
+  documentos. Nunca mostrar camada vazia sem explicação.
+- Dados SÓ por `scripts/zee_acre.py` (workflow `.github/workflows/zee-acre.yml`,
+  modos descobrir/inspecionar/converter — `*.ac.gov.br` e o Drive dão 403 nas
+  sessões; o runner alcança). Travas: sem `.prj` para; feição sem zona para;
+  cobertura fora de 95–105% do Acre não grava. Nomes das zonas vivem SÓ no script
+  (`ZONAS`, Lei 1.904/2007); o mapa lê o que vem no arquivo.
+- **Fase II e Fase III nunca juntas** no mapa (mesmas cores, polígonos
+  sobrepostos). Situação legal sempre escrita: só a Fase II tem lei.
+- Cor por zona em Okabe-Ito (`ZEE_ZONA_COR`); subzona = tons da cor da zona.
+  Pane `zeePane` z 360 (Meio Físico 350 < ZEE < overlayPane 400) — a Zona 2
+  coincide com UCs/TIs, cujo contorno fica por cima.
+- Documentos: `data/zee/documentos.json` — acervo (pasta da SEMA no Drive) + 69
+  PDFs em 8 grupos recolhíveis, com link do site OFICIAL da SEMA (Drive só para o
+  que não está lá). Nova aba, `noopener noreferrer`; o SIGUC não copia o PDF.
+  Documento novo = uma linha no JSON. A pasta e o site só têm PDF — nenhum
+  arquivo vetorial (conferido pelo `descobrir`, 25/10/2026).
+- Guarda: `tests/mapa-zee.test.js` (6, página real; contrafactual conferido —
+  pane acima do overlay e link sem `noreferrer` reprovam).
+  `tests/mapa-barra-camadas.test.js` passou a contar 11 abas.
+- Sem mudança em `pwa/sw.js` (tela de mesa; ícone `map` já existia).
 
 ## Regra do sistema — Minha localização e legenda em degradê no Mapa das UCs (Fase 5, 24/10/2026)
 Fecha o plano em `docs/mapa-ucs/plano-medicao-comparacao.md`.

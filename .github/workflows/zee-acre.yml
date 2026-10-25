@@ -1,0 +1,87 @@
+name: ZEE do Acre (Mapa de Gestão)
+
+# Plano em docs/mapa-ucs/plano-zee.md. Roda FORA das sessões de
+# desenvolvimento porque *.ac.gov.br e o Google Drive respondem 403 no proxy
+# delas; o runner do GitHub alcança os dois.
+#
+# - descobrir (padrão, e o que roda no push): lista a pasta da SEMA no Drive,
+#   os links das páginas do ZEE e as camadas da INDE/MMA. Não grava nada.
+# - inspecionar: baixa o arquivo (URL ou drive:<id>) e mostra campos,
+#   projeção e valores. Não grava nada.
+# - converter: gera data/zee/<camada>.geojson + manifesto.json e grava no
+#   próprio branch (travas no script: sem .prj, sem zona, cobertura ≠ 95–105%).
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'descobrir | inspecionar | converter'
+        type: choice
+        options: [descobrir, inspecionar, converter]
+        default: descobrir
+      arquivo:
+        description: 'URL do .zip do shapefile, ou drive:<id do arquivo no Drive>'
+        required: false
+      fase:
+        description: 'Fase do ZEE (converter)'
+        type: choice
+        options: ['2', '3']
+        default: '2'
+      campos:
+        description: 'Opcional: --campo-zona X --campo-subzona Y (o --inspecionar mostra os nomes)'
+        required: false
+      escala:
+        description: 'Escala do mapeamento (converter)'
+        required: false
+        default: '1:250.000'
+  push:
+    # Mudar o script ou o workflow já roda a descoberta — é como se testa de
+    # uma branch (workflow_dispatch só existe na main).
+    paths:
+      - 'scripts/zee_acre.py'
+      - '.github/workflows/zee-acre.yml'
+
+concurrency:
+  group: zee-acre
+  cancel-in-progress: false
+
+jobs:
+  zee:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write   # grava data/zee/ no próprio branch (commit do bot)
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Dependências
+        run: pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1'
+      - name: Autoteste (sem rede)
+        run: python scripts/zee_acre.py --autoteste
+      - name: Rodar
+        env:
+          MODO: ${{ inputs.modo || 'descobrir' }}
+          ARQUIVO: ${{ inputs.arquivo }}
+          FASE: ${{ inputs.fase || '2' }}
+          CAMPOS: ${{ inputs.campos }}
+          ESCALA: ${{ inputs.escala || '1:250.000' }}
+        run: |
+          case "$MODO" in
+            descobrir)   python scripts/zee_acre.py --descobrir ;;
+            inspecionar) python scripts/zee_acre.py --inspecionar "$ARQUIVO" ;;
+            converter)   # CAMPOS sem aspas de propósito: são flags (--campo-zona X ...)
+                         python scripts/zee_acre.py --converter "$ARQUIVO" --fase "$FASE" --escala "$ESCALA" $CAMPOS ;;
+          esac
+      - name: Gravar no branch
+        if: ${{ inputs.modo == 'converter' }}
+        # Commit feito com GITHUB_TOKEN não dispara workflow — sem laço.
+        run: |
+          git add data/zee
+          if git diff --cached --quiet; then echo "Sem mudança nos arquivos."; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "dados: ZEE do Acre (Mapa de Gestão), gerado por scripts/zee_acre.py"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

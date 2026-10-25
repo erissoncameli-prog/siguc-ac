@@ -27,6 +27,10 @@ const PEDO = { type: 'FeatureCollection', fonte: 'IBGE — BDIA:pedo_area', esca
   { type: 'Feature', geometry: quad(-69.7, -10.0, 0.2), properties: { legenda_2: 'Latossolos Amarelos', ordem: 'LATOSSOLOS', textura: 'argilosa' } },
   { type: 'Feature', geometry: quad(-69.4, -10.0, 0.2), properties: { legenda_2: 'Argissolos Vermelhos', ordem: 'ARGISSOLOS', textura: 'argilosa' } },
 ] };
+const APT = { type: 'FeatureCollection', fonte: 'Embrapa — GeoInfo, projeto UZEE-AML (geonode:acre_aptidao_agric)', escala: null, cobertura_pct: 47.2, features: [
+  { type: 'Feature', geometry: quad(-68.0, -10.0, 0.2), properties: { class_apt: 'B/P' } },
+  { type: 'Feature', geometry: quad(-67.7, -10.0, 0.2), properties: { class_apt: 'R/A' } },
+] };
 const MASSAS = { type: 'FeatureCollection', fonte: 'ANA — SNIRH2016/Massa_dagua/MapServer/0', features: [
   { type: 'Feature', geometry: quad(-70.0, -9.6, 0.05), properties: { nmoriginal: 'Lagoa Sacado', detipomass: 'Natural', nuareaha: 3.2 } },
   { type: 'Feature', geometry: quad(-69.8, -9.6, 0.05), properties: { detipomass: 'Artificial', nmgenerico: 'Barragem', nuareaha: 412 } },
@@ -44,7 +48,7 @@ async function abrir(page) {
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.js', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.js'), contentType: 'application/javascript' }));
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.css', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.css'), contentType: 'text/css' }));
   const pedidos = [];
-  await page.route('**/data/meio_fisico/**', r => { const u = new URL(r.request().url()).pathname; pedidos.push(u); r.fulfill({ json: u.endsWith('/massas_dagua.geojson') ? MASSAS : PEDO }) });
+  await page.route('**/data/meio_fisico/**', r => { const u = new URL(r.request().url()).pathname; pedidos.push(u); r.fulfill({ json: u.endsWith('/massas_dagua.geojson') ? MASSAS : u.endsWith('/aptidao_agricola.geojson') ? APT : PEDO }) });
   await page.goto(`${BASE}/pages/mapa.html`);
   await page.waitForFunction(() => typeof renderPagina === 'function' && typeof L !== 'undefined' && typeof mfMontar === 'function');
   await page.evaluate(() => {
@@ -59,16 +63,16 @@ async function abrir(page) {
 
 async function ligarPedologia(page) {
   await page.click('#mlb-btn-meio');
-  await expect(page.locator('[data-mf-tema]')).toHaveCount(7);
+  await expect(page.locator('[data-mf-tema]')).toHaveCount(8);
   await page.locator('[data-mf-tema="pedologia"] [data-mf-acao="ligar"]').check();
   await page.waitForFunction(() => mfAtivos().includes('pedologia'));
 }
 
-test('aba lista os 7 temas (IBGE e ANA) com fonte e escala; nada é baixado antes de ligar', async ({ page }) => {
+test('aba lista os 8 temas (IBGE, Embrapa e ANA) com fonte e escala; nada é baixado antes de ligar', async ({ page }) => {
   const pedidos = await abrir(page);
   await page.click('#mlb-btn-meio');
   const textos = await page.locator('[data-mf-tema] .mf-meta').allInnerTexts();
-  expect(textos.length).toBe(7);
+  expect(textos.length).toBe(8);
   expect(textos.filter(t => /IBGE/.test(t)).every(t => /1:/.test(t))).toBe(true);
   // a ANA não publica a escala: a tela diz isso, nunca inventa um número
   const ana = textos.filter(t => /ANA/.test(t));
@@ -168,4 +172,24 @@ test('massas d\'água por área: degradê em escala log com legenda em barra', a
   const leg = page.locator('.cart-legenda .cart-leg-degrade');
   await expect(leg).toContainText("Massas d'água — Área (cadastro ANA) (escala log)");
   await expect(leg.locator('.cart-leg-degrade-rot')).toHaveText(/^3\s*412$/);
+});
+
+test('aptidão agrícola do UZEE: diz que cobre só parte do Acre e mostra o código da fonte, sem significado inventado', async ({ page }) => {
+  await abrir(page);
+  await page.click('#mlb-btn-meio');
+  const box = page.locator('[data-mf-tema="aptidao_agricola"]');
+  await expect(box.locator('.mf-meta')).toHaveText(/Embrapa.*escala não informada pelo serviço/);
+  await expect(box.locator('.mf-nota-tema')).toContainText('Cobre só as regiões de consolidação e expansão do MacroZEE');
+  await expect(box.locator('.mf-nota-tema')).toContainText('não publica a legenda por extenso');
+  await box.locator('[data-mf-acao="ligar"]').check();
+  await page.waitForFunction(() => mfAtivos().includes('aptidao_agricola'));
+  const cores = await page.evaluate(() => _mf.camadas.aptidao_agricola.layer.getLayers().map(l => l.options.fillColor));
+  expect(cores[0]).not.toBe(cores[1]);
+  const leg = await page.evaluate(() => mfItensLegenda().map(i => i.label));
+  expect(leg).toEqual(['Aptidão agrícola — ZEE/UZEE — B/P', 'Aptidão agrícola — ZEE/UZEE — R/A']);
+  await page.evaluate(() => _mf.camadas.aptidao_agricola.layer.getLayers()[0].openPopup());
+  const t = await page.locator('.leaflet-popup-content').last().innerText();
+  expect(t).toContain('B/P');
+  expect(t).toContain('não publica a legenda por extenso');
+  expect(t).not.toMatch(/boa|regular|pastagem|lavoura/i);   // nenhum significado suposto
 });
