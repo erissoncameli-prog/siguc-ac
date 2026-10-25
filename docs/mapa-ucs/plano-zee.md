@@ -43,6 +43,28 @@ SEMA** — é ele que destrava a camada.
   nas sessões de desenvolvimento. O runner do GitHub alcança: por isso a
   descoberta e a conversão a partir de URL rodam no workflow.
 
+## Busca na internet pelo arquivo vetorial (25/10/2026) — nada público
+
+Rodado pelo modo `descobrir` (log do workflow "ZEE do Acre") + buscas na web:
+
+| Fonte | Resultado |
+|---|---|
+| Pasta da SEMA no Drive e repositório do site da SEMA | só PDF (~65 arquivos) |
+| INDE (`geoservicos.inde.gov.br`, inclusive o workspace MMA) | nenhuma camada de ZEE do Acre |
+| GeoInfo/Embrapa (`geoinfo.dados.embrapa.br`) — herdou parte do projeto UZEE-AML | do Acre, só solos/aptidão agrícola do UZEE (`geonode:acre_aptidao_agric`, 2017) e TerraClass; **sem zonas de gestão** |
+| SIAGEO/Embrapa (`amazonia.cnptia.embrapa.br/i3geo`, ~650 camadas dos ZEE estaduais) | **fora do ar** — o domínio não existe mais |
+| i3Geo do MMA (`mapas.mma.gov.br`, "Mapa Integrado dos ZEE estaduais") | não responde (timeout) |
+| Wayback Machine (mapas.mma, seiam.ac.gov.br, semapi, sema.ac, SIAGEO, zeeamazonia) | ~34 mil URLs arquivadas; nenhum shapefile do ZEE |
+| ArcGIS Online | nada |
+
+Conclusão: o arquivo vetorial do Mapa de Gestão hoje só existe na SEMA
+(Núcleo de ZEE) — e talvez na Embrapa Informática Agropecuária, que coordenou
+o SIAGEO (equipe de João Vila). Pedir a um dos dois.
+
+Extra disponível, se interessar: `geonode:acre_aptidao_agric` (WFS da
+GeoInfo/Embrapa) — solos/aptidão agrícola do UZEE para o Acre, 2017. É camada
+temática do ZEE, não o Mapa de Gestão.
+
 ## O que foi entregue (sem o dado vetorial)
 
 - **Aba "ZEE"** na barra de camadas (`js/mapa-zee.js`, prefixo `zee`):
