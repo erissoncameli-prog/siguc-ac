@@ -128,3 +128,27 @@ test('relatório do imóvel: mapa com satélite, barra de escala na moldura e gr
   await expect(quadro).toContainText('Esri World Imagery');
   expect(await quadro.locator('.rel-mapa-escala').textContent()).not.toMatch(/1:\d/);
 });
+
+test('relatório do imóvel: ZEE Fase III do arquivo real, e falha dita como "não conferido"', async ({ page }) => {
+  await abrir(page);
+  // imóvel de ~1 km² perto de Rio Branco
+  const r = await page.evaluate(async () => {
+    const poli = turf.polygon([[[-67.9, -9.95], [-67.89, -9.95], [-67.89, -9.94], [-67.9, -9.94], [-67.9, -9.95]]])
+    const zee = await _relZee(poli)
+    return { zee, html: _relZeeHTML(zee), curto: _relZeeHTML(zee, true), soma: zee.lista.reduce((s, c) => s + c.pct, 0) }
+  });
+  expect(r.zee.falhou).toBe(null);
+  expect(r.zee.lista.length).toBeGreaterThan(0);
+  expect(r.soma).toBeGreaterThan(95);          // o imóvel inteiro está no Acre
+  expect(r.soma).toBeLessThan(101);
+  expect(r.html).toContain('ZEE Fase III');
+  expect(r.html).toContain('sem lei estadual');
+  expect(r.html).toContain('<table');
+  expect(r.curto).not.toContain('<table');
+  const falha = await page.evaluate(async () => {
+    _zimPromessa = Promise.resolve(null)
+    return _relZeeHTML(await _relZee(turf.polygon([[[-67.9, -9.95], [-67.89, -9.95], [-67.89, -9.94], [-67.9, -9.95]]])))
+  });
+  expect(falha).toContain('ZEE não conferido');
+  expect(falha).not.toContain('<table');
+});

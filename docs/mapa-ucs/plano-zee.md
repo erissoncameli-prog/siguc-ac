@@ -142,6 +142,19 @@ texto.
   Não copiados para o repositório; o pacote inteiro entrou como link em
   `documentos.json` (grupo Fase III).
 
+### Quadro de áreas, classes e relatórios do CAR (26/10/2026)
+
+- `data/zee/fase3_quantificacoes.json`: 37 classes (4 zonas, 20 subzonas, 13
+  unidades) com área 2007 e 2020, da planilha de quantificações da SEMA e da
+  tabela de atributos. Zonas 2020 somam 16.431.092 ha (SIG) contra 16.422.136 ha
+  oficiais do estado; o % do Acre usa o oficial. Unidades 1.1.8, 1.2.3, 1.3.2 e
+  subzonas 3.3–3.5 são novas na Fase III ("nova" no quadro). A unidade 1.3.1 de
+  2007 = subzona 1.3 inteira (a Fase II não a dividia).
+- Aba ZEE: árvore de classes com mostrar/ocultar e área, colorir por unidade,
+  quadro 2007 × 2020, popup com área oficial ao lado da área do desenho.
+- Relatórios "CAR na UC" e do imóvel: zona/subzona/unidade que o imóvel atinge,
+  com hectares e % (`js/zee-imovel.js`).
+
 ## Fase II recebida (26/10/2026)
 
 O usuário enviou `ZEE_II.rar` (RAR5 — o `unar` 1.10 falha nos `.shp`; extrair com
@@ -215,4 +228,9 @@ subzonas/unidades de manejo, se existir).
   site. O `SUBSIDIOS_A_GESTAO_TERRITORIAL.pdf` é imagem do mapa: vetorizar a
   partir dele não serve (deformação e perda de precisão em 1:250 mil).
 - Nomes e diretrizes das subzonas (anexos da Lei 1.904/2007).
-- Depois: subzona do ZEE no relatório "CAR na UC" e no relatório do imóvel.
+- ~~Subzona do ZEE no relatório "CAR na UC" e no relatório do imóvel~~ —
+  entregue em 26/10/2026 (`js/zee-imovel.js`).
+- Mapas oficiais (JPG por zona, A0 em PDF), metadados, minuta de lei de 2021 e
+  apresentação de 2023: estão só dentro do pacote de 845 MB. Para listar cada
+  um em `documentos.json` falta um link público por arquivo (a regra é não
+  copiar PDF para o SIGUC) ou a decisão de hospedá-los.

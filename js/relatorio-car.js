@@ -622,6 +622,43 @@ function _relEmbargosHTML(emb) {
     </table>${nota}`;
 }
 
+// ── ZEE Fase III do imóvel ───────────────────────────────────────────────
+// Mesma regra do relatório "CAR na UC": fonte única em js/zee-imovel.js
+// (zimCarregar/zimPreparar/zimDoImovel). Falha = "não conferido", nunca
+// "fora do ZEE".
+async function _relZee(carPoly) {
+  if (!carPoly) return { lista: [], falhou: 'geometria do imóvel indisponível' };
+  if (typeof zimCarregar !== 'function') return { lista: [], falhou: 'módulo do ZEE não carregado' };
+  try {
+    const gj = await zimCarregar();
+    if (!gj) return { lista: [], falhou: 'o arquivo do ZEE Fase III não carregou' };
+    return { lista: zimDoImovel(carPoly, zimPreparar(gj, turf.bbox(carPoly))), falhou: null };
+  } catch (e) {
+    console.warn('[relatorio-car] zee', e);
+    return { lista: [], falhou: e.message || String(e) };
+  }
+}
+
+function _relZeeHTML(zee, compacto) {
+  if (!zee) return '';
+  const tit = '<div class="rel-secao-subtitulo">Zoneamento Ecológico-Econômico (ZEE Fase III)</div>';
+  if (zee.falhou) return `${tit}<div style="font-size:9px;color:#92400e">ZEE não conferido (${_relEsc(zee.falhou)}) — a ausência de classe NÃO significa fora do ZEE.</div>`;
+  const nota = `<div style="font-size:8px;color:#6b7280;margin-top:3px">${_relEsc(ZIM_SITUACAO)}. Área da interseção com o polígono do CAR (desenho do mapa, não registral). Não substitui a análise do imóvel.</div>`;
+  if (!zee.lista.length) return `${tit}<div style="font-size:9px">O imóvel não cai em nenhuma classe do ZEE (fora do limite do Acre usado pelo ZEE).</div>${nota}`;
+  if (compacto) return `${tit}<div style="font-size:9px">${_relEsc(zimTextoLongo(zee.lista))}</div>${nota}`;
+  return `${tit}
+    <table class="rel-table rel-table-sm">
+      <tr><th>Zona</th><th>Subzona</th><th>Unidade de manejo</th><th>Área no imóvel</th><th>% do imóvel</th></tr>
+      ${zee.lista.map(c => `<tr>
+        <td>${_relEsc(c.zona || 'Zona ' + c.zona_cod)}</td>
+        <td>${_relEsc(c.subzona ? c.subzona + (c.subzona_nome ? ' — ' + c.subzona_nome : '') : '—')}</td>
+        <td>${_relEsc(c.unidade ? c.unidade + (c.unidade_nome ? ' — ' + c.unidade_nome : '') : '—')}</td>
+        <td>${_relF2(c.ha)} ha</td>
+        <td>${c.pct != null ? _relF1(c.pct) + '%' : '—'}</td>
+      </tr>`).join('')}
+    </table>${nota}`;
+}
+
 // ── Monta dados de um imóvel (usa caches existentes) ─────────────────────
 
 async function _montarDadosRelatorio(feat) {
@@ -650,7 +687,7 @@ async function _montarDadosRelatorio(feat) {
   const numModulo = parseFloat(local.num_modulo || p.num_modulo || 0);
   const pequenaProp = numModulo > 0 && numModulo <= 4;
   const sit = _relSituacaoAtual(local, p);
-  const embargos = await _relEmbargos(carPoly, cod);
+  const [embargos, zee] = await Promise.all([_relEmbargos(carPoly, cod), _relZee(carPoly)]);
   const totalGeral  = pr?.totalGeral || 0;
   const haConsol    = pr?.haConsolidado || 0;
 
@@ -666,6 +703,7 @@ async function _montarDadosRelatorio(feat) {
     condicao_analise: sit.condicao,                  // condição (legível; no cancelado, o motivo)
     dat_cancelamento: sit.dataCanc ? _relDataBR(sit.dataCanc) : '',
     embargos,
+    zee,
     embargosVigentes: embargos.lista.filter(e => e.situacao === 'vigente').length,
     nome_class:   local.nome_class  || '—',
     num_modulo:   numModulo,
@@ -890,6 +928,8 @@ function _htmlFolhaSintetica(d, cab, protocolo, idx, total, multi) {
         <div class="rel-conf conf-il"  ><div class="cl">${d.asvBase?'🔴 A verificar / Ilegal':'🟠 A verificar'}</div><div class="cv">${_relF2(d.haAVerificar)} ha</div><div class="cs">${d.asvBase?'Art. 38 CF':'Base ASV indisp.'} · ${_relPct(d.haAVerificar,d.totalGeral_ha)}%</div></div>
       </div>
 
+      ${_relZeeHTML(d.zee, true)}
+
       <!-- Mapas lado a lado -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         ${_htmlMapaABNT({ id: mapLocId, titulo:'Mapa 1 — Localização Regional', altura:200,
@@ -978,6 +1018,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
           ${d.emUC?`<tr><td>Sobreposição com UC</td><td><strong style="color:#d97706">⚠️ ${_relEsc(d.ucNome||'UC do Acre')} — ${_relF2(d.areaUC)} ha sobrepostos</strong></td></tr>`:''}
         </table>
         ${_relEmbargosHTML(d.embargos)}
+        ${_relZeeHTML(d.zee)}
       </div>
 
       <div class="rel-secao">

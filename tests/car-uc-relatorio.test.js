@@ -397,6 +397,34 @@ test('lista só os imóveis que se sobrepõem à UC, com zonas e atenção', asy
   expect(ambiental).toBe(0);   // não marcado → não pedido
 });
 
+test('ZEE Fase III: classe de cada imóvel (arquivo real), quadro clicável e falha dita como "não conferido"', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  // os três imóveis caem no ZEE (arquivo real data/zee/fase3_gestao.geojson)
+  const zee = await page.evaluate(() => _carucRel.imoveis.map(i => [i.cod, (i.zee || []).map(c => c.cod), Math.round((i.zee || []).reduce((s, c) => s + c.ha, 0))]));
+  for (const [, cods] of zee) expect(cods.length).toBeGreaterThan(0);
+  await expect(linhaCar(page, 'AC-A')).toContainText(/ZEE III: \d/);
+  const card = page.locator('.card', { has: page.locator('.card-title', { hasText: 'ZEE Fase III' }) });
+  await expect(card).toContainText('sem lei estadual');
+  const primeira = card.locator('tbody tr').first();
+  const n = Number(await primeira.locator('td.num').first().innerText());
+  await primeira.click();
+  await expect(page.locator(LINHAS)).toHaveCount(n);
+  // coluna da planilha/CSV
+  const csv = await page.evaluate(() => carucCsv(_carucRel));
+  expect(csv).toContain('ZEE Fase III');
+});
+
+test('ZEE Fase III indisponível: aviso, nunca "fora do ZEE"', async ({ page }) => {
+  await page.route('**/data/zee/fase3_gestao.geojson', r => r.fulfill({ status: 404, body: '' }));
+  await abrir(page);
+  await gerar(page);
+  await expect(page.locator('#caruc-resultado')).toContainText('ZEE Fase III não conferido');
+  await expect(page.locator('#caruc-resultado')).not.toContainText(/\d+ imóvel\(is\) fora do ZEE/);
+  expect(await page.evaluate(() => _carucRel.imoveis.flatMap(i => CARUC_FILTROS.find(d => d.chave === 'zee').valores(i)))).toEqual(['ZEE não conferido', 'ZEE não conferido', 'ZEE não conferido']);
+  expect(await page.evaluate(() => _carucRel.imoveis.every(i => i.zee === undefined))).toBe(true);
+});
+
 test('embargos: IBAMA por sobreposição, IMAC pelo nº do CAR, e a fonte sem carga diz isso', async ({ page }) => {
   await abrir(page);
   await gerar(page);

@@ -99,6 +99,21 @@ async function carucMontarPdf(rel, protocolo) {
     if (r.sem_zona) _agpdfParagrafo(ctx, `${r.sem_zona} imóvel(is) na UC fora de qualquer zona cadastrada.`, { muted: true })
   }
 
+  _agpdfTitulo(ctx, 'ZEE Fase III')
+  if (!rel.zee?.conferido) {
+    _agpdfParagrafo(ctx, `ZEE Fase III não conferido${rel.falhas?.zee ? ' (' + rel.falhas.zee + ')' : ''} — a ausência de classe NÃO significa fora do ZEE.`, { muted: true })
+  } else {
+    _agpdfParagrafo(ctx, `${ZIM_SITUACAO}. Área = parte do imóvel na UC/ZA que cai em cada classe (desenho do mapa, não registral).`, { muted: true })
+    if (r.por_zee.length) {
+      _agpdfTabela(ctx, {
+        head: [['Zona, subzona ou unidade de manejo', 'Imóveis', 'Área (ha)']],
+        body: r.por_zee.map(z => [z.rotulo, String(z.n), _carucN(z.ha)]),
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+      })
+    }
+    if (r.fora_zee) _agpdfParagrafo(ctx, `${r.fora_zee} imóvel(is) fora do ZEE (fora do limite do Acre usado pelo ZEE).`, { muted: true })
+  }
+
   _carucTabelaContagem(ctx, 'Prioridade para fiscalização', r.por_prioridade.filter(p => p.n), 'Prioridade')
   _carucTabelaContagem(ctx, 'Quanto do imóvel está na UC', r.por_faixa_uc, 'Faixa')
   _carucTabelaContagem(ctx, 'Por município', r.por_municipio, 'Município')
@@ -231,6 +246,7 @@ function _carucPdfNota(i) {
   const partes = []
   if (i.prioridade?.motivos?.length) partes.push('Motivo: ' + i.prioridade.motivos.join('; '))
   if (i.atencoes?.length) partes.push('Atenção: ' + i.atencoes.join('; '))
+  if (i.zee?.length) partes.push('ZEE III: ' + zimTexto(i.zee))
   if (i.embargos?.length) partes.push('Embargo: ' + i.embargos.slice(0, 4).map(e => `${carucEmbargoRotulo(e)} (${CARUC_EMBARGO_SITUACAO[e.situacao] || e.situacao})`).join('; ')
     + (i.embargos.length > 4 ? ` e mais ${i.embargos.length - 4}` : ''))
   if (i.sobreposicoes?.length) partes.push('Sobrepõe: ' + i.sobreposicoes.slice(0, 4).map(s => `${s.cod} (${_carucN(s.ha)} ha${s.mesmo_titular ? ', mesmo titular' : ''})`).join('; ')

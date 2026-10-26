@@ -172,7 +172,7 @@ test('colorir por subzona: tons da cor da zona, legenda por subzona, preferênci
     'ZEE Fase II — Subzona 2.1 (UCs de proteção integral)']);
   await page.evaluate(() => { const i = document.querySelector('[data-zee-acao="opacidade"]'); i.value = '70'; i.dispatchEvent(new Event('input', { bubbles: true })) });
   expect(await page.evaluate(() => _zee.layer.getLayers()[0].options.fillOpacity)).toBe(0.7);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_zee')))).toEqual({ ativa: 'fase2_gestao', colorir: 'subzona', opacidade: 0.7, comp: [] });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_zee')))).toEqual({ ativa: 'fase2_gestao', colorir: 'subzona', opacidade: 0.7, comp: [], ocultos: [] });
 });
 
 test('arquivos REAIS (SEMA, 26/10/2026): Fase II só zonas, Fase III com subzona e unidade de manejo', async ({ page }) => {
@@ -207,6 +207,31 @@ test('arquivos REAIS (SEMA, 26/10/2026): Fase II só zonas, Fase III com subzona
   await page.locator('[data-zee-acao="colorir"]').selectOption('subzona');
   expect(await page.evaluate(() => zeeItensLegenda().length)).toBe(20);
 
+  // colorir por unidade de manejo: 13 unidades + 17 subzonas sem unidade
+  await page.locator('[data-zee-acao="colorir"]').selectOption('unidade');
+  expect(await page.evaluate(() => zeeItensLegenda().length)).toBe(30);
+  expect(new Set(await page.evaluate(() => _zee.layer.getLayers().map(l => l.options.fillColor))).size).toBe(30);
+  // árvore de classes: 4 zonas + 20 subzonas + 13 unidades, com área oficial
+  await expect(page.locator('#zee-classes [data-zee-acao="classe"]')).toHaveCount(37);
+  await expect(page.locator('#zee-classes .zee-cl', { hasText: 'Unidade 1.1.1' })).toContainText('206.336 ha');
+  // ocultar a Zona 2: some do mapa e da legenda; os filhos ficam travados
+  await page.locator('#zee-classes [data-zee-cod="2"]').uncheck();
+  expect(await page.evaluate(() => _zee.layer.getLayers().filter(l => l.feature.properties.zona_cod === '2').length)).toBe(0);
+  expect(await page.evaluate(() => _zee.layer.getLayers().length)).toBe(24);
+  expect(await page.evaluate(() => zeeItensLegenda().length)).toBe(24);
+  await expect(page.locator('#zee-classes [data-zee-cod="2.1"]')).toBeDisabled();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_zee')).ocultos)).toEqual(['2']);
+  await page.locator('#zee-classes [data-zee-acao="todas"]').click();
+  await page.waitForFunction(() => _zee.layer.getLayers().length === 30);
+  await expect(page.locator('#mlb-dropdown')).toBeVisible(); // o painel não fecha
+  // quadro de áreas oficiais 2007 × 2020 (planilha da SEMA)
+  const q = page.locator('#zee-quadro details');
+  await q.locator('summary').click();
+  await expect(q.locator('tbody tr')).toHaveCount(37);
+  await expect(q.locator('tr', { hasText: '1.1.8' })).toContainText('nova');
+  await expect(q.locator('tr.zee-q-n1', { hasText: 'Zona 3' })).toContainText('-56,0%');
+  await page.locator('[data-zee-acao="colorir"]').selectOption('subzona');
+
   // clique de verdade no mapa: o popup abre na feição de baixo do cursor
   await page.click('#mlb-dropdown .mlb-close');
   await expect(page.locator('#mlb-dropdown')).toBeHidden();
@@ -231,6 +256,8 @@ test('arquivos REAIS (SEMA, 26/10/2026): Fase II só zonas, Fase III com subzona
   expect(t).toMatch(/Unidade de manejo 1\.1\.1/i);
   expect(t).toContain('Zona 1 — Sistemas de Produção Agropecuários e Florestais Sustentáveis');
   expect(t).toContain('sem lei estadual que o institua');
+  expect(t).toMatch(/Área oficial \(SEMA, 2020\):\s*206\.336 ha/);
+  expect(t).toMatch(/Área na Fase II \(2007\):\s*134\.673 ha/);
   t0 = Date.now();
   await page.mouse.move(alvo.x, alvo.y + 150); await page.mouse.down();
   await page.mouse.move(alvo.x + 200, alvo.y + 250, { steps: 10 }); await page.mouse.up();

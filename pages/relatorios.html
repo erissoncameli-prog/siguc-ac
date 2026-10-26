@@ -12,6 +12,7 @@
 <script src="../js/mapa-cartografia.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/vendor/turf-6.5.0.min.js"></script>
+<script src="../js/zee-imovel.js"></script>
 <script src="../js/car-uc-relatorio.js"></script>
 <script src="../js/vendor/proj4-2.11.0.min.js"></script>
 <script src="../js/mapa-moldura.js"></script>
@@ -512,6 +513,7 @@ function carucRender(rel) {
   if (rel.falhas.prodes) avisos.push(`${rel.falhas.prodes} de ${rel.falhas.prodes_quadrantes} quadrantes do PRODES não responderam — os valores de PRODES podem estar incompletos.`)
   if (rel.falhas.ambiental) avisos.push(`Focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
   if (rel.falhas.embargos) avisos.push(carucEmbargosFonteTexto(rel))
+  if (rel.falhas.zee) avisos.push(`ZEE Fase III não conferido (${rel.falhas.zee}) — imóvel sem classe NÃO significa fora do ZEE.`)
   if (rel.falhas.fora_sem_geom) avisos.push(`${rel.falhas.fora_sem_geom} CAR(s) do mesmo titular fora da UC não vieram do SICAR — aparecem na lista, mas não no mapa.`)
   if (rel.resumo.sem_planilha) avisos.push(`${rel.resumo.sem_planilha} imóvel(is) do SICAR não estão na planilha local — aparecem sem titular, classe e módulos.`)
 
@@ -742,6 +744,15 @@ function _carucConteudoHTML(rel) {
        </table></div>` : '<div class="caruc-nota">Nenhum imóvel do recorte atinge as zonas cadastradas.</div>'}
        ${r.sem_zona ? `<div class="caruc-nota"><span${_carucClic('zona', 'Fora de zona cadastrada', r.sem_zona)}>${formatNum(r.sem_zona, 0)} imóvel(is) na UC fora de qualquer zona cadastrada</span>.</div>` : ''}`
 
+  const zeeHTML = !rel.zee?.conferido
+    ? `<div class="caruc-aviso" style="margin:0">ZEE Fase III não conferido — a ausência de classe não significa fora do ZEE.</div>`
+    : `<div class="caruc-nota">${esc(ZIM_SITUACAO)}. Área = parte do imóvel na UC/ZA em cada classe (desenho do mapa, não registral).</div>
+       ${r.por_zee.length ? `<div class="table-wrap"><table class="caruc-mini">
+         <thead><tr><th>Zona, subzona ou unidade de manejo</th><th class="num">Imóveis</th><th class="num">Área (ha)</th></tr></thead>
+         <tbody>${r.por_zee.map(z => `<tr${_carucClic('zee', z.rotulo, z.n)}><td>${esc(z.rotulo)}</td><td class="num">${formatNum(z.n, 0)}</td><td class="num">${formatNum(z.ha, 2)}</td></tr>`).join('')}</tbody>
+       </table></div>` : '<div class="caruc-nota">Nenhum imóvel do recorte cai no ZEE.</div>'}
+       ${r.fora_zee ? `<div class="caruc-nota"><span${_carucClic('zee', 'Fora do ZEE', r.fora_zee)}>${formatNum(r.fora_zee, 0)} imóvel(is) fora do ZEE</span>.</div>` : ''}`
+
   const thAmb = (o.focos ? `<th class="num">Focos ${o.focosDe}–${o.focosAte}</th>` : '') + (o.deter ? '<th class="num">DETER</th>' : '') + (o.prodes ? '<th class="num">PRODES após 2008 (ha)</th>' : '')
   const nCols = 9 + (o.focos ? 1 : 0) + (o.deter ? 1 : 0) + (o.prodes ? 1 : 0)
   const linhas = rel.imoveis.length
@@ -782,6 +793,11 @@ function _carucConteudoHTML(rel) {
       <div class="card-body">${zonaHTML}</div>
     </div>
 
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><div class="card-title">ZEE Fase III — zona, subzona e unidade de manejo</div></div>
+      <div class="card-body">${zeeHTML}</div>
+    </div>
+
     <div class="caruc-grid4" style="margin-bottom:16px">
       ${_carucMiniTabela('Por município', r.por_municipio, 'Município', 'municipio')}
       ${_carucMiniTabela('Por situação do cadastro', r.por_situacao, 'Situação', 'situacao')}
@@ -798,7 +814,7 @@ function _carucConteudoHTML(rel) {
       </div>
       <div class="card-body">
         <div class="table-wrap"><table class="table" id="caruc-tabela">
-          <thead><tr><th>Prioridade</th><th>Nº do CAR</th><th>Imóvel / titular</th><th>Município</th><th>Situação / classe</th><th>Tipo</th><th class="num">Área na UC (ha)</th><th>Zonas</th><th>Inscrição</th>${thAmb}</tr></thead>
+          <thead><tr><th>Prioridade</th><th>Nº do CAR</th><th>Imóvel / titular</th><th>Município</th><th>Situação / classe</th><th>Tipo</th><th class="num">Área na UC (ha)</th><th>Zonas / ZEE</th><th>Inscrição</th>${thAmb}</tr></thead>
           <tbody>${linhas}</tbody>
         </table></div>
       </div>
@@ -841,7 +857,7 @@ function _carucLinhaHTML(i, o, pino) {
     <td>${esc(i.situacao || '—')}${_carucCanceladoHTML(i)}${i.classe ? `<br><span class="caruc-nota">${esc(i.classe)}</span>` : ''}</td>
     <td>${esc(carucTipoImovel(i.tipo_imovel))}</td>
     <td class="num">${formatNum(i.area_analise_ha, 2)}<br><span class="caruc-nota">${i.pct_analise != null ? formatNum(i.pct_analise, 1) + '% do imóvel' : ''}</span></td>
-    <td>${zonas || '<span class="caruc-nota">—</span>'}</td>
+    <td>${zonas || '<span class="caruc-nota">—</span>'}${(i.zee || []).length ? `<span class="caruc-nota" style="display:block" title="${esc(zimTextoLongo(i.zee))}">ZEE III: ${esc(i.zee.map(c => c.cod).join(', '))}</span>` : ''}</td>
     <td>${i.data_inscricao ? formatData(i.data_inscricao) : '—'}</td>
     ${amb}
   </tr>`
