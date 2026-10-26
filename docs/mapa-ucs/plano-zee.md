@@ -94,7 +94,34 @@ texto.
   informa escala → `escala: null` e a tela diz "não informada".
   Convertido por `--converter … --fase 3 --shp AC_MapaGestao_ZEE_III_Versao0506
   --campo-zona Zona --campo-subzona Zon_label --campo-zona-nome DescrZona
-  --campo-subzona-nome DescSubZon --campo-unidade-nome DescUniman --escala nenhuma`.
+  --campo-subzona-nome DescSubZon --campo-unidade-nome DescUniman --escala nenhuma
+  --area-minima-ha 6.25`. Resultado: 30 feições, 4 zonas, 20 subzonas, 13
+  unidades de manejo (todas na Zona 1), 99,8% do Acre, 15,1 MB (3,9 MB com
+  gzip; o mapa só baixa ao ligar).
+- **Por que a conversão passava de 30 min (medido com `--perfil`)**: o arquivo
+  veio de raster vetorizado — 5,9 milhões de vértices em 223.876 partes
+  (143.555 menores que 0,2 ha) e 142.108 furos (123.603 com menos de 1 ha). O
+  simplify topológico passa de 150 s numa feição só (e o `make_valid` e o
+  recorte idem); com SVG/pyshp o resto também pesava. Caminho novo
+  (`ler_preparar`): pyogrio (WKB → shapely 2 em array), tirar o Z, **tirar
+  partes e furos abaixo da área mínima** (`tirar_miudos`; o furo de uma zona é a
+  ilha de outra, tirando os dois a área passa para a zona em volta), Douglas-Peucker
+  simples na unidade do arquivo (TOLERANCIA/2 em metros), `make_valid` só no
+  inválido, reprojeção em bloco e o `recortar` do Meio Físico (sem mudança).
+  Conversão inteira em ~70 s.
+- **Área mínima 6,25 ha** (= 1 mm² no papel a 1:250 mil), declarada em
+  `manifesto.json` (`area_minima_ha`). Medido: 1 ha → 19,3 MB, área −0,06%;
+  6,25 ha → 15,1 MB, −0,15%, maior variação numa feição 6,3%; 25 ha → 12,3 MB,
+  −0,32%; 100 ha → 9,6 MB, −0,77% (18,8% numa feição). O tamanho quase não cai
+  com área maior — o peso está nos contornos —, então ficou a menor perda.
+  Outro valor = rodar o `converter` de novo com `--area-minima-ha`.
+- Sobreposições finas nas divisas: cada feição é simplificada sozinha, então
+  vizinhas se sobrepõem em faixas de metros (257 pares, ~19 mil ha somados,
+  0,12% do estado). Mesma natureza da Fase II e do Meio Físico (mesma
+  tolerância de 45 m); só some com simplificação de cobertura no `recortar`, que
+  é do Meio Físico e não foi mexido.
+- No navegador, com o arquivo real: ligar ~0,8 s, clique → popup ~0,1–0,2 s,
+  arrastar ~0,4–0,5 s (SVG; canvas medido igual, não entrou).
 - `ZEE_ACRE_FUNDIARIO.shp` (1.248 polígonos; metadado:
   `ZEE_Ac_fUNDIARIO_REVISADO_2019`): base fundiária que o ZEE usou — 952
   imóveis rurais (IRU), 156 assentamentos, 84 glebas federais, 32 TIs, 18 UCs
@@ -163,6 +190,13 @@ subzonas/unidades de manejo, se existir).
   - Travas: sem `.prj` → para; feição sem zona → para e lista os valores;
     cobertura fora de 95–105% do estado → nada gravado.
   - ARQ pode ser `.zip`, pasta, `.shp`, URL ou `drive:<id>`.
+  - `--area-minima-ha N`: tira partes e furos menores que N antes de
+    simplificar (arquivo vindo de raster). Fica no manifesto.
+  - Modos de diagnóstico do workflow: `extrair` (artefato só com o `.shp`
+    escolhido — o blob storage do GitHub dá 403 nas sessões, então serve para
+    baixar de fora) e `perfil` (mede a conversão inteira por área mínima, sem
+    gravar). `timeout-minutes: 90` só por segurança; log sem buffer
+    (`PYTHONUNBUFFERED`), então um job cancelado mostra até onde chegou.
 
 ## Como ligar quando o dado chegar
 

@@ -175,19 +175,66 @@ test('colorir por subzona: tons da cor da zona, legenda por subzona, preferênci
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_zee')))).toEqual({ ativa: 'fase2_gestao', colorir: 'subzona', opacidade: 0.7, comp: [] });
 });
 
-test('arquivo REAL da Fase II (SEMA, 26/10/2026): 4 zonas, sem subzona — só "colorir por zona"', async ({ page }) => {
+test('arquivos REAIS (SEMA, 26/10/2026): Fase II só zonas, Fase III com subzona e unidade de manejo', async ({ page }) => {
+  test.setTimeout(60000);
   await abrir(page, { reais: true });
   await abrirAba(page);
   await expect(page.locator('.zee-aviso')).toHaveCount(0);
-  await expect(page.locator('[data-zee-camada="fase3_gestao"] [data-zee-acao="ligar"]')).toBeDisabled();
-  // sem subzona no arquivo, a opção de colorir por subzona não faz nada — não aparece
-  await expect(page.locator('[data-zee-acao="colorir"]')).toHaveCount(0);
+  await expect(page.locator('[data-zee-camada="fase3_gestao"] [data-zee-acao="ligar"]')).toBeEnabled();
+  // a Fase III tem subzona: a opção de colorir por subzona aparece
+  await expect(page.locator('[data-zee-acao="colorir"]')).toHaveCount(1);
   await ligar(page, 'fase2_gestao');
   const zonas = await page.evaluate(() => _zee.layer.getLayers().map(l => [l.feature.properties.zona_cod, l.options.fillColor]));
   expect(zonas).toEqual([['1', '#E69F00'], ['2', '#009E73'], ['3', '#CC79A7'], ['4', '#0072B2']]);
   const leg = await page.evaluate(() => zeeItensLegenda().map(i => i.label));
   expect(leg).toHaveLength(4);
   expect(leg[3]).toMatch(/Zona 4 — Cidades florestais/);
+
+  await ligar(page, 'fase3_gestao');
+  const f3 = await page.evaluate(() => _zee.layer.getLayers().map(l => l.feature.properties));
+  expect(f3).toHaveLength(30);
+  expect([...new Set(f3.map(p => p.zona_cod))]).toEqual(['1', '2', '3', '4']);
+  expect(new Set(f3.map(p => p.subzona)).size).toBe(20);
+  expect(f3.filter(p => p.unidade).length).toBe(13);
+  // nomes do PRÓPRIO arquivo (a Fase III renomeou as zonas)
+  expect(f3.find(p => p.zona_cod === '4').zona).toBe('Zona 4 — Cidades do Acre');
+  // um código, um nome
+  const nomes = {};
+  for (const p of f3) for (const [c, n] of [[p.zona_cod, p.zona], [p.subzona, p.subzona_nome], [p.unidade, p.unidade_nome]]) {
+    if (!c || !n) continue;
+    expect(nomes[c] ?? n).toBe(n); nomes[c] = n;
+  }
+  await page.locator('[data-zee-acao="colorir"]').selectOption('subzona');
+  expect(await page.evaluate(() => zeeItensLegenda().length)).toBe(20);
+
+  // clique de verdade no mapa: o popup abre na feição de baixo do cursor
+  await page.click('#mlb-dropdown .mlb-close');
+  await expect(page.locator('#mlb-dropdown')).toBeHidden();
+  const alvo = await page.evaluate(() => {
+    const l = _zee.layer.getLayers().find(l => l.feature.properties.unidade === '1.1.1')
+    // ponto dentro da MAIOR parte da unidade, longe das divisas (a simplificação
+    // deixa sobreposições finas, de metros, entre feições vizinhas)
+    const g = l.feature.geometry
+    const partes = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]
+    const maior = partes.map(c => turf.polygon(c)).sort((a, b) => turf.area(b) - turf.area(a))[0]
+    const [lng, lat] = turf.pointOnFeature(turf.buffer(maior, -1, { units: 'kilometers' })).geometry.coordinates
+    const c = L.latLng(lat, lng); mapaL.setView(c, 13, { animate: false })
+    const p = mapaL.latLngToContainerPoint(c), r = mapaL.getContainer().getBoundingClientRect()
+    return { x: r.left + p.x, y: r.top + p.y }
+  })
+  let t0 = Date.now();
+  await page.mouse.click(alvo.x, alvo.y);
+  await expect(page.locator('.leaflet-popup-content')).toBeVisible();
+  // arquivo de 15 MB (~716 mil vértices): medido ~0,1–0,5 s; o teto (folgado para CI carregado) pega regressão grosseira
+  expect(Date.now() - t0).toBeLessThan(15000);
+  const t = await page.locator('.leaflet-popup-content').last().innerText();
+  expect(t).toMatch(/Unidade de manejo 1\.1\.1/i);
+  expect(t).toContain('Zona 1 — Sistemas de Produção Agropecuários e Florestais Sustentáveis');
+  expect(t).toContain('sem lei estadual que o institua');
+  t0 = Date.now();
+  await page.mouse.move(alvo.x, alvo.y + 150); await page.mouse.down();
+  await page.mouse.move(alvo.x + 200, alvo.y + 250, { steps: 10 }); await page.mouse.up();
+  expect(Date.now() - t0).toBeLessThan(15000);
 });
 
 test('Fase III liga e desliga a Fase II — nunca as duas no mapa', async ({ page }) => {
