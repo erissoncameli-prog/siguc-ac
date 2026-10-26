@@ -72,7 +72,7 @@ CAMADAS = {
 # para arquivo público.
 CAMPO_PESSOAL = re.compile(r'propriet|cpf|cnpj|matric|certif|titular|detentor|ocupa|posseir|^rg$|^nome', re.I)
 
-CAMPOS_SAIDA = ['zona_cod', 'zona', 'subzona', 'subzona_nome', 'unidade', 'diretriz']
+CAMPOS_SAIDA = ['zona_cod', 'zona', 'subzona', 'subzona_nome', 'unidade', 'unidade_nome', 'diretriz']
 
 # Fontes candidatas (descoberta). A pasta é a que a SEMA compartilhou
 # (dona sema.acre856@gmail.com, "O_ZONEAMENTO_ECOLOGICO_ECONOMICO_DO_ACRE_ZEE").
@@ -189,16 +189,39 @@ def normalizar(props, campos, legenda):
         sub = sub or s3
     if not zona:
         return None
+    # Fase III: "1.2.0" = subzona 1.2 SEM unidade de manejo (Unid_man 0)
+    if uni and uni.endswith('.0'):
+        uni = None
     leg = legenda.get(uni) or legenda.get(sub) or {}
-    nome = _texto(props.get(campos['nome'])) if campos.get('nome') else None
+    def _cp(chave):
+        return _texto(props.get(campos[chave])) if campos.get(chave) else None
+    # Nome da zona: o do PRÓPRIO arquivo quando ele traz (a Fase III renomeou
+    # as zonas — "Cidades do Acre" etc.); senão o da Lei 1.904/2007 (Fase II).
+    nome_zona = _cp('zona_nome') or ZONAS[zona]
     return {
         'zona_cod': zona,
-        'zona': f'Zona {zona} — {ZONAS[zona]}',
+        'zona': f'Zona {zona} — {nome_zona}',
         'subzona': sub,
-        'subzona_nome': leg.get('nome') or nome,
+        'subzona_nome': leg.get('nome') or _cp('subzona_nome') or _cp('nome'),
         'unidade': uni,
+        'unidade_nome': _cp('unidade_nome') if uni else None,
         'diretriz': leg.get('diretriz'),
     }
+
+
+def conferir_nomes(feats):
+    """O mesmo código nunca pode ter dois nomes (zona, subzona, unidade):
+    seria digitação divergente no arquivo, e a legenda mentiria."""
+    vistos, conflitos = {}, []
+    for p in (f['properties'] for f in feats):
+        for cod, nome in ((p.get('zona_cod'), p.get('zona')), (p.get('subzona'), p.get('subzona_nome')),
+                          (p.get('unidade'), p.get('unidade_nome'))):
+            if not cod or not nome:
+                continue
+            if vistos.setdefault(cod, nome) != nome:
+                conflitos.append(f'{cod}: {vistos[cod]!r} × {nome!r}')
+    if conflitos:
+        raise SystemExit('código com mais de um nome no arquivo — nada gravado:\n  ' + '\n  '.join(sorted(set(conflitos))))
 
 
 # ── leitura do shapefile ─────────────────────────────────────────────────
@@ -263,7 +286,7 @@ def _extrair_aninhados(pasta, listar=False):
     import shutil
     import subprocess
     internos = [os.path.join(r, f) for r, _, fs in os.walk(pasta) for f in fs
-                if f.lower().endswith(('.rar', '.7z', '.zip'))]
+                if f.lower().endswith(('.rar', '.7z', '.zip')) and os.path.dirname(os.path.join(r, f)) != pasta]
     if not internos:
         return
     sete = shutil.which('7z') or shutil.which('7zz')
@@ -274,6 +297,12 @@ def _extrair_aninhados(pasta, listar=False):
             continue
         # 7z recusa caminho absoluto/".." por padrão; o destino é pasta própria
         r = subprocess.run([sete, 'x', '-y', f'-o{destino}', arq], capture_output=True, text=True)
+        if r.returncode != 0:
+            # extração quebrada deixa arquivos de 0 byte que se passariam
+            # por shapefile — fora (o 7z do runner não abre RAR5)
+            shutil.rmtree(destino, ignore_errors=True)
+            print(f'Pacote interno NÃO aberto: {os.path.relpath(arq, pasta)} (7z saiu com {r.returncode})')
+            continue
         if listar:
             n = sum(len(fs) for _, _, fs in os.walk(destino)) if os.path.isdir(destino) else 0
             print(f'Pacote interno: {os.path.relpath(arq, pasta)} → {n} arquivo(s)' +
@@ -390,6 +419,18 @@ def inspecionar(alvo, escolha=None):
             print(f'\n{len(shp)} shapefiles no pacote (escolha um com --shp):')
             for s in shp:
                 _resumo_shp(s, tmp)
+            # metadado em texto (escala, datum, data, autoria do mapa)
+            for raiz, _, fs in os.walk(tmp):
+                for f in fs:
+                    c = os.path.join(raiz, f)
+                    if f.lower().endswith('.txt') and 'metad' in f.lower() and os.path.getsize(c) < 60000:
+                        print(f'\n── {os.path.relpath(c, tmp)} ──')
+                        txt = open(c, 'rb').read()
+                        try:
+                            txt = txt.decode('utf-8')
+                        except UnicodeDecodeError:
+                            txt = txt.decode('latin-1')
+                        print('\n'.join(txt.splitlines()[:80]))
             return
         _, crs = transformador(shp)
         campos, regs = ler_shp(shp)
@@ -437,6 +478,7 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
         brutas.append({'type': 'Feature', 'properties': p, 'geometry': mapping(g)})
     if sem_zona:
         raise SystemExit(f'{sum(sem_zona.values())} feição(ões) sem zona reconhecível — nada gravado. Valores: {sem_zona}')
+    conferir_nomes(brutas)
 
     feats, inval = recortar(brutas, acre, CAMPOS_SAIDA)
     if not feats:
@@ -450,6 +492,8 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     feats.sort(key=lambda f: (f['properties']['zona_cod'], f['properties'].get('subzona') or '', f['properties'].get('unidade') or ''))
 
     os.makedirs(saida, exist_ok=True)
+    # "nenhuma" = a fonte não informa escala; a tela diz isso, nunca inventa
+    escala = None if (escala or '').strip().lower() in ('', 'nenhuma', 'nao_informada', '-') else escala
     meta = {'fonte': fonte or fonte_padrao, 'escala': escala, 'projecao_origem': crs_nome,
             'gerado_em': date.today().isoformat()}
     with open(os.path.join(saida, camada_id + '.geojson'), 'w', encoding='utf-8') as f:
@@ -464,6 +508,94 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
         json.dump(man, f, ensure_ascii=False, indent=1)
     kb = os.path.getsize(os.path.join(saida, camada_id + '.geojson')) / 1024
     print(f'{camada_id}: {len(feats)} feições, cobre {pct:.1f}% do Acre, {inval} geometria(s) corrigida(s), {kb:.0f} KB')
+
+
+# ── base fundiária do ZEE (Fase III) ─────────────────────────────────────
+# Tipo do arquivo → rótulo da tela. Tipo fora desta lista = para (nunca
+# adivinha o que é).
+FUND_TIPOS = {
+    'ASSENTAMENTO': 'Projeto de assentamento',
+    'GLEBEST': 'Gleba pública estadual',
+    'GLEBFED': 'Gleba pública federal',
+    'IRU': 'Imóvel rural (propriedade privada)',
+    'TI': 'Terra indígena',
+    'UCPI': 'UC de proteção integral',
+    'UCUS': 'UC de uso sustentável',
+}
+# Campos que SAEM no arquivo público — lista fechada. Ficam de fora:
+# PROPRIET (proprietário), MATRICULA, CERTIF, CODIGO (código do SIGEF, que
+# leva ao titular) e OBSERVACAO (texto livre). NOME só para área pública:
+# no imóvel rural o nome da fazenda costuma ser o do dono.
+FUND_CAMPOS = ['tipo', 'tipo_rotulo', 'subtipo', 'nome', 'orgao', 'fonte', 'situacao', 'sobreposicao',
+               'zona', 'subzona']
+
+
+def normalizar_fundiario(props):
+    tipo = (_texto(props.get('Tipo')) or '').upper()
+    if tipo not in FUND_TIPOS:
+        return None
+    return {
+        'tipo': tipo,
+        'tipo_rotulo': FUND_TIPOS[tipo],
+        'subtipo': _texto(props.get('SUBTIPO')),
+        'nome': None if tipo == 'IRU' else _texto(props.get('NOME')),
+        'orgao': _texto(props.get('ORGAO')),
+        'fonte': _texto(props.get('FONTE')),
+        'situacao': _texto(props.get('SITUACAO')),
+        'sobreposicao': _texto(props.get('SOBREPOSIC')),
+        'zona': _texto(props.get('zonas')),
+        'subzona': _texto(props.get('subzonas')),
+    }
+
+
+def converter_fundiario(alvo, saida, acre_arq, escolha=None):
+    acre = make_valid(shape(json.load(open(acre_arq))['features'][0]['geometry']))
+    with tempfile.TemporaryDirectory() as tmp:
+        shp = localizar_shp(alvo, tmp, escolha)
+        t, crs_nome = transformador(shp)
+        campos_arq, regs = ler_shp(shp)
+    if 'Tipo' not in campos_arq:
+        raise SystemExit(f'sem o campo Tipo — não parece a base fundiária do ZEE. Campos: {campos_arq}')
+    brutas, fora = [], {}
+    for geo, props in regs:
+        p = normalizar_fundiario(props)
+        if p is None:
+            k = str(props.get('Tipo')); fora[k] = fora.get(k, 0) + 1
+            continue
+        g = force_2d(shape(geo))
+        if t is not None:
+            g = transform(t.transform, g)
+        if not g.is_valid:
+            g = make_valid(g)
+        brutas.append({'type': 'Feature', 'properties': p, 'geometry': mapping(g)})
+    if fora:
+        raise SystemExit(f'Tipo não reconhecido — nada gravado: {fora}')
+    feats, inval = recortar(brutas, acre, FUND_CAMPOS)
+    # Trava de CONTAGEM (a base fundiária não recobre o estado de forma
+    # exclusiva: as camadas se sobrepõem). Sumir mais de 5% = algo errado.
+    if len(feats) < 0.95 * len(brutas):
+        raise SystemExit(f'só {len(feats)} de {len(brutas)} feições ficaram dentro do Acre — nada gravado (projeção?)')
+    for f in feats:
+        f['properties']['area_ha'] = round(area_ha(f['geometry']), 1)
+        assert set(f['properties']) <= set(FUND_CAMPOS) | {'area_ha'}, f['properties'].keys()
+    feats.sort(key=lambda f: (f['properties']['tipo'], f['properties'].get('nome') or ''))
+    os.makedirs(saida, exist_ok=True)
+    camada_id = 'fase3_fundiario'
+    meta = {'fonte': 'SEMA-AC — ZEE Fase III, base fundiária (INCRA, ITERACRE, SIGEF/SNCI, FUNAI, ICMBio, IMAC e outros)',
+            'escala': None, 'projecao_origem': crs_nome, 'gerado_em': date.today().isoformat()}
+    with open(os.path.join(saida, camada_id + '.geojson'), 'w', encoding='utf-8') as f:
+        json.dump({'type': 'FeatureCollection', **meta, 'features': feats}, f, ensure_ascii=False, separators=(',', ':'))
+    man_arq = os.path.join(saida, 'manifesto.json')
+    man = json.load(open(man_arq, encoding='utf-8')) if os.path.exists(man_arq) else {'camadas': {}}
+    por_tipo = {}
+    for f in feats:
+        por_tipo[f['properties']['tipo']] = por_tipo.get(f['properties']['tipo'], 0) + 1
+    man['camadas'][camada_id] = {**meta, 'arquivo': camada_id + '.geojson', 'feicoes': len(feats),
+                                 'complementar': True, 'por_tipo': por_tipo}
+    with open(man_arq, 'w', encoding='utf-8') as f:
+        json.dump(man, f, ensure_ascii=False, indent=1)
+    kb = os.path.getsize(os.path.join(saida, camada_id + '.geojson')) / 1024
+    print(f'{camada_id}: {len(feats)} de {len(brutas)} feições, por tipo {por_tipo}, {inval} geometria(s) corrigida(s), {kb:.0f} KB')
 
 
 # ── descoberta (só leitura) ──────────────────────────────────────────────
@@ -742,6 +874,30 @@ def autoteste():
             raise AssertionError('aceitou shapefile sem .prj')
         except SystemExit as e:
             assert 'sem .prj' in str(e)
+    # Fase III: código completo no Zon_label, nomes do próprio arquivo, ".0" = sem unidade
+    c3 = {'zona': 'Zona', 'subzona': 'Zon_label', 'unidade': None, 'nome': None,
+          'zona_nome': 'DescrZona', 'subzona_nome': 'DescSubZon', 'unidade_nome': 'DescUniman'}
+    p3 = normalizar({'Zona': '4', 'Zon_label': '4.1.0', 'DescrZona': 'Cidades do Acre',
+                     'DescSubZon': 'Capital do Acre', 'DescUniman': ''}, c3, {})
+    assert p3['zona'] == 'Zona 4 — Cidades do Acre' and p3['subzona'] == '4.1' and p3['unidade'] is None, p3
+    assert p3['subzona_nome'] == 'Capital do Acre' and p3['unidade_nome'] is None, p3
+    p3 = normalizar({'Zona': '1', 'Zon_label': '1.2.3', 'DescrZona': 'Produção', 'DescSubZon': 'Agropecuária',
+                     'DescUniman': 'Áreas com alto potencial'}, c3, {})
+    assert p3['unidade'] == '1.2.3' and p3['unidade_nome'] == 'Áreas com alto potencial', p3
+    try:
+        conferir_nomes([{'properties': {'zona_cod': '1', 'zona': 'Zona 1 — A'}},
+                        {'properties': {'zona_cod': '1', 'zona': 'Zona 1 — B'}}])
+        raise AssertionError('código com dois nomes aceito')
+    except SystemExit:
+        pass
+    # fundiário: dado pessoal nunca sai; nome do imóvel rural também não
+    f = normalizar_fundiario({'Tipo': 'IRU', 'NOME': 'Fazenda do Fulano', 'PROPRIET': 'Fulano de Tal',
+                              'MATRICULA': '123', 'CODIGO': 'abc', 'SUBTIPO': 'Propriedade Privada'})
+    assert f['nome'] is None and 'Fulano' not in json.dumps(f) and '123' not in json.dumps(f), f
+    assert normalizar_fundiario({'Tipo': 'UCUS', 'NOME': 'RESEX Chico Mendes'})['nome'] == 'RESEX Chico Mendes'
+    assert normalizar_fundiario({'Tipo': 'OUTRO'}) is None
+    assert set(normalizar_fundiario({'Tipo': 'TI'})) <= set(FUND_CAMPOS)
+
     # pacote com vários .shp: escolhe pelo trecho, nunca chuta
     shps = ['/r/a/Zonas_Gestao.shp', '/r/b/Zonas_Gestao_Sub.shp', '/r/c/Fundiario.shp']
     assert _escolher_shp(shps, '/r', 'zonas_gestao') == '/r/a/Zonas_Gestao.shp'   # nome exato vence
@@ -766,6 +922,10 @@ def main():
     ap.add_argument('--campo-subzona')
     ap.add_argument('--campo-unidade')
     ap.add_argument('--campo-nome')
+    ap.add_argument('--campo-zona-nome', help='nome da zona no próprio arquivo (Fase III: DescrZona)')
+    ap.add_argument('--campo-subzona-nome', help='Fase III: DescSubZon')
+    ap.add_argument('--campo-unidade-nome', help='Fase III: DescUniman')
+    ap.add_argument('--fundiario', help='converte a base fundiária do ZEE (ARQ; escolha o .shp com --shp)')
     ap.add_argument('--legenda')
     ap.add_argument('--escala')
     ap.add_argument('--fonte')
@@ -783,7 +943,11 @@ def main():
         if not a.fase:
             ap.error('--converter exige --fase 2 ou 3')
         converter(a.converter, a.fase, {'zona': a.campo_zona, 'subzona': a.campo_subzona, 'unidade': a.campo_unidade,
-                                        'nome': a.campo_nome}, a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp)
+                                        'nome': a.campo_nome, 'zona_nome': a.campo_zona_nome,
+                                        'subzona_nome': a.campo_subzona_nome, 'unidade_nome': a.campo_unidade_nome},
+                  a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp)
+    elif a.fundiario:
+        converter_fundiario(a.fundiario, a.saida, a.acre, a.shp)
     else:
         ap.print_help()
 

@@ -12,14 +12,16 @@ name: ZEE do Acre (Mapa de Gestão)
 #   vai no campo `shp`.
 # - converter: gera data/zee/<camada>.geojson + manifesto.json e grava no
 #   próprio branch (travas no script: sem .prj, sem zona, cobertura ≠ 95–105%).
+# - fundiario: base fundiária do ZEE Fase III → data/zee/fase3_fundiario.geojson,
+#   só com os campos públicos (sem proprietário, matrícula, certificação).
 
 on:
   workflow_dispatch:
     inputs:
       modo:
-        description: 'descobrir | inspecionar | converter'
+        description: 'descobrir | inspecionar | converter | fundiario'
         type: choice
-        options: [descobrir, inspecionar, converter]
+        options: [descobrir, inspecionar, converter, fundiario]
         default: descobrir
       arquivo:
         description: 'URL do .zip do shapefile, ou drive:<id do arquivo no Drive>'
@@ -80,9 +82,10 @@ jobs:
             inspecionar) python scripts/zee_acre.py --inspecionar "$ARQUIVO" "${ESCOLHA[@]}" ;;
             converter)   # CAMPOS sem aspas de propósito: são flags (--campo-zona X ...)
                          python scripts/zee_acre.py --converter "$ARQUIVO" --fase "$FASE" --escala "$ESCALA" "${ESCOLHA[@]}" $CAMPOS ;;
+            fundiario)   python scripts/zee_acre.py --fundiario "$ARQUIVO" "${ESCOLHA[@]}" ;;
           esac
       - name: Gravar no branch
-        if: ${{ inputs.modo == 'converter' }}
+        if: ${{ inputs.modo == 'converter' || inputs.modo == 'fundiario' }}
         # Commit feito com GITHUB_TOKEN não dispara workflow — sem laço.
         run: |
           git add data/zee
