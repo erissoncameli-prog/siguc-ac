@@ -260,6 +260,12 @@ def _resumo_zip(z):
     print(f'Pacote: {sum(n for n, _ in por_ext.values())} arquivos')
     for ext, (n, tam) in sorted(por_ext.items(), key=lambda kv: -kv[1][1]):
         print(f'  {ext:16} {n:5} arquivo(s)  {tam / 1e6:9.1f} MB')
+    # tudo que não é foto/fonte/arquivo de diagramação — é onde pode haver dado
+    outros = [i for i in z.infolist() if not i.is_dir() and os.path.splitext(i.filename)[1].lower()
+              not in ('.jpg', '.jpeg', '.png', '.otf', '.ttf', '.indd', '.idml', '.lock')]
+    print(f'Arquivos (sem fotos/fontes/diagramação): {len(outros)}')
+    for i in sorted(outros, key=lambda i: i.filename):
+        print(f'  {i.file_size / 1e6:9.2f} MB  {i.filename}')
     maiores = sorted((i for i in z.infolist() if not i.is_dir()), key=lambda i: -i.file_size)[:15]
     print('Maiores:')
     for i in maiores:
@@ -274,6 +280,10 @@ def _escolher_shp(shps, raiz, escolha):
         cand = [s for s in shps if escolha.lower() in rel[s].lower()]
         exatos = [s for s in cand if os.path.splitext(os.path.basename(s))[0].lower() == escolha.lower()]
         cand = exatos or cand
+        # o mesmo arquivo solto e dentro de um .rar interno (cópia): vale o solto
+        soltos = [c for c in cand if '_extraido' not in rel[c]]
+        if len(cand) > 1 and len(soltos) == 1:
+            cand = soltos
         if len(cand) == 1:
             return cand[0]
         raise SystemExit(f'--shp {escolha!r} casou {len(cand)} arquivo(s): {[rel[s] for s in cand] or sorted(rel.values())}')
@@ -292,7 +302,8 @@ def _extrair_aninhados(pasta, listar=False):
                 if f.lower().endswith(('.rar', '.7z', '.zip')) and os.path.dirname(os.path.join(r, f)) != pasta]
     if not internos:
         return
-    sete = shutil.which('7z') or shutil.which('7zz')
+    # 7zz (pacote 7zip + 7zip-rar) abre RAR5; o 7z antigo (p7zip) não abre
+    sete = shutil.which('7zz') or shutil.which('7z')
     for arq in internos:
         destino = arq + '_extraido'
         if not sete:
@@ -1114,6 +1125,8 @@ def autoteste():
     shps = ['/r/a/Zonas_Gestao.shp', '/r/b/Zonas_Gestao_Sub.shp', '/r/c/Fundiario.shp']
     assert _escolher_shp(shps, '/r', 'zonas_gestao') == '/r/a/Zonas_Gestao.shp'   # nome exato vence
     assert _escolher_shp(shps, '/r', 'fundi') == '/r/c/Fundiario.shp'
+    # cópia dentro de .rar interno não torna a escolha ambígua
+    assert _escolher_shp(shps + ['/r/x.rar_extraido/Fundiario.shp'], '/r', 'fundi') == '/r/c/Fundiario.shp'
     for ruim in (None, 'zonas', 'nada'):
         try:
             _escolher_shp(shps, '/r', ruim)

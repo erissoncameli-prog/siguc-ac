@@ -68,7 +68,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Dependências
-        run: pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1' 'pyogrio==0.11.1'
+        # 7zip + 7zip-rar: o 7zz abre os .rar (RAR5) de dentro do pacote da Fase III
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq 7zip 7zip-rar >/dev/null || echo "7zip-rar indisponível — .rar internos seguem fechados"
+          pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1' 'pyogrio==0.11.1'
       - name: Autoteste (sem rede)
         run: python scripts/zee_acre.py --autoteste
       - name: Rodar
