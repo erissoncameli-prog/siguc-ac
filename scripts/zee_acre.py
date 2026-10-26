@@ -519,7 +519,71 @@ def extrair(alvo, escolha, destino):
     print(f'{destino}: {os.path.getsize(destino) / 1e6:.1f} MB em {time.time() - t0:.0f} s', flush=True)
 
 
-def perfil(alvo, escolha, acre_arq, orcamento_s=1500):
+def _anatomia(geoms, tol):
+    """Anéis por feição: muitos anéis minúsculos (vetorização de raster)
+    pesam no simplify topológico mais que os vértices."""
+    g2 = shapely.force_2d(geoms)
+    partes = shapely.get_parts(g2)
+    furos = [shapely.get_interior_ring(p, k) for p in partes for k in range(shapely.get_num_interior_rings(p))]
+    af = shapely.area(shapely.polygons(furos)) if furos else np.array([])
+    ap = shapely.area(shapely.polygons(shapely.get_exterior_ring(partes)))
+    lim = (2 * tol) ** 2   # anel menor que um quadrado de 2× a tolerância
+    print(f'anatomia: {len(partes):,} partes ({int((ap < lim).sum()):,} menores que {lim:,.0f}), '
+          f'{len(furos):,} furos ({int((af < lim).sum()):,} menores; {int((af < 10000).sum()):,} < 1 ha) · '
+          f'área total dos furos minúsculos {af[af < lim].sum() / 1e4 if len(af) else 0:,.1f} ha', flush=True)
+    vfur = shapely.get_num_coordinates(np.array(furos)) if furos else np.array([0])
+    print(f'  vértices em furos: {int(vfur.sum()):,} · em contornos: {int(shapely.get_num_coordinates(shapely.get_exterior_ring(partes)).sum()):,}', flush=True)
+
+
+def _medir_filho(fila, nome, wkb, tol):
+    import shapely as sh
+    g = sh.force_2d(sh.from_wkb(wkb))
+    t1 = time.time()
+    tempos = []
+    def marca(r):
+        tempos.append(f'{time.time() - t1:.1f}')
+        return r
+    if nome == 'topologico':
+        g = marca(sh.simplify(g, tol, preserve_topology=True))
+        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
+    elif nome == 'dp_simples':
+        g = marca(sh.simplify(g, tol, preserve_topology=False))
+        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
+    elif nome == 'valida_antes':
+        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
+        g = marca(sh.simplify(g, tol, preserve_topology=False))
+    elif nome == 'repetidos':
+        g = marca(sh.remove_repeated_points(g, tol))
+        g = marca(sh.simplify(g, tol, preserve_topology=True))
+        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
+    elif nome == 'malha':
+        g = marca(sh.set_precision(g, tol))
+        g = marca(sh.simplify(g, tol, preserve_topology=False))
+        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
+    fila.put(f'{nome}: {" / ".join(tempos)} s · {sh.get_num_coordinates(g):,} vértices · '
+             f'{sh.get_num_geometries(g)} partes · área {sh.area(g) / 1e4:,.0f} ha · válida={sh.is_valid(g)}')
+
+
+def _estrategias(g, tol, nv, limite_s=150):
+    """Cada estratégia num processo filho com tempo-limite (o GEOS não volta
+    ao Python no meio de uma operação para ser interrompido)."""
+    import multiprocessing as mp
+    print(f'estratégias na feição de {nv:,} vértices (área original {shapely.area(g) / 1e4:,.0f} ha):', flush=True)
+    wkb = shapely.to_wkb(g)
+    for nome in ('dp_simples', 'valida_antes', 'malha', 'repetidos', 'topologico'):
+        fila = mp.Queue()
+        pr = mp.Process(target=_medir_filho, args=(fila, nome, wkb, tol))
+        t1 = time.time()
+        pr.start()
+        pr.join(limite_s)
+        if pr.is_alive():
+            pr.terminate(); pr.join()
+            print(f'  {nome}: passou de {limite_s} s', flush=True)
+        else:
+            print(f'  {fila.get() if not fila.empty() else nome + ": falhou"} (total {time.time() - t1:.1f} s)', flush=True)
+
+
+def perfil(alvo, escolha, acre_arq, orcamento_s=2400):
     """Mede o caminho rápido feição por feição (da menor para a maior), com
     tempo de cada etapa, sem gravar nada. Para no orçamento de tempo — o
     log mostra até onde chegou e qual etapa pesa."""
@@ -537,8 +601,14 @@ def perfil(alvo, escolha, acre_arq, orcamento_s=1500):
         print(f'{crs_nome} · tolerância {tol:.1f} · {len(geoms)} feições lidas (pyogrio + from_wkb) em {time.time() - t0:.1f} s', flush=True)
     nv = shapely.get_num_coordinates(geoms)
     print(f'vértices: total {int(nv.sum()):,}, maior {int(nv.max()):,}', flush=True)
+    _anatomia(geoms, tol)
+    for i in np.argsort(nv)[::-1][:3]:
+        _estrategias(geoms[i], tol, int(nv[i]))
+    print(f'estratégias medidas em {time.time() - t_ini:.0f} s', flush=True)
     tot = {}
     for i in np.argsort(nv):
+        if nv[i] > 300_000:
+            continue   # as grandes já passaram pelas estratégias acima
         if time.time() - t_ini > orcamento_s:
             print(f'orçamento de {orcamento_s} s esgotado — parei', flush=True)
             break
