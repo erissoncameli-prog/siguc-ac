@@ -73,6 +73,24 @@ regras): a tela mostra o código da fonte e diz isso. Quando o significado for
 confirmado (ex.: Documento Síntese, mapa APTIDAO.pdf), entra como rótulo — nunca
 antes.
 
+## Fase II recebida (26/10/2026)
+
+O usuário enviou `ZEE_II.rar` (RAR5 — o `unar` 1.10 falha nos `.shp`; extrair com
+`7z` do pacote `7zip-rar`). Conteúdo:
+
+- `Zonas_Gestao_Consolidada.shp` (QGIS, 14/10/2016, WGS 84): 4 multipolígonos,
+  campos `Label` ("Zona 01"…"Zona 04") e `Zonas` (nome sem acento). **Só zonas,
+  sem subzonas nem unidades de manejo.** Convertido por
+  `zee_acre.py --converter … --fase 2 --campo-zona Label --escala 1:250.000`:
+  cobre 99,9% do Acre — Z1 4.181.601 ha (25,5%), Z2 7.907.922 ha (48,2%),
+  Z3 4.292.043 ha (26,2%), Z4 26.612 ha (0,2%).
+- `FUNDIARIO_250.shp` (Lambert/SAD 69, 2021): 459 polígonos de situação
+  fundiária (arrecadada, assentamento, discriminada, particular, TI, UC, sem
+  estudo). Não é zona do ZEE; não carregado — decisão pendente do usuário.
+
+Pendências que continuam: subzonas da Fase II (pedir à SEMA o shapefile com
+subzonas/unidades de manejo, se existir) e o arquivo da Fase III.
+
 ## O que foi entregue (sem o dado vetorial)
 
 - **Aba "ZEE"** na barra de camadas (`js/mapa-zee.js`, prefixo `zee`):

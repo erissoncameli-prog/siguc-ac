@@ -271,10 +271,13 @@ function _zeeCamadasHTML() {
   }).join('')
   const aviso = semDado ? `<div class="zee-aviso" role="note">O arquivo vetorial do Mapa de Gestão ainda não foi recebido da SEMA.
     Enquanto isso, os documentos do ZEE estão disponíveis abaixo para consulta e download.</div>` : ''
+  // O arquivo da Fase II recebido em 26/10/2026 só tem as 4 zonas: sem
+  // subzona no manifesto, "Colorir por subzona" seria uma opção que não faz nada.
+  const temSub = Object.values(_zee.manifesto || {}).some(m => m.subzonas > 0)
   const ctrl = `<div class="zee-ctrl">
-    <label>Colorir por <select data-zee-acao="colorir">
+    ${temSub ? `<label>Colorir por <select data-zee-acao="colorir">
       <option value="zona"${_zee.pref.colorir === 'zona' ? ' selected' : ''}>Zona</option>
-      <option value="subzona"${_zee.pref.colorir === 'subzona' ? ' selected' : ''}>Subzona</option></select></label>
+      <option value="subzona"${_zee.pref.colorir === 'subzona' ? ' selected' : ''}>Subzona</option></select></label>` : ''}
     <label>Opacidade <input type="range" min="0" max="100" step="5" value="${Math.round(_zee.pref.opacidade * 100)}" data-zee-acao="opacidade" aria-label="Opacidade do ZEE"></label>
   </div>`
   return aviso + html + (semDado || _zee.manifesto === undefined ? '' : ctrl)

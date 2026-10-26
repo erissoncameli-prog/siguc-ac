@@ -36,11 +36,11 @@ const FASE3 = { type: 'FeatureCollection', features: [
   { type: 'Feature', geometry: quad(-70.0, -9.6, 0.2), properties: { zona_cod: '3', zona: 'Zona 3 — Áreas prioritárias para o ordenamento territorial', subzona: '3.1' } },
 ] };
 const MANIFESTO = { camadas: {
-  fase2_gestao: { arquivo: 'fase2_gestao.geojson', fonte: FASE2.fonte, escala: '1:250.000', gerado_em: '2026-10-25', feicoes: 3 },
-  fase3_gestao: { arquivo: 'fase3_gestao.geojson', fonte: 'SEMA-AC — ZEE Fase III', escala: null, gerado_em: '2026-10-25', feicoes: 1 },
+  fase2_gestao: { arquivo: 'fase2_gestao.geojson', fonte: FASE2.fonte, escala: '1:250.000', gerado_em: '2026-10-25', feicoes: 3, subzonas: 3 },
+  fase3_gestao: { arquivo: 'fase3_gestao.geojson', fonte: 'SEMA-AC — ZEE Fase III', escala: null, gerado_em: '2026-10-25', feicoes: 1, subzonas: 1 },
 } };
 
-async function abrir(page, { manifesto = MANIFESTO, geojsonStatus = 200 } = {}) {
+async function abrir(page, { manifesto = MANIFESTO, geojsonStatus = 200, reais = false } = {}) {
   await page.addInitScript(() => {
     const mk = pend => { const f = function () {}; const p = new Proxy(f, { get(t, k) { if (k === 'then') return pend ? () => {} : r => r({ data: null, error: null }); if (k === 'auth') return mk(true); return mk(pend) }, apply() { return p } }); return p };
     window.supabase = { createClient: () => mk(false) };
@@ -52,8 +52,9 @@ async function abrir(page, { manifesto = MANIFESTO, geojsonStatus = 200 } = {}) 
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.js', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.js'), contentType: 'application/javascript' }));
   await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.css', r => r.fulfill({ path: path.join(VENDOR, 'leaflet.css'), contentType: 'text/css' }));
   const pedidos = [];
-  await page.route('**/data/zee/manifesto.json', r => { pedidos.push('manifesto'); manifesto ? r.fulfill({ json: manifesto }) : r.fulfill({ status: 404, body: '' }) });
-  await page.route('**/data/zee/*.geojson', r => {
+  // reais = os arquivos do repositório (data/zee/), servidos pelo servidor estático
+  if (!reais) await page.route('**/data/zee/manifesto.json', r => { pedidos.push('manifesto'); manifesto ? r.fulfill({ json: manifesto }) : r.fulfill({ status: 404, body: '' }) });
+  if (!reais) await page.route('**/data/zee/*.geojson', r => {
     const u = new URL(r.request().url()).pathname; pedidos.push(u);
     if (geojsonStatus !== 200) return r.fulfill({ status: geojsonStatus, body: '' });
     r.fulfill({ json: u.endsWith('/fase3_gestao.geojson') ? FASE3 : FASE2 });
@@ -167,6 +168,21 @@ test('colorir por subzona: tons da cor da zona, legenda por subzona, preferênci
   await page.evaluate(() => { const i = document.querySelector('[data-zee-acao="opacidade"]'); i.value = '70'; i.dispatchEvent(new Event('input', { bubbles: true })) });
   expect(await page.evaluate(() => _zee.layer.getLayers()[0].options.fillOpacity)).toBe(0.7);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_zee')))).toEqual({ ativa: 'fase2_gestao', colorir: 'subzona', opacidade: 0.7 });
+});
+
+test('arquivo REAL da Fase II (SEMA, 26/10/2026): 4 zonas, sem subzona — só "colorir por zona"', async ({ page }) => {
+  await abrir(page, { reais: true });
+  await abrirAba(page);
+  await expect(page.locator('.zee-aviso')).toHaveCount(0);
+  await expect(page.locator('[data-zee-camada="fase3_gestao"] [data-zee-acao="ligar"]')).toBeDisabled();
+  // sem subzona no arquivo, a opção de colorir por subzona não faz nada — não aparece
+  await expect(page.locator('[data-zee-acao="colorir"]')).toHaveCount(0);
+  await ligar(page, 'fase2_gestao');
+  const zonas = await page.evaluate(() => _zee.layer.getLayers().map(l => [l.feature.properties.zona_cod, l.options.fillColor]));
+  expect(zonas).toEqual([['1', '#E69F00'], ['2', '#009E73'], ['3', '#CC79A7'], ['4', '#0072B2']]);
+  const leg = await page.evaluate(() => zeeItensLegenda().map(i => i.label));
+  expect(leg).toHaveLength(4);
+  expect(leg[3]).toMatch(/Zona 4 — Cidades florestais/);
 });
 
 test('Fase III liga e desliga a Fase II — nunca as duas no mapa', async ({ page }) => {

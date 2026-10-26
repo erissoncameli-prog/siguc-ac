@@ -107,11 +107,11 @@ TEMA_ZEE = re.compile(r'zee|zoneamento|acre|uzee|gest[aã]o.?territ', re.I)
 
 
 # ── leitura do código de zona/subzona ────────────────────────────────────
-_COD = re.compile(r'(?<![\d.])([1-4])(?:\s*[.,]\s*(\d{1,2}))?(?:\s*[.,]\s*(\d{1,2}))?(?![\d])')
+_COD = re.compile(r'(?<![\d.])0?([1-4])(?:\s*[.,]\s*(\d{1,2}))?(?:\s*[.,]\s*(\d{1,2}))?(?![\d])')
 
 
 def ler_codigo(valor):
-    """'Zona 1', 'Z1', '1', 'Subzona 1.2', 'SZ 2.3.1', 1.2 → (zona, subzona, unidade).
+    """'Zona 1', 'Zona 01' (arquivo da SEMA), 'Z1', '1', 'Subzona 1.2', 'SZ 2.3.1', 1.2 → (zona, subzona, unidade).
     Devolve (None, None, None) quando não há código de 1 a 4 reconhecível."""
     if valor is None:
         return None, None, None
@@ -263,6 +263,14 @@ def ler_shp(shp):
     import shapefile
     cpg = _arquivo_irmao(shp, '.cpg')
     cod = open(cpg).read().strip() if cpg else 'latin-1'
+    # QGIS grava "System" (codificação da máquina que salvou) — não é nome
+    # que o Python conheça; o ZEE da SEMA veio assim. Latin-1 é o padrão dos
+    # .dbf brasileiros; se o texto vier errado, o --inspecionar mostra.
+    try:
+        import codecs
+        codecs.lookup(cod)
+    except LookupError:
+        cod = 'latin-1'
     r = shapefile.Reader(shp[:-4], encoding=cod, encodingErrors='replace')
     campos = [f[0] for f in r.fields[1:]]
     regs = [(sr.shape.__geo_interface__, sr.record.as_dict()) for sr in r.iterShapeRecords() if sr.shape.shapeType != 0]
@@ -531,6 +539,9 @@ def _camadas_cap(xml):
 def autoteste():
     from shapely.geometry import box
     assert ler_codigo('Zona 1') == ('1', None, None)
+    assert ler_codigo('Zona 01') == ('1', None, None)          # Label do arquivo da SEMA (Fase II)
+    assert ler_codigo('Zona 04') == ('4', None, None)
+    assert ler_codigo('Zona 10') == (None, None, None)
     assert ler_codigo('Subzona 1.2') == ('1', '1.2', None)
     assert ler_codigo('SZ 2.3.1') == ('2', '2.3', '2.3.1')
     assert ler_codigo('2,1') == ('2', '2.1', None)
