@@ -46,7 +46,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from meio_fisico import GEOD, area_ha, recortar  # noqa: E402  (mesmo recorte e simplificação do Meio Físico)
 
-from shapely import make_valid  # noqa: E402
+from shapely import force_2d, make_valid  # noqa: E402
 from shapely.geometry import mapping, shape  # noqa: E402
 from shapely.ops import transform  # noqa: E402
 
@@ -66,6 +66,11 @@ CAMADAS = {
     '2': ('fase2_gestao', 'SEMA-AC — ZEE Fase II, Mapa de Gestão Territorial'),
     '3': ('fase3_gestao', 'SEMA-AC — ZEE Fase III, Mapa de Subsídio à Gestão Territorial e Ambiental'),
 }
+
+# Nome de coluna que pode trazer dado pessoal (mesma ideia de
+# camadas_mapa_campo_pessoal, migration 367): o valor nunca vai para log nem
+# para arquivo público.
+CAMPO_PESSOAL = re.compile(r'propriet|cpf|cnpj|matric|certif|titular|detentor|ocupa|posseir|^rg$|^nome', re.I)
 
 CAMPOS_SAIDA = ['zona_cod', 'zona', 'subzona', 'subzona_nome', 'unidade', 'diretriz']
 
@@ -251,6 +256,34 @@ def _escolher_shp(shps, raiz, escolha):
     raise SystemExit(f'esperava 1 .shp, achei {len(shps)} — escolha com --shp: {sorted(rel.values())}')
 
 
+def _extrair_aninhados(pasta, listar=False):
+    """Pacote dentro do pacote (a Fase III traz 3 .rar com versões do mapa):
+    extrai cada um numa pasta irmã com o 7z do runner. Sem 7z, avisa e segue
+    — nunca falha o que já foi extraído."""
+    import shutil
+    import subprocess
+    internos = [os.path.join(r, f) for r, _, fs in os.walk(pasta) for f in fs
+                if f.lower().endswith(('.rar', '.7z', '.zip'))]
+    if not internos:
+        return
+    sete = shutil.which('7z') or shutil.which('7zz')
+    for arq in internos:
+        destino = arq + '_extraido'
+        if not sete:
+            print(f'  (sem 7z no ambiente — não abri {os.path.relpath(arq, pasta)})')
+            continue
+        # 7z recusa caminho absoluto/".." por padrão; o destino é pasta própria
+        r = subprocess.run([sete, 'x', '-y', f'-o{destino}', arq], capture_output=True, text=True)
+        if listar:
+            n = sum(len(fs) for _, _, fs in os.walk(destino)) if os.path.isdir(destino) else 0
+            print(f'Pacote interno: {os.path.relpath(arq, pasta)} → {n} arquivo(s)' +
+                  ('' if r.returncode == 0 else f' (7z saiu com {r.returncode}: {r.stderr.strip()[-200:]})'))
+            for raiz, _, fs in os.walk(destino):
+                for f in sorted(fs):
+                    c = os.path.join(raiz, f)
+                    print(f'    {os.path.getsize(c) / 1e6:8.1f} MB  {os.path.relpath(c, destino)}')
+
+
 def localizar_shp(alvo, pasta_tmp, escolha=None, listar=False):
     if re.match(r'^(https?://|drive:)', alvo):
         alvo = _baixar(alvo, pasta_tmp)
@@ -263,6 +296,7 @@ def localizar_shp(alvo, pasta_tmp, escolha=None, listar=False):
                 if not destino.startswith(os.path.realpath(pasta_tmp) + os.sep):
                     raise SystemExit(f'caminho suspeito dentro do .zip: {nome}')
             z.extractall(pasta_tmp)
+        _extrair_aninhados(pasta_tmp, listar)
         alvo = pasta_tmp
     if os.path.isdir(alvo):
         shps = sorted(os.path.join(r, f) for r, _, fs in os.walk(alvo) for f in fs if f.lower().endswith('.shp'))
@@ -299,8 +333,7 @@ def transformador(shp):
     return t, crs.name
 
 
-def ler_shp(shp):
-    import shapefile
+def _codificacao(shp):
     cpg = _arquivo_irmao(shp, '.cpg')
     cod = open(cpg).read().strip() if cpg else 'latin-1'
     # QGIS grava "System" (codificação da máquina que salvou) — não é nome
@@ -311,7 +344,12 @@ def ler_shp(shp):
         codecs.lookup(cod)
     except LookupError:
         cod = 'latin-1'
-    r = shapefile.Reader(shp[:-4], encoding=cod, encodingErrors='replace')
+    return cod
+
+
+def ler_shp(shp):
+    import shapefile
+    r = shapefile.Reader(shp[:-4], encoding=_codificacao(shp), encodingErrors='replace')
     campos = [f[0] for f in r.fields[1:]]
     regs = [(sr.shape.__geo_interface__, sr.record.as_dict()) for sr in r.iterShapeRecords() if sr.shape.shapeType != 0]
     return campos, regs
@@ -321,7 +359,7 @@ def _resumo_shp(shp, raiz):
     """Uma linha por shapefile do pacote: feições, tipo, projeção e campos."""
     import shapefile
     try:
-        r = shapefile.Reader(shp[:-4], encoding='latin-1', encodingErrors='replace')
+        r = shapefile.Reader(shp[:-4], encoding=_codificacao(shp), encodingErrors='replace')
         prj = _arquivo_irmao(shp, '.prj')
         if prj:
             from pyproj import CRS
@@ -330,7 +368,17 @@ def _resumo_shp(shp, raiz):
             crs = 'SEM .prj'
         campos = [f[0] for f in r.fields[1:]]
         print(f'- {os.path.relpath(shp, raiz)} · {len(r)} feições · {r.shapeTypeName} · {crs}')
-        print(f'    campos: {campos}')
+        regs = [rec.as_dict() for rec in r.iterRecords()]
+        for c in campos:
+            vals = sorted({str(x.get(c)).strip() for x in regs} - {'', 'None'})
+            cheio = sum(1 for x in regs if str(x.get(c)).strip() not in ('', 'None'))
+            if CAMPO_PESSOAL.search(c):
+                # log de Actions pode ser público: nome de proprietário,
+                # matrícula etc. nunca são impressos, só contados
+                print(f'    {c}: {len(vals)} valores, {cheio}/{len(regs)} preenchidos — NÃO exibidos (possível dado pessoal)')
+            else:
+                amostra = [v if len(v) <= 70 else v[:67] + '…' for v in vals[:10]]
+                print(f'    {c}: {len(vals)} valores, {cheio}/{len(regs)} preenchidos — {amostra}{" …" if len(vals) > 10 else ""}')
     except Exception as e:  # um arquivo quebrado não pode esconder os outros
         print(f'- {os.path.relpath(shp, raiz)} · NÃO LEU: {e}')
 
@@ -379,7 +427,9 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
             chave = str(props.get(campos.get('subzona') or campos.get('zona')))
             sem_zona[chave] = sem_zona.get(chave, 0) + 1
             continue
-        g = shape(geo)
+        # Fase III vem em POLYGONZ: o Z (sempre 0) só pesa no arquivo e
+        # atrapalha o recorte — sai antes de tudo
+        g = force_2d(shape(geo))
         if t is not None:
             g = transform(t.transform, g)
         if not g.is_valid:
