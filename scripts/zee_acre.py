@@ -40,6 +40,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 import zipfile
 from datetime import date
 
@@ -451,7 +452,9 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     with tempfile.TemporaryDirectory() as tmp:
         shp = localizar_shp(alvo, tmp, escolha)
         t, crs_nome = transformador(shp)
+        t0 = time.time()
         campos_arq, regs = ler_shp(shp)
+        print(f'lidas {len(regs)} feições em {time.time() - t0:.0f} s', flush=True)
     campos = detectar_campos(campos_arq)
     campos.update({k: v for k, v in campos_forcados.items() if v})
     faltam = [v for v in campos.values() if v and v not in campos_arq]
@@ -462,7 +465,10 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     print(f'Projeção de origem: {crs_nome} · campos usados: {campos}')
 
     brutas, sem_zona = [], {}
-    for geo, props in regs:
+    t0 = time.time()
+    for i, (geo, props) in enumerate(regs, 1):
+        if i % 200 == 0:
+            print(f'  preparando {i}/{len(regs)} · {time.time() - t0:.0f} s', flush=True)
         p = normalizar(props, campos, legenda)
         if p is None:
             chave = str(props.get(campos.get('subzona') or campos.get('zona')))
@@ -473,11 +479,10 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
         g = force_2d(shape(geo))
         if t is not None:
             g = transform(t.transform, g)
-        if not g.is_valid:
-            g = make_valid(g)
-        # Simplifica ANTES do recorte: com todos os vértices, a interseção
-        # da Fase III (190 MB) com o limite do Acre passava dos 30 min do
-        # workflow. O recorte simplifica de novo na tolerância final.
+        # Simplifica ANTES de validar e recortar: com todos os vértices, o
+        # make_valid e a interseção da Fase III (190 MB) com o limite do
+        # Acre passavam dos 30 min do workflow. O recorte simplifica de novo
+        # na tolerância final.
         g = g.simplify(TOLERANCIA / 2, preserve_topology=True)
         if not g.is_valid:
             g = make_valid(g)
@@ -485,8 +490,10 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     if sem_zona:
         raise SystemExit(f'{sum(sem_zona.values())} feição(ões) sem zona reconhecível — nada gravado. Valores: {sem_zona}')
     conferir_nomes(brutas)
-
+    print(f'preparadas {len(brutas)} feições em {time.time() - t0:.0f} s · recortando', flush=True)
+    t0 = time.time()
     feats, inval = recortar(brutas, acre, CAMPOS_SAIDA)
+    print(f'recorte em {time.time() - t0:.0f} s', flush=True)
     if not feats:
         raise SystemExit('nenhuma feição dentro do Acre — nada gravado (projeção ou eixo errado?)')
     for f in feats:
@@ -571,11 +578,10 @@ def converter_fundiario(alvo, saida, acre_arq, escolha=None):
         g = force_2d(shape(geo))
         if t is not None:
             g = transform(t.transform, g)
-        if not g.is_valid:
-            g = make_valid(g)
-        # Simplifica ANTES do recorte: com todos os vértices, a interseção
-        # da Fase III (190 MB) com o limite do Acre passava dos 30 min do
-        # workflow. O recorte simplifica de novo na tolerância final.
+        # Simplifica ANTES de validar e recortar: com todos os vértices, o
+        # make_valid e a interseção da Fase III (190 MB) com o limite do
+        # Acre passavam dos 30 min do workflow. O recorte simplifica de novo
+        # na tolerância final.
         g = g.simplify(TOLERANCIA / 2, preserve_topology=True)
         if not g.is_valid:
             g = make_valid(g)
