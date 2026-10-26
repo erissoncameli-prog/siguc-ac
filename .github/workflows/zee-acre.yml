@@ -7,7 +7,9 @@ name: ZEE do Acre (Mapa de Gestão)
 # - descobrir (padrão, e o que roda no push): lista a pasta da SEMA no Drive,
 #   os links das páginas do ZEE e as camadas da INDE/MMA. Não grava nada.
 # - inspecionar: baixa o arquivo (URL ou drive:<id>) e mostra campos,
-#   projeção e valores. Não grava nada.
+#   projeção e valores. Não grava nada. Pacote com vários .shp (a Fase III
+#   veio num .zip de 845 MB): lista o conteúdo e cada shapefile; o escolhido
+#   vai no campo `shp`.
 # - converter: gera data/zee/<camada>.geojson + manifesto.json e grava no
 #   próprio branch (travas no script: sem .prj, sem zona, cobertura ≠ 95–105%).
 
@@ -27,6 +29,9 @@ on:
         type: choice
         options: ['2', '3']
         default: '2'
+      shp:
+        description: 'Pacote com vários .shp: trecho do nome do escolhido (o inspecionar lista todos)'
+        required: false
       campos:
         description: 'Opcional: --campo-zona X --campo-subzona Y (o --inspecionar mostra os nomes)'
         required: false
@@ -67,12 +72,14 @@ jobs:
           FASE: ${{ inputs.fase || '2' }}
           CAMPOS: ${{ inputs.campos }}
           ESCALA: ${{ inputs.escala || '1:250.000' }}
+          SHP: ${{ inputs.shp }}
         run: |
+          ESCOLHA=(); [ -n "$SHP" ] && ESCOLHA=(--shp "$SHP")
           case "$MODO" in
             descobrir)   python scripts/zee_acre.py --descobrir ;;
-            inspecionar) python scripts/zee_acre.py --inspecionar "$ARQUIVO" ;;
+            inspecionar) python scripts/zee_acre.py --inspecionar "$ARQUIVO" "${ESCOLHA[@]}" ;;
             converter)   # CAMPOS sem aspas de propósito: são flags (--campo-zona X ...)
-                         python scripts/zee_acre.py --converter "$ARQUIVO" --fase "$FASE" --escala "$ESCALA" $CAMPOS ;;
+                         python scripts/zee_acre.py --converter "$ARQUIVO" --fase "$FASE" --escala "$ESCALA" "${ESCOLHA[@]}" $CAMPOS ;;
           esac
       - name: Gravar no branch
         if: ${{ inputs.modo == 'converter' }}

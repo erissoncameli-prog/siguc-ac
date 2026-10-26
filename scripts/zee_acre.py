@@ -215,11 +215,49 @@ def _baixar(url, pasta):
     return destino[:-4] + '.zip'
 
 
-def localizar_shp(alvo, pasta_tmp):
+def _resumo_zip(z):
+    """O que tem no pacote, antes de extrair: contagem/volume por extensão e
+    os maiores arquivos. A Fase III veio num .zip de 845 MB — sem isto não dá
+    para saber se o vetorial está lá dentro ou se é tudo imagem/PDF."""
+    por_ext = {}
+    for i in z.infolist():
+        if i.is_dir():
+            continue
+        ext = os.path.splitext(i.filename)[1].lower() or '(sem extensão)'
+        n, tam = por_ext.get(ext, (0, 0))
+        por_ext[ext] = (n + 1, tam + i.file_size)
+    print(f'Pacote: {sum(n for n, _ in por_ext.values())} arquivos')
+    for ext, (n, tam) in sorted(por_ext.items(), key=lambda kv: -kv[1][1]):
+        print(f'  {ext:16} {n:5} arquivo(s)  {tam / 1e6:9.1f} MB')
+    maiores = sorted((i for i in z.infolist() if not i.is_dir()), key=lambda i: -i.file_size)[:15]
+    print('Maiores:')
+    for i in maiores:
+        print(f'  {i.file_size / 1e6:9.1f} MB  {i.filename}')
+
+
+def _escolher_shp(shps, raiz, escolha):
+    """Pacote com vários .shp: --shp TRECHO escolhe pelo caminho (sem
+    diferenciar maiúscula). Ambíguo ou ausente = para e lista — nunca chuta."""
+    rel = {s: os.path.relpath(s, raiz) for s in shps}
+    if escolha:
+        cand = [s for s in shps if escolha.lower() in rel[s].lower()]
+        exatos = [s for s in cand if os.path.splitext(os.path.basename(s))[0].lower() == escolha.lower()]
+        cand = exatos or cand
+        if len(cand) == 1:
+            return cand[0]
+        raise SystemExit(f'--shp {escolha!r} casou {len(cand)} arquivo(s): {[rel[s] for s in cand] or sorted(rel.values())}')
+    if len(shps) == 1:
+        return shps[0]
+    raise SystemExit(f'esperava 1 .shp, achei {len(shps)} — escolha com --shp: {sorted(rel.values())}')
+
+
+def localizar_shp(alvo, pasta_tmp, escolha=None, listar=False):
     if re.match(r'^(https?://|drive:)', alvo):
         alvo = _baixar(alvo, pasta_tmp)
     if alvo.lower().endswith('.zip'):
         with zipfile.ZipFile(alvo) as z:
+            if listar:
+                _resumo_zip(z)
             for nome in z.namelist():
                 destino = os.path.realpath(os.path.join(pasta_tmp, nome))
                 if not destino.startswith(os.path.realpath(pasta_tmp) + os.sep):
@@ -227,10 +265,12 @@ def localizar_shp(alvo, pasta_tmp):
             z.extractall(pasta_tmp)
         alvo = pasta_tmp
     if os.path.isdir(alvo):
-        shps = [os.path.join(r, f) for r, _, fs in os.walk(alvo) for f in fs if f.lower().endswith('.shp')]
-        if len(shps) != 1:
-            raise SystemExit(f'esperava 1 .shp em {alvo}, achei {len(shps)}: {[os.path.basename(s) for s in shps]}')
-        alvo = shps[0]
+        shps = sorted(os.path.join(r, f) for r, _, fs in os.walk(alvo) for f in fs if f.lower().endswith('.shp'))
+        if listar and len(shps) > 1 and not escolha:
+            return shps
+        if not shps:
+            raise SystemExit(f'nenhum .shp em {alvo}')
+        alvo = _escolher_shp(shps, alvo, escolha)
     if not alvo.lower().endswith('.shp'):
         raise SystemExit(f'{alvo}: esperava .shp, pasta, .zip ou URL')
     return alvo
@@ -277,9 +317,32 @@ def ler_shp(shp):
     return campos, regs
 
 
-def inspecionar(alvo):
+def _resumo_shp(shp, raiz):
+    """Uma linha por shapefile do pacote: feições, tipo, projeção e campos."""
+    import shapefile
+    try:
+        r = shapefile.Reader(shp[:-4], encoding='latin-1', encodingErrors='replace')
+        prj = _arquivo_irmao(shp, '.prj')
+        if prj:
+            from pyproj import CRS
+            crs = CRS.from_wkt(open(prj, encoding='latin-1').read()).name
+        else:
+            crs = 'SEM .prj'
+        campos = [f[0] for f in r.fields[1:]]
+        print(f'- {os.path.relpath(shp, raiz)} · {len(r)} feições · {r.shapeTypeName} · {crs}')
+        print(f'    campos: {campos}')
+    except Exception as e:  # um arquivo quebrado não pode esconder os outros
+        print(f'- {os.path.relpath(shp, raiz)} · NÃO LEU: {e}')
+
+
+def inspecionar(alvo, escolha=None):
     with tempfile.TemporaryDirectory() as tmp:
-        shp = localizar_shp(alvo, tmp)
+        shp = localizar_shp(alvo, tmp, escolha, listar=True)
+        if isinstance(shp, list):
+            print(f'\n{len(shp)} shapefiles no pacote (escolha um com --shp):')
+            for s in shp:
+                _resumo_shp(s, tmp)
+            return
         _, crs = transformador(shp)
         campos, regs = ler_shp(shp)
         print(f'Arquivo: {os.path.basename(shp)} · {len(regs)} feições · projeção: {crs}')
@@ -289,7 +352,7 @@ def inspecionar(alvo):
             print(f'  {c}: {len(vals)} valores — {vals[:12]}{" …" if len(vals) > 12 else ""}')
 
 
-def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, acre_arq):
+def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, acre_arq, escolha=None):
     if fase not in CAMADAS:
         raise SystemExit('--fase deve ser 2 ou 3')
     camada_id, fonte_padrao = CAMADAS[fase]
@@ -297,7 +360,7 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     acre = make_valid(shape(json.load(open(acre_arq))['features'][0]['geometry']))
     area_acre = abs(GEOD.geometry_area_perimeter(acre)[0]) / 10000
     with tempfile.TemporaryDirectory() as tmp:
-        shp = localizar_shp(alvo, tmp)
+        shp = localizar_shp(alvo, tmp, escolha)
         t, crs_nome = transformador(shp)
         campos_arq, regs = ler_shp(shp)
     campos = detectar_campos(campos_arq)
@@ -629,6 +692,16 @@ def autoteste():
             raise AssertionError('aceitou shapefile sem .prj')
         except SystemExit as e:
             assert 'sem .prj' in str(e)
+    # pacote com vários .shp: escolhe pelo trecho, nunca chuta
+    shps = ['/r/a/Zonas_Gestao.shp', '/r/b/Zonas_Gestao_Sub.shp', '/r/c/Fundiario.shp']
+    assert _escolher_shp(shps, '/r', 'zonas_gestao') == '/r/a/Zonas_Gestao.shp'   # nome exato vence
+    assert _escolher_shp(shps, '/r', 'fundi') == '/r/c/Fundiario.shp'
+    for ruim in (None, 'zonas', 'nada'):
+        try:
+            _escolher_shp(shps, '/r', ruim)
+            raise AssertionError(f'escolha {ruim!r} aceita')
+        except SystemExit:
+            pass
     print('autoteste ok')
 
 
@@ -648,18 +721,19 @@ def main():
     ap.add_argument('--fonte')
     ap.add_argument('--saida', default='data/zee')
     ap.add_argument('--acre', default='data/acre_estado.geojson')
+    ap.add_argument('--shp', help='pacote com vários .shp: trecho do caminho/nome do escolhido')
     a = ap.parse_args()
     if a.autoteste:
         autoteste()
     elif a.descobrir:
         descobrir()
     elif a.inspecionar:
-        inspecionar(a.inspecionar)
+        inspecionar(a.inspecionar, a.shp)
     elif a.converter:
         if not a.fase:
             ap.error('--converter exige --fase 2 ou 3')
         converter(a.converter, a.fase, {'zona': a.campo_zona, 'subzona': a.campo_subzona, 'unidade': a.campo_unidade,
-                                        'nome': a.campo_nome}, a.legenda, a.escala, a.fonte, a.saida, a.acre)
+                                        'nome': a.campo_nome}, a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp)
     else:
         ap.print_help()
 
