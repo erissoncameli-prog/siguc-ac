@@ -73,6 +73,75 @@ regras): a tela mostra o código da fonte e diz isso. Quando o significado for
 confirmado (ex.: Documento Síntese, mapa APTIDAO.pdf), entra como rótulo — nunca
 antes.
 
+## Fase III recebida (26/10/2026)
+
+O usuário compartilhou do Drive do Núcleo do ZEE o `ZEE FASE III.zip` (845 MB,
+227 arquivos). Grande demais para o chat: o workflow baixa
+(`drive:<id>`, confirmação de arquivo grande do Drive) e o `--inspecionar`
+lista o pacote (volume por extensão, maiores arquivos, cada shapefile com os
+valores de cada campo — campo com possível dado pessoal só é CONTADO, nunca
+impresso, porque log de Actions pode ser público) e imprime o metadado em
+texto.
+
+- `MapaGestão_ZEEIII_Mapa_anexos/AC_MapaGestao_ZEE_III_Versao0506.shp`
+  (POLYGONZ, WGS 84/UTM 19S, 190 MB): 30 polígonos, `Zona` 1–4, `Zon_label`
+  com o código completo (1.1.1 … ; `x.y.0` = subzona sem unidade de manejo —
+  segundo o metadado só a Zona 1 tem unidade), `DescrZona`, `DescSubZon`,
+  `DescUniman`. **A Fase III renomeou as zonas** (Zona 1 = Sistemas de
+  Produção Agropecuários e Florestais Sustentáveis, Zona 4 = Cidades do Acre):
+  o nome vem do PRÓPRIO arquivo (`--campo-zona-nome`), não da tabela da Lei
+  1.904. Trava nova: um código, um nome (`conferir_nomes`). O metadado não
+  informa escala → `escala: null` e a tela diz "não informada".
+  Convertido por `--converter … --fase 3 --shp AC_MapaGestao_ZEE_III_Versao0506
+  --campo-zona Zona --campo-subzona Zon_label --campo-zona-nome DescrZona
+  --campo-subzona-nome DescSubZon --campo-unidade-nome DescUniman --escala nenhuma
+  --area-minima-ha 6.25`. Resultado: 30 feições, 4 zonas, 20 subzonas, 13
+  unidades de manejo (todas na Zona 1), 99,8% do Acre, 15,1 MB (3,9 MB com
+  gzip; o mapa só baixa ao ligar).
+- **Por que a conversão passava de 30 min (medido com `--perfil`)**: o arquivo
+  veio de raster vetorizado — 5,9 milhões de vértices em 223.876 partes
+  (143.555 menores que 0,2 ha) e 142.108 furos (123.603 com menos de 1 ha). O
+  simplify topológico passa de 150 s numa feição só (e o `make_valid` e o
+  recorte idem); com SVG/pyshp o resto também pesava. Caminho novo
+  (`ler_preparar`): pyogrio (WKB → shapely 2 em array), tirar o Z, **tirar
+  partes e furos abaixo da área mínima** (`tirar_miudos`; o furo de uma zona é a
+  ilha de outra, tirando os dois a área passa para a zona em volta), Douglas-Peucker
+  simples na unidade do arquivo (TOLERANCIA/2 em metros), `make_valid` só no
+  inválido, reprojeção em bloco e o `recortar` do Meio Físico (sem mudança).
+  Conversão inteira em ~70 s.
+- **Área mínima 6,25 ha** (= 1 mm² no papel a 1:250 mil), declarada em
+  `manifesto.json` (`area_minima_ha`). Medido: 1 ha → 19,3 MB, área −0,06%;
+  6,25 ha → 15,1 MB, −0,15%, maior variação numa feição 6,3%; 25 ha → 12,3 MB,
+  −0,32%; 100 ha → 9,6 MB, −0,77% (18,8% numa feição). O tamanho quase não cai
+  com área maior — o peso está nos contornos —, então ficou a menor perda.
+  Outro valor = rodar o `converter` de novo com `--area-minima-ha`.
+- Sobreposições finas nas divisas: cada feição é simplificada sozinha, então
+  vizinhas se sobrepõem em faixas de metros (257 pares, ~19 mil ha somados,
+  0,12% do estado). Mesma natureza da Fase II e do Meio Físico (mesma
+  tolerância de 45 m); só some com simplificação de cobertura no `recortar`, que
+  é do Meio Físico e não foi mexido.
+- No navegador, com o arquivo real: ligar ~0,8 s, clique → popup ~0,1–0,2 s,
+  arrastar ~0,4–0,5 s (SVG; canvas medido igual, não entrou).
+- `ZEE_ACRE_FUNDIARIO.shp` (1.248 polígonos; metadado:
+  `ZEE_Ac_fUNDIARIO_REVISADO_2019`): base fundiária que o ZEE usou — 952
+  imóveis rurais (IRU), 156 assentamentos, 84 glebas federais, 32 TIs, 18 UCs
+  de uso sustentável, 3 glebas estaduais, 3 UCs de proteção integral.
+  **Tem dado pessoal**: `PROPRIET` (nome do proprietário), `MATRICULA`,
+  `CERTIF`, `CODIGO` (SIGEF) e `NOME` (nome da propriedade). O
+  `--fundiario` grava `data/zee/fase3_fundiario.geojson` só com lista fechada
+  de campos (`FUND_CAMPOS`): tipo, subtipo, órgão, fonte, situação,
+  sobreposição, zona/subzona e o nome SÓ de área pública (no IRU o nome da
+  fazenda costuma ser o do dono). Fica fora do ROPA: o que vai para o arquivo
+  não identifica pessoa. Na tela é "camada complementar" da aba ZEE (liga junto
+  com qualquer fase, cor por tipo).
+- 3 `.rar` internos (`Mapa_gestao_ZEE_FaseIII_AJ2020`, `FUNDIARIO`,
+  `Mapas_relatorio`) = cópias do que já está solto no pacote. O 7z do runner
+  não abre RAR5 (sai com −11); a extração quebrada é descartada.
+- PDFs/JPGs: mapa A0 em PDF, resumo executivo (já publicado no site da SEMA),
+  minuta de lei de 2021, apresentação de 2023, metadados, mapas por zona em JPG.
+  Não copiados para o repositório; o pacote inteiro entrou como link em
+  `documentos.json` (grupo Fase III).
+
 ## Fase II recebida (26/10/2026)
 
 O usuário enviou `ZEE_II.rar` (RAR5 — o `unar` 1.10 falha nos `.shp`; extrair com
@@ -88,8 +157,8 @@ O usuário enviou `ZEE_II.rar` (RAR5 — o `unar` 1.10 falha nos `.shp`; extrair
   fundiária (arrecadada, assentamento, discriminada, particular, TI, UC, sem
   estudo). Não é zona do ZEE; não carregado — decisão pendente do usuário.
 
-Pendências que continuam: subzonas da Fase II (pedir à SEMA o shapefile com
-subzonas/unidades de manejo, se existir) e o arquivo da Fase III.
+Pendência que continua: subzonas da Fase II (pedir à SEMA o shapefile com
+subzonas/unidades de manejo, se existir).
 
 ## O que foi entregue (sem o dado vetorial)
 
@@ -121,6 +190,13 @@ subzonas/unidades de manejo, se existir) e o arquivo da Fase III.
   - Travas: sem `.prj` → para; feição sem zona → para e lista os valores;
     cobertura fora de 95–105% do estado → nada gravado.
   - ARQ pode ser `.zip`, pasta, `.shp`, URL ou `drive:<id>`.
+  - `--area-minima-ha N`: tira partes e furos menores que N antes de
+    simplificar (arquivo vindo de raster). Fica no manifesto.
+  - Modos de diagnóstico do workflow: `extrair` (artefato só com o `.shp`
+    escolhido — o blob storage do GitHub dá 403 nas sessões, então serve para
+    baixar de fora) e `perfil` (mede a conversão inteira por área mínima, sem
+    gravar). `timeout-minutes: 90` só por segurança; log sem buffer
+    (`PYTHONUNBUFFERED`), então um job cancelado mostra até onde chegou.
 
 ## Como ligar quando o dado chegar
 

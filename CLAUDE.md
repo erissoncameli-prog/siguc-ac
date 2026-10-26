@@ -1367,11 +1367,40 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
   `subzonas: 0` no manifesto a aba não oferece "colorir por subzona". O código
   vem do campo `Label` ("Zona 01" — zero à esquerda; `ler_codigo` aceita) e o
   nome segue a tabela `ZONAS` do script (conferido: mesma numeração do arquivo).
-  `.cpg` = "System" (QGIS) → lido como latin-1. Fase III segue sem arquivo: a
-  aba diz "ainda não recebido" e não deixa ligar. O mesmo RAR trouxe
+  `.cpg` = "System" (QGIS) → lido como latin-1. O mesmo RAR trouxe
   `FUNDIARIO_250.shp` (459 polígonos de situação fundiária) — NÃO carregado.
+- **Fase III carregada (26/10/2026)**: `data/zee/fase3_gestao.geojson`, do
+  `ZEE FASE III.zip` (845 MB no Drive do Núcleo do ZEE — baixado pelo workflow,
+  nunca pelo chat). Zona/subzona/unidade de manejo (código em `Zon_label`,
+  `x.y.0` = sem unidade) e os NOMES DO PRÓPRIO ARQUIVO — a Fase III renomeou as
+  zonas, então `--campo-zona-nome` vence a tabela `ZONAS` da Lei 1.904. Trava:
+  um código, um nome. Sem escala no metadado → "não informada". 30 feições,
+  20 subzonas, 13 unidades (só na Zona 1), 99,8% do Acre, 15,1 MB.
+- **Fase III veio de raster vetorizado** (5,9 mi de vértices, 224 mil partes e
+  142 mil furos quase todos < 1 ha): conversão passava de 30 min. Caminho rápido
+  `ler_preparar` (pyogrio + shapely 2 vetorizado): tira Z → `tirar_miudos`
+  (`--area-minima-ha`, 6,25 ha = 1 mm² a 1:250 mil, declarado no manifesto) →
+  Douglas-Peucker simples em METROS antes de reprojetar → `make_valid` só no
+  inválido → `recortar` do Meio Físico (intocado). ~70 s. Medido com o modo
+  `perfil` do workflow (também `extrair`); números em `plano-zee.md`. Sem área
+  mínima (base fundiária) segue o simplify topológico de antes. ⚠️ pyogrio:
+  passar o nome canônico da codificação (`codecs.lookup(...).name`) — "latin-1"
+  o GDAL não reconhece e lê como UTF-8 (quebra no "ç").
+- Simplificação feição a feição deixa sobreposições finas nas divisas (0,12% do
+  estado na Fase III): clique numa divisa pode abrir a vizinha.
+- **Base fundiária do ZEE III** (`data/zee/fase3_fundiario.geojson`, 1.248
+  polígonos, `zee_acre.py --fundiario`): camada COMPLEMENTAR da aba
+  (`ZEE_COMPLEMENTARES`, liga junto com qualquer fase, cor por tipo, pane
+  `zeeCompPane` z 365). **Dado pessoal NUNCA sai**: lista fechada
+  `FUND_CAMPOS` — sem `PROPRIET`, `MATRICULA`, `CERTIF`, `CODIGO` (SIGEF),
+  `OBSERVACAO`; nome só de área pública (no imóvel rural, nome da fazenda =
+  dono). O `--inspecionar` só CONTA campo com nome de dado pessoal
+  (`CAMPO_PESSOAL`), nunca imprime — log de Actions pode ser público.
+- Pacote com vários shapefiles: `--inspecionar` lista tudo (e abre `.rar`/
+  `.7z`/`.zip` internos com o 7z do runner — RAR5 não abre, é descartado) e
+  `--shp TRECHO` escolhe; ambíguo para e lista.
 - Dados SÓ por `scripts/zee_acre.py` (workflow `.github/workflows/zee-acre.yml`,
-  modos descobrir/inspecionar/converter — `*.ac.gov.br` e o Drive dão 403 nas
+  modos descobrir/inspecionar/converter/fundiario/extrair/perfil — `*.ac.gov.br` e o Drive dão 403 nas
   sessões; o runner alcança). Travas: sem `.prj` para; feição sem zona para;
   cobertura fora de 95–105% do Acre não grava. Nomes das zonas vivem SÓ no script
   (`ZONAS`, Lei 1.904/2007); o mapa lê o que vem no arquivo.
@@ -1385,8 +1414,10 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
   que não está lá). Nova aba, `noopener noreferrer`; o SIGUC não copia o PDF.
   Documento novo = uma linha no JSON. A pasta e o site só têm PDF — nenhum
   arquivo vetorial (conferido pelo `descobrir`, 25/10/2026).
-- Guarda: `tests/mapa-zee.test.js` (6, página real; contrafactual conferido —
-  pane acima do overlay e link sem `noreferrer` reprovam).
+- Guarda: `tests/mapa-zee.test.js` (9, página real; contrafactual conferido —
+  pane acima do overlay e link sem `noreferrer` reprovam; base fundiária com
+  imóvel rural sem nome; arquivos REAIS: Fase III com 30 feições, um código um
+  nome, colorir por subzona, clique de verdade abrindo o popup da unidade).
   `tests/mapa-barra-camadas.test.js` passou a contar 11 abas.
 - Sem mudança em `pwa/sw.js` (tela de mesa; ícone `map` já existia).
 

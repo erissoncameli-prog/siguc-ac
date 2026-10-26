@@ -240,6 +240,12 @@
      "titulo": "ZEE-II (página da Fase III)",
      "url": "https://sema.ac.gov.br/wp-content/uploads/2022/02/ZEE-II.pdf",
      "tipo": "pdf"
+    },
+    {
+     "titulo": "Pacote completo da Fase III (Núcleo do ZEE, .zip de 845 MB)",
+     "url": "https://drive.google.com/file/d/1Rn7z_usurllWh1njQhKHiIN61h11QYnc/view",
+     "tipo": "pasta",
+     "descricao": "Mapa de Gestão em PDF (A0) e em shapefile, base fundiária, metadados, minuta de lei (2021), resumo executivo para impressão e apresentação de 2023."
     }
    ]
   },

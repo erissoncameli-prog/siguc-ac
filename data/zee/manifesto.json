@@ -16,6 +16,42 @@
     "4"
    ],
    "subzonas": 0
+  },
+  "fase3_fundiario": {
+   "fonte": "SEMA-AC — ZEE Fase III, base fundiária (INCRA, ITERACRE, SIGEF/SNCI, FUNAI, ICMBio, IMAC e outros)",
+   "escala": null,
+   "projecao_origem": "WGS 84 / UTM zone 19S",
+   "gerado_em": "2026-10-26",
+   "arquivo": "fase3_fundiario.geojson",
+   "feicoes": 1248,
+   "complementar": true,
+   "por_tipo": {
+    "ASSENTAMENTO": 156,
+    "GLEBEST": 3,
+    "GLEBFED": 84,
+    "IRU": 952,
+    "TI": 32,
+    "UCPI": 3,
+    "UCUS": 18
+   }
+  },
+  "fase3_gestao": {
+   "fonte": "SEMA-AC — ZEE Fase III, Mapa de Subsídio à Gestão Territorial e Ambiental",
+   "escala": null,
+   "projecao_origem": "WGS 84 / UTM zone 19S",
+   "gerado_em": "2026-10-26",
+   "area_minima_ha": 6.25,
+   "arquivo": "fase3_gestao.geojson",
+   "feicoes": 30,
+   "area_ha": 16390002,
+   "cobertura_pct": 99.8,
+   "zonas": [
+    "1",
+    "2",
+    "3",
+    "4"
+   ],
+   "subzonas": 20
   }
  }
 }

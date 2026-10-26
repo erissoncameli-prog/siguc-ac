@@ -35,7 +35,12 @@ const FASE2 = { type: 'FeatureCollection', fonte: 'SEMA-AC — ZEE Fase II, Mapa
 const FASE3 = { type: 'FeatureCollection', features: [
   { type: 'Feature', geometry: quad(-70.0, -9.6, 0.2), properties: { zona_cod: '3', zona: 'Zona 3 — Áreas prioritárias para o ordenamento territorial', subzona: '3.1' } },
 ] };
+const FUND = { type: 'FeatureCollection', features: [
+  { type: 'Feature', geometry: quad(-70.0, -10.4, 0.2), properties: { tipo: 'UCUS', tipo_rotulo: 'UC de uso sustentável', nome: 'RESEX Teste', orgao: 'ICMbio', zona: 'Zona 2', area_ha: 4000 } },
+  { type: 'Feature', geometry: quad(-69.7, -10.4, 0.1), properties: { tipo: 'IRU', tipo_rotulo: 'Imóvel rural (propriedade privada)', subtipo: 'Propriedade Privada', area_ha: 900 } },
+] };
 const MANIFESTO = { camadas: {
+  fase3_fundiario: { arquivo: 'fase3_fundiario.geojson', fonte: 'SEMA-AC — ZEE Fase III, base fundiária', escala: null, feicoes: 2, complementar: true },
   fase2_gestao: { arquivo: 'fase2_gestao.geojson', fonte: FASE2.fonte, escala: '1:250.000', gerado_em: '2026-10-25', feicoes: 3, subzonas: 3 },
   fase3_gestao: { arquivo: 'fase3_gestao.geojson', fonte: 'SEMA-AC — ZEE Fase III', escala: null, gerado_em: '2026-10-25', feicoes: 1, subzonas: 1 },
 } };
@@ -57,7 +62,7 @@ async function abrir(page, { manifesto = MANIFESTO, geojsonStatus = 200, reais =
   if (!reais) await page.route('**/data/zee/*.geojson', r => {
     const u = new URL(r.request().url()).pathname; pedidos.push(u);
     if (geojsonStatus !== 200) return r.fulfill({ status: geojsonStatus, body: '' });
-    r.fulfill({ json: u.endsWith('/fase3_gestao.geojson') ? FASE3 : FASE2 });
+    r.fulfill({ json: u.endsWith('/fase3_gestao.geojson') ? FASE3 : u.endsWith('/fase3_fundiario.geojson') ? FUND : FASE2 });
   });
   await page.goto(`${BASE}/pages/mapa.html`);
   await page.waitForFunction(() => typeof renderPagina === 'function' && typeof L !== 'undefined' && typeof zeeMontar === 'function');
@@ -167,22 +172,69 @@ test('colorir por subzona: tons da cor da zona, legenda por subzona, preferênci
     'ZEE Fase II — Subzona 2.1 (UCs de proteção integral)']);
   await page.evaluate(() => { const i = document.querySelector('[data-zee-acao="opacidade"]'); i.value = '70'; i.dispatchEvent(new Event('input', { bubbles: true })) });
   expect(await page.evaluate(() => _zee.layer.getLayers()[0].options.fillOpacity)).toBe(0.7);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_zee')))).toEqual({ ativa: 'fase2_gestao', colorir: 'subzona', opacidade: 0.7 });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_zee')))).toEqual({ ativa: 'fase2_gestao', colorir: 'subzona', opacidade: 0.7, comp: [] });
 });
 
-test('arquivo REAL da Fase II (SEMA, 26/10/2026): 4 zonas, sem subzona — só "colorir por zona"', async ({ page }) => {
+test('arquivos REAIS (SEMA, 26/10/2026): Fase II só zonas, Fase III com subzona e unidade de manejo', async ({ page }) => {
+  test.setTimeout(60000);
   await abrir(page, { reais: true });
   await abrirAba(page);
   await expect(page.locator('.zee-aviso')).toHaveCount(0);
-  await expect(page.locator('[data-zee-camada="fase3_gestao"] [data-zee-acao="ligar"]')).toBeDisabled();
-  // sem subzona no arquivo, a opção de colorir por subzona não faz nada — não aparece
-  await expect(page.locator('[data-zee-acao="colorir"]')).toHaveCount(0);
+  await expect(page.locator('[data-zee-camada="fase3_gestao"] [data-zee-acao="ligar"]')).toBeEnabled();
+  // a Fase III tem subzona: a opção de colorir por subzona aparece
+  await expect(page.locator('[data-zee-acao="colorir"]')).toHaveCount(1);
   await ligar(page, 'fase2_gestao');
   const zonas = await page.evaluate(() => _zee.layer.getLayers().map(l => [l.feature.properties.zona_cod, l.options.fillColor]));
   expect(zonas).toEqual([['1', '#E69F00'], ['2', '#009E73'], ['3', '#CC79A7'], ['4', '#0072B2']]);
   const leg = await page.evaluate(() => zeeItensLegenda().map(i => i.label));
   expect(leg).toHaveLength(4);
   expect(leg[3]).toMatch(/Zona 4 — Cidades florestais/);
+
+  await ligar(page, 'fase3_gestao');
+  const f3 = await page.evaluate(() => _zee.layer.getLayers().map(l => l.feature.properties));
+  expect(f3).toHaveLength(30);
+  expect([...new Set(f3.map(p => p.zona_cod))]).toEqual(['1', '2', '3', '4']);
+  expect(new Set(f3.map(p => p.subzona)).size).toBe(20);
+  expect(f3.filter(p => p.unidade).length).toBe(13);
+  // nomes do PRÓPRIO arquivo (a Fase III renomeou as zonas)
+  expect(f3.find(p => p.zona_cod === '4').zona).toBe('Zona 4 — Cidades do Acre');
+  // um código, um nome
+  const nomes = {};
+  for (const p of f3) for (const [c, n] of [[p.zona_cod, p.zona], [p.subzona, p.subzona_nome], [p.unidade, p.unidade_nome]]) {
+    if (!c || !n) continue;
+    expect(nomes[c] ?? n).toBe(n); nomes[c] = n;
+  }
+  await page.locator('[data-zee-acao="colorir"]').selectOption('subzona');
+  expect(await page.evaluate(() => zeeItensLegenda().length)).toBe(20);
+
+  // clique de verdade no mapa: o popup abre na feição de baixo do cursor
+  await page.click('#mlb-dropdown .mlb-close');
+  await expect(page.locator('#mlb-dropdown')).toBeHidden();
+  const alvo = await page.evaluate(() => {
+    const l = _zee.layer.getLayers().find(l => l.feature.properties.unidade === '1.1.1')
+    // ponto dentro da MAIOR parte da unidade, longe das divisas (a simplificação
+    // deixa sobreposições finas, de metros, entre feições vizinhas)
+    const g = l.feature.geometry
+    const partes = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]
+    const maior = partes.map(c => turf.polygon(c)).sort((a, b) => turf.area(b) - turf.area(a))[0]
+    const [lng, lat] = turf.pointOnFeature(turf.buffer(maior, -1, { units: 'kilometers' })).geometry.coordinates
+    const c = L.latLng(lat, lng); mapaL.setView(c, 13, { animate: false })
+    const p = mapaL.latLngToContainerPoint(c), r = mapaL.getContainer().getBoundingClientRect()
+    return { x: r.left + p.x, y: r.top + p.y }
+  })
+  let t0 = Date.now();
+  await page.mouse.click(alvo.x, alvo.y);
+  await expect(page.locator('.leaflet-popup-content')).toBeVisible();
+  // arquivo de 15 MB (~716 mil vértices): medido ~0,1–0,5 s; o teto (folgado para CI carregado) pega regressão grosseira
+  expect(Date.now() - t0).toBeLessThan(15000);
+  const t = await page.locator('.leaflet-popup-content').last().innerText();
+  expect(t).toMatch(/Unidade de manejo 1\.1\.1/i);
+  expect(t).toContain('Zona 1 — Sistemas de Produção Agropecuários e Florestais Sustentáveis');
+  expect(t).toContain('sem lei estadual que o institua');
+  t0 = Date.now();
+  await page.mouse.move(alvo.x, alvo.y + 150); await page.mouse.down();
+  await page.mouse.move(alvo.x + 200, alvo.y + 250, { steps: 10 }); await page.mouse.up();
+  expect(Date.now() - t0).toBeLessThan(15000);
 });
 
 test('Fase III liga e desliga a Fase II — nunca as duas no mapa', async ({ page }) => {
@@ -203,6 +255,42 @@ test('Fase III liga e desliga a Fase II — nunca as duas no mapa', async ({ pag
   expect(await page.evaluate(() => zeeAtiva())).toBe(null);
   const leg = await page.evaluate(() => document.querySelector('.cart-legenda')?.innerText || '');
   expect(leg).not.toContain('ZEE');
+});
+
+test('base fundiária: liga junto com a fase, cor por tipo, imóvel rural sem nome', async ({ page }) => {
+  const pedidos = await abrir(page);
+  await abrirAba(page);
+  // sem fundiário no manifesto, a seção nem aparece (testado no caso "sem arquivo"); aqui aparece
+  const caixa = page.locator('[data-zee-comp="fase3_fundiario"] [data-zee-acao="comp"]');
+  await expect(caixa).toBeVisible();
+  expect(pedidos).not.toContain('/data/zee/fase3_fundiario.geojson'); // só baixa ao ligar
+  await ligar(page, 'fase2_gestao');
+  await caixa.check();
+  await page.waitForFunction(() => zeeComplementaresAtivas().length === 1);
+  // as duas no mapa ao mesmo tempo, fundiário por cima das zonas e abaixo das UCs
+  const r = await page.evaluate(() => ({
+    fase: zeeAtiva(),
+    cores: _zee.comp.fase3_fundiario.getLayers().map(l => l.options.color),
+    z: ['zeePane', 'zeeCompPane', 'overlayPane'].map(p => Number(getComputedStyle(mapaL.getPane(p)).zIndex)),
+  }));
+  expect(r.fase).toBe('fase2_gestao');
+  expect(r.cores).toEqual(['#8C6D1F', '#E69F00']);
+  expect(r.z[0]).toBeLessThan(r.z[1]);
+  expect(r.z[1]).toBeLessThan(r.z[2]);
+  await expect(page.locator('#zee-count-badge')).toHaveText('2');
+  const leg = await page.evaluate(() => document.querySelector('.cart-legenda')?.innerText || '');
+  expect(leg).toContain('Fundiário ZEE III — UC de uso sustentável');
+  expect(leg).toContain('Fundiário ZEE III — Imóvel rural (propriedade privada)');
+  // popup do imóvel rural: tipo, sem nome, com o aviso
+  await page.evaluate(() => _zee.comp.fase3_fundiario.getLayers()[1].openPopup());
+  const t = await page.locator('.leaflet-popup-content').last().innerText();
+  expect(t).toContain('Imóvel rural (propriedade privada)');
+  expect(t).toContain('nome e titular não são exibidos');
+  // desligar a fase não desliga o fundiário
+  await page.locator('[data-zee-camada="fase2_gestao"] [data-zee-acao="ligar"]').uncheck();
+  expect(await page.evaluate(() => [zeeAtiva(), zeeComplementaresAtivas()])).toEqual([null, ['fase3_fundiario']]);
+  await caixa.uncheck();
+  expect(await page.evaluate(() => zeeComplementaresAtivas())).toEqual([]);
 });
 
 test('arquivo listado no manifesto que falha: aviso e a caixa volta a desmarcada', async ({ page }) => {
