@@ -388,7 +388,38 @@ def _log(msg, t0):
     print(f'  {msg} · {time.time() - t0:.1f} s', flush=True)
 
 
-def ler_preparar(shp, t):
+def tirar_miudos(geoms, area_min):
+    """Tira partes e furos menores que `area_min` (na unidade do arquivo).
+    O ZEE III veio de raster vetorizado: 224 mil partes e 142 mil furos,
+    quase todos de menos de 1 ha — é isso, não o número de vértices, que
+    trava o simplify topológico e o make_valid. Num mapa que recobre o
+    estado, o furo de uma zona é a ilha de outra: tirando os dois, a área
+    passa para a zona em volta, sem buraco nem sobreposição.
+    Devolve (geometrias, partes tiradas, furos tirados)."""
+    from shapely.geometry import MultiPolygon, Polygon
+    partes, idx = shapely.get_parts(geoms, return_index=True)
+    poli = shapely.get_type_id(partes) == 3   # só polígonos
+    partes, idx = partes[poli], idx[poli]
+    ext = shapely.get_exterior_ring(partes)
+    fica = shapely.area(shapely.polygons(ext)) >= area_min
+    novas = [[] for _ in geoms]
+    n_furos = 0
+    for p, i, ok in zip(partes, idx, fica):
+        if not ok:
+            continue
+        furos = list(p.interiors)
+        if furos:
+            af = shapely.area(shapely.polygons(furos))
+            manter = [f for f, a in zip(furos, af) if a >= area_min]
+            n_furos += len(furos) - len(manter)
+            if len(manter) != len(furos):
+                p = Polygon(p.exterior, manter)
+        novas[i].append(p)
+    saida = np.array([MultiPolygon(ps) if len(ps) > 1 else (ps[0] if ps else Polygon()) for ps in novas], dtype=object)
+    return saida, int((~fica).sum()), n_furos
+
+
+def ler_preparar(shp, t, area_min_ha=0):
     """Caminho rápido (Fase III: 30 polígonos com milhões de vértices cada).
     pyogrio lê a geometria em WKB direto para um array do shapely 2 e todas
     as etapas são vetorizadas: tirar o Z, simplificar na unidade de ORIGEM
@@ -410,8 +441,23 @@ def ler_preparar(shp, t):
     geoms, props = geoms[~vazio], [p for p, v in zip(props, vazio) if not v]
     geoms = shapely.force_2d(geoms)        # Fase III vem em POLYGONZ (Z sempre 0)
     _log('sem Z', t0)
-    geoms = shapely.simplify(geoms, tolerancia_origem(shp), preserve_topology=True)
-    _log(f'simplificadas: {int(shapely.get_num_coordinates(geoms).sum()):,} vértices', t0)
+    tol = tolerancia_origem(shp)
+    if area_min_ha:
+        # unidade do arquivo: m² em UTM, grau² em lon/lat (aproximado)
+        amin = area_min_ha * 10000 / (1 if tol > 1 else M_POR_GRAU ** 2)
+        a0 = shapely.area(geoms)
+        geoms, n_p, n_f = tirar_miudos(geoms, amin)
+        _log(f'menores que {area_min_ha} ha: {n_p:,} parte(s) e {n_f:,} furo(s) tirados', t0)
+        # Sem os anéis miúdos, Douglas-Peucker simples basta (o topológico
+        # levava minutos por feição); o que sair inválido o make_valid corrige.
+        geoms = shapely.simplify(geoms, tol, preserve_topology=False)
+        a1 = shapely.area(geoms)
+        var = np.abs(a1 - a0) / np.where(a0 > 0, a0, 1) * 100
+        _log(f'simplificadas: {int(shapely.get_num_coordinates(geoms).sum()):,} vértices · área total '
+             f'{(a1.sum() - a0.sum()) / a0.sum() * 100:+.2f}% · maior variação numa feição {var.max():.1f}%', t0)
+    else:
+        geoms = shapely.simplify(geoms, tol, preserve_topology=True)
+        _log(f'simplificadas: {int(shapely.get_num_coordinates(geoms).sum()):,} vértices', t0)
     inval = ~shapely.is_valid(geoms)
     if inval.any():
         geoms[inval] = shapely.make_valid(geoms[inval])
@@ -519,119 +565,33 @@ def extrair(alvo, escolha, destino):
     print(f'{destino}: {os.path.getsize(destino) / 1e6:.1f} MB em {time.time() - t0:.0f} s', flush=True)
 
 
-def _anatomia(geoms, tol):
-    """Anéis por feição: muitos anéis minúsculos (vetorização de raster)
-    pesam no simplify topológico mais que os vértices."""
-    g2 = shapely.force_2d(geoms)
-    partes = shapely.get_parts(g2)
-    furos = [shapely.get_interior_ring(p, k) for p in partes for k in range(shapely.get_num_interior_rings(p))]
-    af = shapely.area(shapely.polygons(furos)) if furos else np.array([])
-    ap = shapely.area(shapely.polygons(shapely.get_exterior_ring(partes)))
-    lim = (2 * tol) ** 2   # anel menor que um quadrado de 2× a tolerância
-    print(f'anatomia: {len(partes):,} partes ({int((ap < lim).sum()):,} menores que {lim:,.0f}), '
-          f'{len(furos):,} furos ({int((af < lim).sum()):,} menores; {int((af < 10000).sum()):,} < 1 ha) · '
-          f'área total dos furos minúsculos {af[af < lim].sum() / 1e4 if len(af) else 0:,.1f} ha', flush=True)
-    vfur = shapely.get_num_coordinates(np.array(furos)) if furos else np.array([0])
-    print(f'  vértices em furos: {int(vfur.sum()):,} · em contornos: {int(shapely.get_num_coordinates(shapely.get_exterior_ring(partes)).sum()):,}', flush=True)
-
-
-def _medir_filho(fila, nome, wkb, tol):
-    import shapely as sh
-    g = sh.force_2d(sh.from_wkb(wkb))
-    t1 = time.time()
-    tempos = []
-    def marca(r):
-        tempos.append(f'{time.time() - t1:.1f}')
-        return r
-    if nome == 'topologico':
-        g = marca(sh.simplify(g, tol, preserve_topology=True))
-        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
-    elif nome == 'dp_simples':
-        g = marca(sh.simplify(g, tol, preserve_topology=False))
-        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
-    elif nome == 'valida_antes':
-        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
-        g = marca(sh.simplify(g, tol, preserve_topology=False))
-    elif nome == 'repetidos':
-        g = marca(sh.remove_repeated_points(g, tol))
-        g = marca(sh.simplify(g, tol, preserve_topology=True))
-        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
-    elif nome == 'malha':
-        g = marca(sh.set_precision(g, tol))
-        g = marca(sh.simplify(g, tol, preserve_topology=False))
-        g = marca(g if sh.is_valid(g) else sh.make_valid(g))
-    fila.put(f'{nome}: {" / ".join(tempos)} s · {sh.get_num_coordinates(g):,} vértices · '
-             f'{sh.get_num_geometries(g)} partes · área {sh.area(g) / 1e4:,.0f} ha · válida={sh.is_valid(g)}')
-
-
-def _estrategias(g, tol, nv, limite_s=150):
-    """Cada estratégia num processo filho com tempo-limite (o GEOS não volta
-    ao Python no meio de uma operação para ser interrompido)."""
-    import multiprocessing as mp
-    print(f'estratégias na feição de {nv:,} vértices (área original {shapely.area(g) / 1e4:,.0f} ha):', flush=True)
-    wkb = shapely.to_wkb(g)
-    for nome in ('dp_simples', 'valida_antes', 'malha', 'repetidos', 'topologico'):
-        fila = mp.Queue()
-        pr = mp.Process(target=_medir_filho, args=(fila, nome, wkb, tol))
-        t1 = time.time()
-        pr.start()
-        pr.join(limite_s)
-        if pr.is_alive():
-            pr.terminate(); pr.join()
-            print(f'  {nome}: passou de {limite_s} s', flush=True)
-        else:
-            print(f'  {fila.get() if not fila.empty() else nome + ": falhou"} (total {time.time() - t1:.1f} s)', flush=True)
-
-
-def perfil(alvo, escolha, acre_arq, orcamento_s=2400):
-    """Mede o caminho rápido feição por feição (da menor para a maior), com
-    tempo de cada etapa, sem gravar nada. Para no orçamento de tempo — o
-    log mostra até onde chegou e qual etapa pesa."""
-    import pyogrio
+def perfil(alvo, escolha, acre_arq, areas_ha=(1, 6.25)):
+    """Mede a conversão inteira (sem gravar) para cada área mínima: tempo de
+    cada etapa, vértices, área por zona antes × depois e tamanho do GeoJSON
+    que sairia. É como se escolhe a área mínima com número, não no chute."""
     acre = make_valid(shape(json.load(open(acre_arq))['features'][0]['geometry']))
-    t_ini = time.time()
     with tempfile.TemporaryDirectory() as tmp:
-        shp = localizar_shp(alvo, tmp, escolha)
-        print(f'baixado e extraído em {time.time() - t_ini:.0f} s', flush=True)
-        t, crs_nome = transformador(shp)
-        tol = tolerancia_origem(shp)
         t0 = time.time()
-        _, _, wkb, _ = pyogrio.raw.read(shp, read_geometry=True, columns=[])
-        geoms = shapely.from_wkb(wkb)
-        print(f'{crs_nome} · tolerância {tol:.1f} · {len(geoms)} feições lidas (pyogrio + from_wkb) em {time.time() - t0:.1f} s', flush=True)
-    nv = shapely.get_num_coordinates(geoms)
-    print(f'vértices: total {int(nv.sum()):,}, maior {int(nv.max()):,}', flush=True)
-    _anatomia(geoms, tol)
-    for i in np.argsort(nv)[::-1][:3]:
-        _estrategias(geoms[i], tol, int(nv[i]))
-    print(f'estratégias medidas em {time.time() - t_ini:.0f} s', flush=True)
-    tot = {}
-    for i in np.argsort(nv):
-        if nv[i] > 300_000:
-            continue   # as grandes já passaram pelas estratégias acima
-        if time.time() - t_ini > orcamento_s:
-            print(f'orçamento de {orcamento_s} s esgotado — parei', flush=True)
-            break
-        g, linha = geoms[i], []
-        def etapa(nome, fn):
-            nonlocal g
-            t1 = time.time(); g = fn(g); dt = time.time() - t1
-            tot[nome] = tot.get(nome, 0) + dt
-            linha.append(f'{nome} {dt:.2f}')
-        etapa('2d', shapely.force_2d)
-        etapa('simplify', lambda x: shapely.simplify(x, tol, preserve_topology=True))
-        nv2 = shapely.get_num_coordinates(g)
-        valido = [None]
-        etapa('is_valid', lambda x: (valido.__setitem__(0, shapely.is_valid(x)), x)[1])
-        if not valido[0]:
-            etapa('make_valid', shapely.make_valid)
-        if t is not None:
-            etapa('transform', lambda x: shapely.transform(x, lambda c: np.column_stack(t.transform(c[:, 0], c[:, 1]))))
-        etapa('recorte', lambda x: (recortar([{'type': 'Feature', 'properties': {}, 'geometry': mapping(x)}], acre, [])[0] or [{'geometry': None}])[0]['geometry'])
-        if g is not None:
-            etapa('area', lambda x: (area_ha(x), x)[1])
-        print(f'  #{i} {g and "ok" or "fora do Acre"} · {int(nv[i]):,} → {int(nv2):,} vértices · válida={valido[0]} · ' + ' · '.join(linha), flush=True)
-    print('total por etapa: ' + ' · '.join(f'{k} {v:.1f} s' for k, v in tot.items()) + f' · tudo {time.time() - t_ini:.0f} s', flush=True)
+        shp = localizar_shp(alvo, tmp, escolha)
+        print(f'baixado e extraído em {time.time() - t0:.0f} s', flush=True)
+        t, _ = transformador(shp)
+        for amin in areas_ha:
+            print(f'\n== área mínima {amin} ha', flush=True)
+            t1 = time.time()
+            campos, geoms, props, corr = ler_preparar(shp, t, amin)
+            feats = [{'type': 'Feature', 'properties': {'_i': i}, 'geometry': mapping(g)} for i, g in enumerate(geoms)]
+            t2 = time.time()
+            out, inval = recortar(feats, acre, ['_i'])
+            print(f'  recorte {time.time() - t2:.1f} s · {len(out)} feições', flush=True)
+            por_zona = {}
+            for f in out:
+                z = str(props[f['properties']['_i']].get('Zona'))
+                por_zona[z] = por_zona.get(z, 0) + area_ha(f['geometry'])
+            tam = len(json.dumps({'type': 'FeatureCollection', 'features': out}, separators=(',', ':')))
+            nv = sum(int(shapely.get_num_coordinates(shape(f['geometry']))) for f in out)
+            print(f'  total {time.time() - t1:.0f} s · {nv:,} vértices · GeoJSON {tam / 1e6:.1f} MB · '
+                  f'área por zona (ha): {dict(sorted((k, round(v)) for k, v in por_zona.items()))} · '
+                  f'Acre {sum(por_zona.values()) / (abs(GEOD.geometry_area_perimeter(acre)[0]) / 1e4) * 100:.1f}%', flush=True)
 
 
 def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, acre_arq, escolha=None):
