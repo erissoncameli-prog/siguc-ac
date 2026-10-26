@@ -551,6 +551,28 @@ def inspecionar(alvo, escolha=None):
             print(f'\n{len(shp)} shapefiles no pacote (escolha um com --shp):')
             for s in shp:
                 _resumo_shp(s, tmp)
+            # planilhas (quantificações, tabela de atributos): só números e
+            # nomes de classe — mas a mesma regra de dado pessoal vale aqui
+            for raiz, _, fs in os.walk(tmp):
+                for f in sorted(fs):
+                    if not f.lower().endswith('.xlsx'):
+                        continue
+                    try:
+                        import openpyxl
+                        wb = openpyxl.load_workbook(os.path.join(raiz, f), read_only=True, data_only=True)
+                    except Exception as e:  # noqa: BLE001
+                        print(f'\n── {f}: não abriu ({e})')
+                        continue
+                    for ws in wb.worksheets:
+                        print(f'\n── {os.path.relpath(os.path.join(raiz, f), tmp)} › {ws.title} ──')
+                        for k, lin in enumerate(ws.iter_rows(values_only=True)):
+                            if k >= 80:
+                                print('   …'); break
+                            cel = ['' if v is None else str(v)[:40] for v in lin]
+                            while cel and cel[-1] == '':
+                                cel.pop()
+                            if cel and not CAMPO_PESSOAL.search(' '.join(cel[:1])):
+                                print('   ' + ' | '.join(cel))
             # metadado em texto (escala, datum, data, autoria do mapa)
             for raiz, _, fs in os.walk(tmp):
                 for f in fs:
