@@ -47,7 +47,9 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from meio_fisico import GEOD, TOLERANCIA, area_ha, recortar  # noqa: E402  (mesmo recorte e simplificação do Meio Físico)
 
-from shapely import force_2d, make_valid  # noqa: E402
+import numpy as np  # noqa: E402
+import shapely  # noqa: E402
+from shapely import make_valid  # noqa: E402
 from shapely.geometry import mapping, shape  # noqa: E402
 from shapely.ops import transform  # noqa: E402
 
@@ -363,6 +365,63 @@ def transformador(shp):
     return t, crs.name
 
 
+def tolerancia_origem(shp):
+    """TOLERANCIA/2 do Meio Físico (graus) na unidade do arquivo: a
+    simplificação prévia roda ANTES da reprojeção (em UTM, metros)."""
+    from pyproj import CRS
+    crs = CRS.from_wkt(open(_arquivo_irmao(shp, '.prj'), encoding='latin-1').read())
+    if crs.is_geographic:
+        return TOLERANCIA / 2
+    un = crs.axis_info[0].unit_name if crs.axis_info else ''
+    if un not in ('metre', 'meter'):
+        raise SystemExit(f'{os.path.basename(shp)}: projeção em {un!r} — esperava graus ou metros')
+    return TOLERANCIA / 2 * M_POR_GRAU
+
+
+# 1° de longitude no Acre (~9° S) ≈ 110 km; de latitude ≈ 110,6 km — 111,3 km
+# é o teto (a tolerância em metros fica um pouco MAIOR que a em graus no
+# oeste/leste, nunca o dobro; o recorte simplifica de novo em graus).
+M_POR_GRAU = 111_320
+
+
+def _log(msg, t0):
+    print(f'  {msg} · {time.time() - t0:.1f} s', flush=True)
+
+
+def ler_preparar(shp, t):
+    """Caminho rápido (Fase III: 30 polígonos com milhões de vértices cada).
+    pyogrio lê a geometria em WKB direto para um array do shapely 2 e todas
+    as etapas são vetorizadas: tirar o Z, simplificar na unidade de ORIGEM
+    (antes de qualquer outra conta, que é o que pesa), make_valid só no que
+    ficou inválido e reprojetar com o pyproj em bloco. Devolve
+    (campos, geometrias em lon/lat, propriedades, nº corrigidas)."""
+    import pyogrio
+    t0 = time.time()
+    import codecs
+    # nome canônico ("iso8859-1"): o GDAL não reconhece "latin-1" e cai em UTF-8
+    meta, _, wkb, valores = pyogrio.raw.read(shp, encoding=codecs.lookup(_codificacao(shp)).name)
+    campos = list(meta['fields'])
+    geoms = shapely.from_wkb(wkb)
+    n0 = int(shapely.get_num_coordinates(geoms).sum())
+    _log(f'lidas {len(geoms)} feições, {n0:,} vértices', t0)
+    props = [{c: (None if (v is None or (isinstance(v, float) and v != v)) else (v.item() if hasattr(v, 'item') else v))
+              for c, v in zip(campos, linha)} for linha in zip(*valores)] if campos else [{} for _ in geoms]
+    vazio = shapely.is_missing(geoms) | shapely.is_empty(geoms)
+    geoms, props = geoms[~vazio], [p for p, v in zip(props, vazio) if not v]
+    geoms = shapely.force_2d(geoms)        # Fase III vem em POLYGONZ (Z sempre 0)
+    _log('sem Z', t0)
+    geoms = shapely.simplify(geoms, tolerancia_origem(shp), preserve_topology=True)
+    _log(f'simplificadas: {int(shapely.get_num_coordinates(geoms).sum()):,} vértices', t0)
+    inval = ~shapely.is_valid(geoms)
+    if inval.any():
+        geoms[inval] = shapely.make_valid(geoms[inval])
+    _log(f'{int(inval.sum())} corrigida(s) pelo make_valid', t0)
+    if t is not None:
+        geoms = shapely.transform(geoms, lambda c: np.column_stack(t.transform(c[:, 0], c[:, 1])))
+        _log('reprojetadas', t0)
+    return campos, geoms, props, int(inval.sum())
+
+
 def _codificacao(shp):
     cpg = _arquivo_irmao(shp, '.cpg')
     cod = open(cpg).read().strip() if cpg else 'latin-1'
@@ -460,6 +519,51 @@ def extrair(alvo, escolha, destino):
     print(f'{destino}: {os.path.getsize(destino) / 1e6:.1f} MB em {time.time() - t0:.0f} s', flush=True)
 
 
+def perfil(alvo, escolha, acre_arq, orcamento_s=1500):
+    """Mede o caminho rápido feição por feição (da menor para a maior), com
+    tempo de cada etapa, sem gravar nada. Para no orçamento de tempo — o
+    log mostra até onde chegou e qual etapa pesa."""
+    import pyogrio
+    acre = make_valid(shape(json.load(open(acre_arq))['features'][0]['geometry']))
+    t_ini = time.time()
+    with tempfile.TemporaryDirectory() as tmp:
+        shp = localizar_shp(alvo, tmp, escolha)
+        print(f'baixado e extraído em {time.time() - t_ini:.0f} s', flush=True)
+        t, crs_nome = transformador(shp)
+        tol = tolerancia_origem(shp)
+        t0 = time.time()
+        _, _, wkb, _ = pyogrio.raw.read(shp, read_geometry=True, columns=[])
+        geoms = shapely.from_wkb(wkb)
+        print(f'{crs_nome} · tolerância {tol:.1f} · {len(geoms)} feições lidas (pyogrio + from_wkb) em {time.time() - t0:.1f} s', flush=True)
+    nv = shapely.get_num_coordinates(geoms)
+    print(f'vértices: total {int(nv.sum()):,}, maior {int(nv.max()):,}', flush=True)
+    tot = {}
+    for i in np.argsort(nv):
+        if time.time() - t_ini > orcamento_s:
+            print(f'orçamento de {orcamento_s} s esgotado — parei', flush=True)
+            break
+        g, linha = geoms[i], []
+        def etapa(nome, fn):
+            nonlocal g
+            t1 = time.time(); g = fn(g); dt = time.time() - t1
+            tot[nome] = tot.get(nome, 0) + dt
+            linha.append(f'{nome} {dt:.2f}')
+        etapa('2d', shapely.force_2d)
+        etapa('simplify', lambda x: shapely.simplify(x, tol, preserve_topology=True))
+        nv2 = shapely.get_num_coordinates(g)
+        valido = [None]
+        etapa('is_valid', lambda x: (valido.__setitem__(0, shapely.is_valid(x)), x)[1])
+        if not valido[0]:
+            etapa('make_valid', shapely.make_valid)
+        if t is not None:
+            etapa('transform', lambda x: shapely.transform(x, lambda c: np.column_stack(t.transform(c[:, 0], c[:, 1]))))
+        etapa('recorte', lambda x: (recortar([{'type': 'Feature', 'properties': {}, 'geometry': mapping(x)}], acre, [])[0] or [{'geometry': None}])[0]['geometry'])
+        if g is not None:
+            etapa('area', lambda x: (area_ha(x), x)[1])
+        print(f'  #{i} {g and "ok" or "fora do Acre"} · {int(nv[i]):,} → {int(nv2):,} vértices · válida={valido[0]} · ' + ' · '.join(linha), flush=True)
+    print('total por etapa: ' + ' · '.join(f'{k} {v:.1f} s' for k, v in tot.items()) + f' · tudo {time.time() - t_ini:.0f} s', flush=True)
+
+
 def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, acre_arq, escolha=None):
     if fase not in CAMADAS:
         raise SystemExit('--fase deve ser 2 ou 3')
@@ -470,9 +574,7 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     with tempfile.TemporaryDirectory() as tmp:
         shp = localizar_shp(alvo, tmp, escolha)
         t, crs_nome = transformador(shp)
-        t0 = time.time()
-        campos_arq, regs = ler_shp(shp)
-        print(f'lidas {len(regs)} feições em {time.time() - t0:.0f} s', flush=True)
+        campos_arq, geoms, regs, corr = ler_preparar(shp, t)
     campos = detectar_campos(campos_arq)
     campos.update({k: v for k, v in campos_forcados.items() if v})
     faltam = [v for v in campos.values() if v and v not in campos_arq]
@@ -483,39 +585,25 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     print(f'Projeção de origem: {crs_nome} · campos usados: {campos}')
 
     brutas, sem_zona = [], {}
-    t0 = time.time()
-    for i, (geo, props) in enumerate(regs, 1):
-        if i % 200 == 0:
-            print(f'  preparando {i}/{len(regs)} · {time.time() - t0:.0f} s', flush=True)
+    for g, props in zip(geoms, regs):
         p = normalizar(props, campos, legenda)
         if p is None:
             chave = str(props.get(campos.get('subzona') or campos.get('zona')))
             sem_zona[chave] = sem_zona.get(chave, 0) + 1
             continue
-        # Fase III vem em POLYGONZ: o Z (sempre 0) só pesa no arquivo e
-        # atrapalha o recorte — sai antes de tudo
-        g = force_2d(shape(geo))
-        if t is not None:
-            g = transform(t.transform, g)
-        # Simplifica ANTES de validar e recortar: com todos os vértices, o
-        # make_valid e a interseção da Fase III (190 MB) com o limite do
-        # Acre passavam dos 30 min do workflow. O recorte simplifica de novo
-        # na tolerância final.
-        g = g.simplify(TOLERANCIA / 2, preserve_topology=True)
-        if not g.is_valid:
-            g = make_valid(g)
         brutas.append({'type': 'Feature', 'properties': p, 'geometry': mapping(g)})
     if sem_zona:
         raise SystemExit(f'{sum(sem_zona.values())} feição(ões) sem zona reconhecível — nada gravado. Valores: {sem_zona}')
     conferir_nomes(brutas)
-    print(f'preparadas {len(brutas)} feições em {time.time() - t0:.0f} s · recortando', flush=True)
     t0 = time.time()
     feats, inval = recortar(brutas, acre, CAMPOS_SAIDA)
-    print(f'recorte em {time.time() - t0:.0f} s', flush=True)
+    inval += corr
+    _log(f'recortadas pelo limite do Acre: {len(feats)} feições', t0)
     if not feats:
         raise SystemExit('nenhuma feição dentro do Acre — nada gravado (projeção ou eixo errado?)')
     for f in feats:
         f['properties']['area_ha'] = round(area_ha(f['geometry']), 1)
+    _log('áreas', t0)
     area = sum(f['properties']['area_ha'] for f in feats)
     pct = area / area_acre * 100
     if pct < 95 or pct > 105:
@@ -584,29 +672,20 @@ def converter_fundiario(alvo, saida, acre_arq, escolha=None):
     with tempfile.TemporaryDirectory() as tmp:
         shp = localizar_shp(alvo, tmp, escolha)
         t, crs_nome = transformador(shp)
-        campos_arq, regs = ler_shp(shp)
+        campos_arq, geoms, regs, corr = ler_preparar(shp, t)
     if 'Tipo' not in campos_arq:
         raise SystemExit(f'sem o campo Tipo — não parece a base fundiária do ZEE. Campos: {campos_arq}')
     brutas, fora = [], {}
-    for geo, props in regs:
+    for g, props in zip(geoms, regs):
         p = normalizar_fundiario(props)
         if p is None:
             k = str(props.get('Tipo')); fora[k] = fora.get(k, 0) + 1
             continue
-        g = force_2d(shape(geo))
-        if t is not None:
-            g = transform(t.transform, g)
-        # Simplifica ANTES de validar e recortar: com todos os vértices, o
-        # make_valid e a interseção da Fase III (190 MB) com o limite do
-        # Acre passavam dos 30 min do workflow. O recorte simplifica de novo
-        # na tolerância final.
-        g = g.simplify(TOLERANCIA / 2, preserve_topology=True)
-        if not g.is_valid:
-            g = make_valid(g)
         brutas.append({'type': 'Feature', 'properties': p, 'geometry': mapping(g)})
     if fora:
         raise SystemExit(f'Tipo não reconhecido — nada gravado: {fora}')
     feats, inval = recortar(brutas, acre, FUND_CAMPOS)
+    inval += corr
     # Trava de CONTAGEM (a base fundiária não recobre o estado de forma
     # exclusiva: as camadas se sobrepõem). Sumir mais de 5% = algo errado.
     if len(feats) < 0.95 * len(brutas):
@@ -910,6 +989,51 @@ def autoteste():
             raise AssertionError('aceitou shapefile sem .prj')
         except SystemExit as e:
             assert 'sem .prj' in str(e)
+        # caminho rápido da Fase III: POLYGONZ em UTM 19S (SIRGAS 2000), anel
+        # com milhares de vértices e ruído de 1 m (some na simplificação em
+        # METROS, antes da reprojeção), uma feição com laço (make_valid) e
+        # nomes do próprio arquivo
+        para_utm = Transformer.from_crs(4674, 31979, always_xy=True)
+        def anel_denso(g, n=4000):
+            ext = g.exterior
+            pts = [ext.interpolate(i / n, normalized=True) for i in range(n)]
+            xy = [para_utm.transform(q.x, q.y) for q in pts]
+            return [(x + (i % 2) * 1.0, y, 0.0) for i, (x, y) in enumerate(xy)]
+        base3 = os.path.join(tmp, 'zee3')
+        w = shapefile.Writer(base3, shapeType=shapefile.POLYGONZ, encoding='latin-1')
+        for c in ('Zona', 'Zon_label', 'DescrZona', 'DescSubZon', 'DescUniman'):
+            w.field(c, 'C', 60)
+        r1 = anel_denso(metades[0][0])
+        w.polyz([r1[::-1] + [r1[-1]]])
+        w.record('1', '1.2.3', 'Produção', 'Agropecuária', 'Áreas com alto potencial')
+        r2 = anel_denso(metades[1][0])
+        # laço: o anel volta sobre si num canto (autointerseção)
+        x0, y0, _ = r2[0]
+        laco = [(x0 + 3000, y0 + 3000, 0.0), (x0 + 3000, y0, 0.0), (x0, y0 + 3000, 0.0)]
+        r2 = [r2[0]] + laco + r2[1:]
+        w.polyz([r2[::-1] + [r2[-1]]])
+        w.record('2', '2.1.0', 'Proteção', 'Unidades de conservação', '')
+        w.close()
+        open(base3 + '.prj', 'w').write(CRS.from_epsg(31979).to_wkt('WKT1_ESRI'))
+        open(base3 + '.cpg', 'w').write('System')   # QGIS: lido como latin-1
+        assert abs(tolerancia_origem(base3 + '.shp') - TOLERANCIA / 2 * M_POR_GRAU) < 1e-9
+        _, g3, pr3, corr3 = ler_preparar(base3 + '.shp', transformador(base3 + '.shp')[0])
+        assert not shapely.has_z(g3).any() and shapely.is_valid(g3).all() and corr3 == 1, (corr3,)
+        assert shapely.get_num_coordinates(g3).max() < 200, shapely.get_num_coordinates(g3)   # 4 000 → poucos
+        assert pr3[0]['DescSubZon'] == 'Agropecuária', pr3[0]
+        saida3 = os.path.join(tmp, 'saida3')
+        converter(base3 + '.shp', '3', {'zona': 'Zona', 'subzona': 'Zon_label', 'zona_nome': 'DescrZona',
+                                        'subzona_nome': 'DescSubZon', 'unidade_nome': 'DescUniman'},
+                  None, 'nenhuma', None, saida3, acre_arq)
+        fc3 = json.load(open(os.path.join(saida3, 'fase3_gestao.geojson')))
+        ps = [f['properties'] for f in fc3['features']]
+        assert [p['unidade'] if 'unidade' in p else None for p in ps] == ['1.2.3', None], ps
+        assert ps[0]['zona'] == 'Zona 1 — Produção' and ps[0]['unidade_nome'] == 'Áreas com alto potencial', ps
+        man3 = json.load(open(os.path.join(saida3, 'manifesto.json')))['camadas']['fase3_gestao']
+        assert man3['escala'] is None and 99 <= man3['cobertura_pct'] <= 101 and man3['subzonas'] == 2, man3
+        xs = [shape(f['geometry']).bounds for f in fc3['features']]
+        assert abs(xs[0][0] - (-70.0)) < 1e-3 and abs(xs[1][2] - (-69.0)) < 1e-3, xs   # UTM → lon/lat certo
+
     # Fase III: código completo no Zon_label, nomes do próprio arquivo, ".0" = sem unidade
     c3 = {'zona': 'Zona', 'subzona': 'Zon_label', 'unidade': None, 'nome': None,
           'zona_nome': 'DescrZona', 'subzona_nome': 'DescSubZon', 'unidade_nome': 'DescUniman'}
@@ -969,6 +1093,7 @@ def main():
     ap.add_argument('--acre', default='data/acre_estado.geojson')
     ap.add_argument('--extrair', help='baixa ARQ e zipa só o .shp escolhido (--shp) e os irmãos em --destino')
     ap.add_argument('--destino', default='zee_extraido.zip')
+    ap.add_argument('--perfil', help='mede cada etapa da conversão de ARQ (--shp), feição por feição, sem gravar')
     ap.add_argument('--shp', help='pacote com vários .shp: trecho do caminho/nome do escolhido')
     a = ap.parse_args()
     if a.autoteste:
@@ -984,6 +1109,8 @@ def main():
                                         'nome': a.campo_nome, 'zona_nome': a.campo_zona_nome,
                                         'subzona_nome': a.campo_subzona_nome, 'unidade_nome': a.campo_unidade_nome},
                   a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp)
+    elif a.perfil:
+        perfil(a.perfil, a.shp, a.acre)
     elif a.extrair:
         extrair(a.extrair, a.shp, a.destino)
     elif a.fundiario:

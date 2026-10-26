@@ -16,14 +16,16 @@ name: ZEE do Acre (Mapa de Gestão)
 #   só com os campos públicos (sem proprietário, matrícula, certificação).
 # - extrair: baixa o pacote e publica como artefato SÓ o shapefile escolhido
 #   (`shp`) — para medir a conversão fora do runner. Não grava no branch.
+# - perfil: mede cada etapa da conversão no runner, feição por feição, com
+#   orçamento de 25 min. Não grava nada.
 
 on:
   workflow_dispatch:
     inputs:
       modo:
-        description: 'descobrir | inspecionar | converter | fundiario | extrair'
+        description: 'descobrir | inspecionar | converter | fundiario | extrair | perfil'
         type: choice
-        options: [descobrir, inspecionar, converter, fundiario, extrair]
+        options: [descobrir, inspecionar, converter, fundiario, extrair, perfil]
         default: descobrir
       arquivo:
         description: 'URL do .zip do shapefile, ou drive:<id do arquivo no Drive>'
@@ -66,7 +68,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Dependências
-        run: pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1'
+        run: pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1' 'pyogrio==0.11.1'
       - name: Autoteste (sem rede)
         run: python scripts/zee_acre.py --autoteste
       - name: Rodar
@@ -86,6 +88,7 @@ jobs:
             converter)   # CAMPOS sem aspas de propósito: são flags (--campo-zona X ...)
                          python scripts/zee_acre.py --converter "$ARQUIVO" --fase "$FASE" --escala "$ESCALA" "${ESCOLHA[@]}" $CAMPOS ;;
             fundiario)   python scripts/zee_acre.py --fundiario "$ARQUIVO" "${ESCOLHA[@]}" ;;
+            perfil)      python scripts/zee_acre.py --perfil "$ARQUIVO" "${ESCOLHA[@]}" ;;
             extrair)     python scripts/zee_acre.py --extrair "$ARQUIVO" "${ESCOLHA[@]}" --destino zee_extraido.zip ;;
           esac
       - name: Publicar o shapefile extraído
