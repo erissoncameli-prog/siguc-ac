@@ -34,6 +34,24 @@
     "UCPI": 3,
     "UCUS": 18
    }
+  },
+  "fase3_gestao": {
+   "fonte": "SEMA-AC — ZEE Fase III, Mapa de Subsídio à Gestão Territorial e Ambiental",
+   "escala": null,
+   "projecao_origem": "WGS 84 / UTM zone 19S",
+   "gerado_em": "2026-10-26",
+   "area_minima_ha": 6.25,
+   "arquivo": "fase3_gestao.geojson",
+   "feicoes": 30,
+   "area_ha": 16390002,
+   "cobertura_pct": 99.8,
+   "zonas": [
+    "1",
+    "2",
+    "3",
+    "4"
+   ],
+   "subzonas": 20
   }
  }
 }
