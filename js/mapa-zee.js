@@ -38,12 +38,41 @@ const ZEE_CAMADAS = {
   },
 }
 
+// Camadas COMPLEMENTARES: ligam junto com qualquer fase (não são zoneamento,
+// são a base que o ZEE usou). Cada uma com a sua chave liga/desliga.
+// Base fundiária da Fase III: gerada por `zee_acre.py --fundiario`, SÓ com
+// campos públicos (sem proprietário, matrícula, certificação, código SIGEF;
+// no imóvel rural nem o nome) — a regra mora no script, a tela só lê.
+const ZEE_COMPLEMENTARES = {
+  fase3_fundiario: {
+    rotulo: 'Base fundiária do ZEE Fase III', curto: 'Fundiário ZEE III',
+    nota: 'Situação fundiária que o ZEE Fase III usou (INCRA, ITERACRE, SIGEF/SNCI, FUNAI, ICMBio, IMAC). Camadas sobrepostas; imóvel rural sem nome nem titular.',
+    campoCor: 'tipo', campoRotulo: 'tipo_rotulo',
+    cores: { ASSENTAMENTO: '#D55E00', GLEBEST: '#56B4E9', GLEBFED: '#0072B2', IRU: '#E69F00', TI: '#CC79A7', UCPI: '#009E73', UCUS: '#8C6D1F' },
+    popup: {
+      titulo: '_titulo',
+      campos: [
+        { campo: 'tipo_rotulo', rotulo: 'Tipo' },
+        { campo: 'subtipo', rotulo: 'Subtipo' },
+        { campo: 'orgao', rotulo: 'Órgão' },
+        { campo: 'fonte', rotulo: 'Fonte' },
+        { campo: 'situacao', rotulo: 'Situação' },
+        { campo: 'sobreposicao', rotulo: 'Sobreposição' },
+        { campo: 'zona', rotulo: 'Zona (ZEE III)' },
+        { campo: 'subzona', rotulo: 'Subzona (ZEE III)' },
+        { campo: 'area_ha', rotulo: 'Área do desenho', sufixo: ' ha', casas: 1 },
+      ],
+    },
+  },
+}
+const ZEE_COMP_PANE = 'zeeCompPane'
+
 // Okabe-Ito: produção laranja · proteção verde-azulado · ordenamento rosa ·
 // cidades azul. Os nomes das zonas vêm do arquivo (scripts/zee_acre.py).
 const ZEE_ZONA_COR = { 1: '#E69F00', 2: '#009E73', 3: '#CC79A7', 4: '#0072B2' }
 const ZEE_COR_SEM = '#9CA3AF'
 
-const _zee = { mapa: null, aoMudar: null, manifesto: undefined, docs: undefined, cache: {}, ativa: null, layer: null, pref: {} }
+const _zee = { mapa: null, aoMudar: null, manifesto: undefined, docs: undefined, cache: {}, ativa: null, layer: null, pref: {}, comp: {} }
 
 function _zeeEsc(s) { return typeof ccfEsc === 'function' ? ccfEsc(s) : String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
 function _zeeIcone(n) { return typeof bico === 'function' ? bico(n) : '' }
@@ -53,9 +82,10 @@ function _zeePrefCarregar() {
   if (!ZEE_CAMADAS[_zee.pref.ativa]) _zee.pref.ativa = null
   if (_zee.pref.colorir !== 'subzona') _zee.pref.colorir = 'zona'
   if (typeof _zee.pref.opacidade !== 'number') _zee.pref.opacidade = 0.4
+  _zee.pref.comp = Array.isArray(_zee.pref.comp) ? _zee.pref.comp.filter(id => ZEE_COMPLEMENTARES[id]) : []
 }
 function _zeePrefSalvar() {
-  try { localStorage.setItem('siguc_zee', JSON.stringify({ ativa: _zee.ativa, colorir: _zee.pref.colorir, opacidade: _zee.pref.opacidade })) } catch (_) {}
+  try { localStorage.setItem('siguc_zee', JSON.stringify({ ativa: _zee.ativa, colorir: _zee.pref.colorir, opacidade: _zee.pref.opacidade, comp: Object.keys(_zee.comp) })) } catch (_) {}
 }
 
 function zeeMontar(mapa, opts = {}) {
@@ -66,8 +96,13 @@ function zeeMontar(mapa, opts = {}) {
     mapa.createPane(ZEE_PANE)
     mapa.getPane(ZEE_PANE).style.zIndex = 360 // meio físico 350 < aqui < overlayPane 400
   }
+  if (!mapa.getPane(ZEE_COMP_PANE)) {
+    mapa.createPane(ZEE_COMP_PANE)
+    mapa.getPane(ZEE_COMP_PANE).style.zIndex = 365 // por cima das zonas, abaixo de UC/TI/CAR
+  }
   _zeePrefCarregar()
   if (_zee.pref.ativa) zeeAlternar(_zee.pref.ativa, true)
+  _zee.pref.comp.forEach(id => zeeComplementar(id, true))
 }
 
 // undefined = ainda não perguntou; null = não há manifesto (dado não chegou)
@@ -129,7 +164,7 @@ function zeeCor(props, coresSub) {
 }
 
 function _zeeRotuloSubzona(p) {
-  if (p.unidade) return `Unidade de manejo ${p.unidade}${p.subzona_nome ? ' — ' + p.subzona_nome : ''}`
+  if (p.unidade) return `Unidade de manejo ${p.unidade}${(p.unidade_nome || p.subzona_nome) ? ' — ' + (p.unidade_nome || p.subzona_nome) : ''}`
   if (p.subzona) return `Subzona ${p.subzona}${p.subzona_nome ? ' — ' + p.subzona_nome : ''}`
   return p.zona || 'Zona não informada'
 }
@@ -150,7 +185,9 @@ const _ZEE_POPUP = {
   campos: [
     { campo: 'zona', rotulo: 'Zona' },
     { campo: 'subzona', rotulo: 'Subzona' },
+    { campo: 'subzona_nome', rotulo: 'Nome da subzona' },
     { campo: 'unidade', rotulo: 'Unidade de manejo' },
+    { campo: 'unidade_nome', rotulo: 'Indicação da unidade' },
     { campo: 'diretriz', rotulo: 'Diretriz de uso' },
   ],
 }
@@ -223,9 +260,78 @@ function zeeDefinirOpacidade(v) {
 
 function zeeAtiva() { return _zee.ativa && _zee.layer ? _zee.ativa : null }
 
+// ── camadas complementares (ex.: base fundiária) ──
+function _zeeCompCor(id, p) {
+  const cfg = ZEE_COMPLEMENTARES[id]
+  return cfg.cores[(p || {})[cfg.campoCor]] || ZEE_COR_SEM
+}
+
+function zeeCompPopupHTML(id, feature) {
+  const cfg = ZEE_COMPLEMENTARES[id]
+  const c = { id: 'zee-' + id, nome: cfg.curto, cor: _zeeCompCor(id, feature.properties), geojson: null, style_config: { popup: cfg.popup } }
+  const corpo = typeof ccfPopupHTML === 'function'
+    ? ccfPopupHTML(c, feature, {})
+    : `<div class="camada-popup"><div class="cp-layer-nome">${_zeeEsc(feature.properties._titulo)}</div></div>`
+  const man = (_zee.manifesto && _zee.manifesto[id]) || {}
+  return corpo + `<div class="zee-fonte">${_zeeEsc(man.fonte || cfg.rotulo)}.
+    ${feature.properties.tipo === 'IRU' ? 'Imóvel rural: nome e titular não são exibidos. ' : ''}Não substitui certidão, matrícula ou registro.</div>`
+}
+
+async function zeeComplementar(id, ligar) {
+  const cfg = ZEE_COMPLEMENTARES[id]
+  if (!cfg || !_zee.mapa) return
+  if (!ligar) {
+    if (_zee.comp[id]) { _zee.mapa.removeLayer(_zee.comp[id]); delete _zee.comp[id] }
+    _zeeStatus(id, ''); _zeePrefSalvar(); _zeeSincPainel(); _zee.aoMudar && _zee.aoMudar()
+    return
+  }
+  if (_zee.comp[id]) return
+  _zeeStatus(id, 'Carregando…')
+  await zeeManifesto()
+  try {
+    if (!zeeDisponivel(id)) throw new Error('sem-dado')
+    if (!_zee.cache[id]) {
+      const arq = _zee.manifesto[id].arquivo || (id + '.geojson')
+      const r = await fetch(ZEE_BASE + arq)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const gj = await r.json()
+      ;(gj.features || []).forEach(f => { const p = f.properties = f.properties || {}; p._titulo = p.nome || p[cfg.campoRotulo] || cfg.curto })
+      _zee.cache[id] = { gj }
+    }
+    const gj = _zee.cache[id].gj
+    _zee.comp[id] = L.geoJSON(gj, {
+      pane: ZEE_COMP_PANE,
+      style: f => { const cor = _zeeCompCor(id, f.properties); return { color: cor, weight: 1.2, opacity: 0.95, fillColor: cor, fillOpacity: 0.12 } },
+      onEachFeature: (f, layer) => layer.bindPopup(() => zeeCompPopupHTML(id, f), { className: 'camada-popup-wrap', maxWidth: 380 }),
+    }).addTo(_zee.mapa)
+    _zeeStatus(id, `${(gj.features || []).length.toLocaleString('pt-BR')} polígonos`)
+  } catch (e) {
+    _zeeStatus(id, e.message === 'sem-dado' ? 'Arquivo ainda não recebido.' : 'Não foi possível carregar o arquivo.', true)
+  }
+  _zeePrefSalvar(); _zeeSincPainel(); _zee.aoMudar && _zee.aoMudar()
+}
+
+function zeeComplementaresAtivas() { return Object.keys(_zee.comp) }
+
 // Legenda (tela e impressão): por zona, ou por subzona (sem teto: cada
 // subzona tem a sua cor — "outros" esconderia a que o usuário procura).
 function zeeItensLegenda() {
+  return _zeeItensLegendaFase().concat(_zeeItensLegendaComp())
+}
+
+function _zeeItensLegendaComp() {
+  const out = []
+  Object.keys(_zee.comp).forEach(id => {
+    const cfg = ZEE_COMPLEMENTARES[id], reg = _zee.cache[id]
+    if (!reg) return
+    const tipos = new Map()
+    ;(reg.gj.features || []).forEach(f => { const p = f.properties; if (!tipos.has(p[cfg.campoCor])) tipos.set(p[cfg.campoCor], p[cfg.campoRotulo]) })
+    Object.keys(cfg.cores).filter(t => tipos.has(t)).forEach(t => out.push({ simbolo: 'rect', cor: cfg.cores[t], opacidade: 0.12, label: `${cfg.curto} — ${tipos.get(t) || t}` }))
+  })
+  return out
+}
+
+function _zeeItensLegendaFase() {
   const id = zeeAtiva(); if (!id) return []
   const reg = _zee.cache[id], op = _zee.pref.opacidade, nome = ZEE_CAMADAS[id].curto
   const feats = reg.gj.features || []
@@ -241,7 +347,7 @@ function zeeItensLegenda() {
 }
 
 function _zeeStatus(id, txt, erro) {
-  const el = document.querySelector(`[data-zee-camada="${id}"] .zee-status`)
+  const el = document.querySelector(`[data-zee-camada="${id}"] .zee-status, [data-zee-comp="${id}"] .zee-status`)
   if (el) { el.textContent = txt; el.classList.toggle('zee-erro', !!erro) }
 }
 
@@ -249,6 +355,10 @@ function _zeeSincPainel() {
   document.querySelectorAll('[data-zee-camada]').forEach(box => {
     const chk = box.querySelector('[data-zee-acao="ligar"]')
     if (chk) chk.checked = box.dataset.zeeCamada === _zee.ativa
+  })
+  document.querySelectorAll('[data-zee-comp]').forEach(box => {
+    const chk = box.querySelector('[data-zee-acao="comp"]')
+    if (chk) chk.checked = !!_zee.comp[box.dataset.zeeComp]
   })
 }
 
@@ -280,7 +390,18 @@ function _zeeCamadasHTML() {
       <option value="subzona"${_zee.pref.colorir === 'subzona' ? ' selected' : ''}>Subzona</option></select></label>` : ''}
     <label>Opacidade <input type="range" min="0" max="100" step="5" value="${Math.round(_zee.pref.opacidade * 100)}" data-zee-acao="opacidade" aria-label="Opacidade do ZEE"></label>
   </div>`
-  return aviso + html + (semDado || _zee.manifesto === undefined ? '' : ctrl)
+  const comp = Object.entries(ZEE_COMPLEMENTARES).filter(([id]) => zeeDisponivel(id)).map(([id, t]) => {
+    const reg = _zee.cache[id]
+    const status = _zee.comp[id] && reg ? `${reg.gj.features.length.toLocaleString('pt-BR')} polígonos` : ''
+    return `<div class="zee-camada" data-zee-comp="${id}">
+      <label class="zee-cab"><input type="checkbox" data-zee-acao="comp"${_zee.comp[id] ? ' checked' : ''}>
+        <span class="zee-nome">${_zeeEsc(t.rotulo)}</span>
+        <span class="zee-status" role="status" aria-live="polite">${_zeeEsc(status)}</span></label>
+      <div class="zee-meta">${_zeeEsc(t.nota)}</div>
+    </div>`
+  }).join('')
+  return aviso + html + (semDado || _zee.manifesto === undefined ? '' : ctrl) +
+    (comp ? `<div class="zee-sec-tit">Camadas complementares</div>${comp}` : '')
 }
 
 const _ZEE_DOC_ICONE = { pasta: 'paperclip', pdf: 'download', lei: 'file-text', pagina: 'file-text' }
@@ -322,6 +443,7 @@ async function zeeLigarPainel(el) {
     el.addEventListener('change', ev => {
       const t = ev.target
       if (t.dataset.zeeAcao === 'ligar') zeeAlternar(t.closest('[data-zee-camada]').dataset.zeeCamada, t.checked)
+      else if (t.dataset.zeeAcao === 'comp') zeeComplementar(t.closest('[data-zee-comp]').dataset.zeeComp, t.checked)
       else if (t.dataset.zeeAcao === 'colorir') zeeColorirPor(t.value)
     })
     el.addEventListener('input', ev => {

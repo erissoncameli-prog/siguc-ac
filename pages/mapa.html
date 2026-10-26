@@ -1733,7 +1733,7 @@ function iniciarMapa(){
   } }); }
   if(typeof zeeMontar === 'function'){ zeeEstilos(); zeeMontar(mapaL, { aoMudar: () => {
     _atualizarLegendaMapa();
-    const b = document.getElementById('zee-count-badge'), n = zeeAtiva() ? 1 : 0;
+    const b = document.getElementById('zee-count-badge'), n = (zeeAtiva() ? 1 : 0) + (typeof zeeComplementaresAtivas === 'function' ? zeeComplementaresAtivas().length : 0);
     if(b){ b.textContent = n; b.style.display = n ? '' : 'none'; }
   } }); }
   if(typeof cmpMontar === 'function') cmpMontar(mapaL, {
