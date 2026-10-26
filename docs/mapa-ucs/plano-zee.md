@@ -73,6 +73,48 @@ regras): a tela mostra o código da fonte e diz isso. Quando o significado for
 confirmado (ex.: Documento Síntese, mapa APTIDAO.pdf), entra como rótulo — nunca
 antes.
 
+## Fase III recebida (26/10/2026)
+
+O usuário compartilhou do Drive do Núcleo do ZEE o `ZEE FASE III.zip` (845 MB,
+227 arquivos). Grande demais para o chat: o workflow baixa
+(`drive:<id>`, confirmação de arquivo grande do Drive) e o `--inspecionar`
+lista o pacote (volume por extensão, maiores arquivos, cada shapefile com os
+valores de cada campo — campo com possível dado pessoal só é CONTADO, nunca
+impresso, porque log de Actions pode ser público) e imprime o metadado em
+texto.
+
+- `MapaGestão_ZEEIII_Mapa_anexos/AC_MapaGestao_ZEE_III_Versao0506.shp`
+  (POLYGONZ, WGS 84/UTM 19S, 190 MB): 30 polígonos, `Zona` 1–4, `Zon_label`
+  com o código completo (1.1.1 … ; `x.y.0` = subzona sem unidade de manejo —
+  segundo o metadado só a Zona 1 tem unidade), `DescrZona`, `DescSubZon`,
+  `DescUniman`. **A Fase III renomeou as zonas** (Zona 1 = Sistemas de
+  Produção Agropecuários e Florestais Sustentáveis, Zona 4 = Cidades do Acre):
+  o nome vem do PRÓPRIO arquivo (`--campo-zona-nome`), não da tabela da Lei
+  1.904. Trava nova: um código, um nome (`conferir_nomes`). O metadado não
+  informa escala → `escala: null` e a tela diz "não informada".
+  Convertido por `--converter … --fase 3 --shp AC_MapaGestao_ZEE_III_Versao0506
+  --campo-zona Zona --campo-subzona Zon_label --campo-zona-nome DescrZona
+  --campo-subzona-nome DescSubZon --campo-unidade-nome DescUniman --escala nenhuma`.
+- `ZEE_ACRE_FUNDIARIO.shp` (1.248 polígonos; metadado:
+  `ZEE_Ac_fUNDIARIO_REVISADO_2019`): base fundiária que o ZEE usou — 952
+  imóveis rurais (IRU), 156 assentamentos, 84 glebas federais, 32 TIs, 18 UCs
+  de uso sustentável, 3 glebas estaduais, 3 UCs de proteção integral.
+  **Tem dado pessoal**: `PROPRIET` (nome do proprietário), `MATRICULA`,
+  `CERTIF`, `CODIGO` (SIGEF) e `NOME` (nome da propriedade). O
+  `--fundiario` grava `data/zee/fase3_fundiario.geojson` só com lista fechada
+  de campos (`FUND_CAMPOS`): tipo, subtipo, órgão, fonte, situação,
+  sobreposição, zona/subzona e o nome SÓ de área pública (no IRU o nome da
+  fazenda costuma ser o do dono). Fica fora do ROPA: o que vai para o arquivo
+  não identifica pessoa. Na tela é "camada complementar" da aba ZEE (liga junto
+  com qualquer fase, cor por tipo).
+- 3 `.rar` internos (`Mapa_gestao_ZEE_FaseIII_AJ2020`, `FUNDIARIO`,
+  `Mapas_relatorio`) = cópias do que já está solto no pacote. O 7z do runner
+  não abre RAR5 (sai com −11); a extração quebrada é descartada.
+- PDFs/JPGs: mapa A0 em PDF, resumo executivo (já publicado no site da SEMA),
+  minuta de lei de 2021, apresentação de 2023, metadados, mapas por zona em JPG.
+  Não copiados para o repositório; o pacote inteiro entrou como link em
+  `documentos.json` (grupo Fase III).
+
 ## Fase II recebida (26/10/2026)
 
 O usuário enviou `ZEE_II.rar` (RAR5 — o `unar` 1.10 falha nos `.shp`; extrair com
@@ -88,8 +130,8 @@ O usuário enviou `ZEE_II.rar` (RAR5 — o `unar` 1.10 falha nos `.shp`; extrair
   fundiária (arrecadada, assentamento, discriminada, particular, TI, UC, sem
   estudo). Não é zona do ZEE; não carregado — decisão pendente do usuário.
 
-Pendências que continuam: subzonas da Fase II (pedir à SEMA o shapefile com
-subzonas/unidades de manejo, se existir) e o arquivo da Fase III.
+Pendência que continua: subzonas da Fase II (pedir à SEMA o shapefile com
+subzonas/unidades de manejo, se existir).
 
 ## O que foi entregue (sem o dado vetorial)
 

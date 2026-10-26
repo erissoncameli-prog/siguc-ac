@@ -1367,9 +1367,25 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
   `subzonas: 0` no manifesto a aba não oferece "colorir por subzona". O código
   vem do campo `Label` ("Zona 01" — zero à esquerda; `ler_codigo` aceita) e o
   nome segue a tabela `ZONAS` do script (conferido: mesma numeração do arquivo).
-  `.cpg` = "System" (QGIS) → lido como latin-1. Fase III segue sem arquivo: a
-  aba diz "ainda não recebido" e não deixa ligar. O mesmo RAR trouxe
+  `.cpg` = "System" (QGIS) → lido como latin-1. O mesmo RAR trouxe
   `FUNDIARIO_250.shp` (459 polígonos de situação fundiária) — NÃO carregado.
+- **Fase III carregada (26/10/2026)**: `data/zee/fase3_gestao.geojson`, do
+  `ZEE FASE III.zip` (845 MB no Drive do Núcleo do ZEE — baixado pelo workflow,
+  nunca pelo chat). Zona/subzona/unidade de manejo (código em `Zon_label`,
+  `x.y.0` = sem unidade) e os NOMES DO PRÓPRIO ARQUIVO — a Fase III renomeou as
+  zonas, então `--campo-zona-nome` vence a tabela `ZONAS` da Lei 1.904. Trava:
+  um código, um nome. Sem escala no metadado → "não informada".
+- **Base fundiária do ZEE III** (`data/zee/fase3_fundiario.geojson`, 1.248
+  polígonos, `zee_acre.py --fundiario`): camada COMPLEMENTAR da aba
+  (`ZEE_COMPLEMENTARES`, liga junto com qualquer fase, cor por tipo, pane
+  `zeeCompPane` z 365). **Dado pessoal NUNCA sai**: lista fechada
+  `FUND_CAMPOS` — sem `PROPRIET`, `MATRICULA`, `CERTIF`, `CODIGO` (SIGEF),
+  `OBSERVACAO`; nome só de área pública (no imóvel rural, nome da fazenda =
+  dono). O `--inspecionar` só CONTA campo com nome de dado pessoal
+  (`CAMPO_PESSOAL`), nunca imprime — log de Actions pode ser público.
+- Pacote com vários shapefiles: `--inspecionar` lista tudo (e abre `.rar`/
+  `.7z`/`.zip` internos com o 7z do runner — RAR5 não abre, é descartado) e
+  `--shp TRECHO` escolhe; ambíguo para e lista.
 - Dados SÓ por `scripts/zee_acre.py` (workflow `.github/workflows/zee-acre.yml`,
   modos descobrir/inspecionar/converter — `*.ac.gov.br` e o Drive dão 403 nas
   sessões; o runner alcança). Travas: sem `.prj` para; feição sem zona para;
@@ -1385,8 +1401,9 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
   que não está lá). Nova aba, `noopener noreferrer`; o SIGUC não copia o PDF.
   Documento novo = uma linha no JSON. A pasta e o site só têm PDF — nenhum
   arquivo vetorial (conferido pelo `descobrir`, 25/10/2026).
-- Guarda: `tests/mapa-zee.test.js` (6, página real; contrafactual conferido —
-  pane acima do overlay e link sem `noreferrer` reprovam).
+- Guarda: `tests/mapa-zee.test.js` (9, página real; contrafactual conferido —
+  pane acima do overlay e link sem `noreferrer` reprovam; base fundiária com
+  imóvel rural sem nome).
   `tests/mapa-barra-camadas.test.js` passou a contar 11 abas.
 - Sem mudança em `pwa/sw.js` (tela de mesa; ícone `map` já existia).
 
