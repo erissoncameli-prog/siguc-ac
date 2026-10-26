@@ -44,7 +44,7 @@ import zipfile
 from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from meio_fisico import GEOD, area_ha, recortar  # noqa: E402  (mesmo recorte e simplificação do Meio Físico)
+from meio_fisico import GEOD, TOLERANCIA, area_ha, recortar  # noqa: E402  (mesmo recorte e simplificação do Meio Físico)
 
 from shapely import force_2d, make_valid  # noqa: E402
 from shapely.geometry import mapping, shape  # noqa: E402
@@ -475,6 +475,12 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
             g = transform(t.transform, g)
         if not g.is_valid:
             g = make_valid(g)
+        # Simplifica ANTES do recorte: com todos os vértices, a interseção
+        # da Fase III (190 MB) com o limite do Acre passava dos 30 min do
+        # workflow. O recorte simplifica de novo na tolerância final.
+        g = g.simplify(TOLERANCIA / 2, preserve_topology=True)
+        if not g.is_valid:
+            g = make_valid(g)
         brutas.append({'type': 'Feature', 'properties': p, 'geometry': mapping(g)})
     if sem_zona:
         raise SystemExit(f'{sum(sem_zona.values())} feição(ões) sem zona reconhecível — nada gravado. Valores: {sem_zona}')
@@ -565,6 +571,12 @@ def converter_fundiario(alvo, saida, acre_arq, escolha=None):
         g = force_2d(shape(geo))
         if t is not None:
             g = transform(t.transform, g)
+        if not g.is_valid:
+            g = make_valid(g)
+        # Simplifica ANTES do recorte: com todos os vértices, a interseção
+        # da Fase III (190 MB) com o limite do Acre passava dos 30 min do
+        # workflow. O recorte simplifica de novo na tolerância final.
+        g = g.simplify(TOLERANCIA / 2, preserve_topology=True)
         if not g.is_valid:
             g = make_valid(g)
         brutas.append({'type': 'Feature', 'properties': p, 'geometry': mapping(g)})
