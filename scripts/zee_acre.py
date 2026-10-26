@@ -565,7 +565,7 @@ def extrair(alvo, escolha, destino):
     print(f'{destino}: {os.path.getsize(destino) / 1e6:.1f} MB em {time.time() - t0:.0f} s', flush=True)
 
 
-def perfil(alvo, escolha, acre_arq, areas_ha=(1, 6.25)):
+def perfil(alvo, escolha, acre_arq, areas_ha=(6.25, 25, 100)):
     """Mede a conversão inteira (sem gravar) para cada área mínima: tempo de
     cada etapa, vértices, área por zona antes × depois e tamanho do GeoJSON
     que sairia. É como se escolhe a área mínima com número, não no chute."""
@@ -587,14 +587,18 @@ def perfil(alvo, escolha, acre_arq, areas_ha=(1, 6.25)):
             for f in out:
                 z = str(props[f['properties']['_i']].get('Zona'))
                 por_zona[z] = por_zona.get(z, 0) + area_ha(f['geometry'])
-            tam = len(json.dumps({'type': 'FeatureCollection', 'features': out}, separators=(',', ':')))
+            import gzip
+            bruto = json.dumps({'type': 'FeatureCollection', 'features': out}, separators=(',', ':')).encode()
+            tam, gz = len(bruto), len(gzip.compress(bruto, 6))
+            n_aneis = sum(len(shapely.get_rings(shapely.get_parts(shape(f['geometry'])))) for f in out)
             nv = sum(int(shapely.get_num_coordinates(shape(f['geometry']))) for f in out)
-            print(f'  total {time.time() - t1:.0f} s · {nv:,} vértices · GeoJSON {tam / 1e6:.1f} MB · '
+            print(f'  total {time.time() - t1:.0f} s · {nv:,} vértices em {n_aneis:,} anéis · GeoJSON {tam / 1e6:.1f} MB '
+                  f'({gz / 1e6:.1f} MB com gzip) · '
                   f'área por zona (ha): {dict(sorted((k, round(v)) for k, v in por_zona.items()))} · '
                   f'Acre {sum(por_zona.values()) / (abs(GEOD.geometry_area_perimeter(acre)[0]) / 1e4) * 100:.1f}%', flush=True)
 
 
-def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, acre_arq, escolha=None):
+def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, acre_arq, escolha=None, area_min_ha=0):
     if fase not in CAMADAS:
         raise SystemExit('--fase deve ser 2 ou 3')
     camada_id, fonte_padrao = CAMADAS[fase]
@@ -604,7 +608,7 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     with tempfile.TemporaryDirectory() as tmp:
         shp = localizar_shp(alvo, tmp, escolha)
         t, crs_nome = transformador(shp)
-        campos_arq, geoms, regs, corr = ler_preparar(shp, t)
+        campos_arq, geoms, regs, corr = ler_preparar(shp, t, area_min_ha)
     campos = detectar_campos(campos_arq)
     campos.update({k: v for k, v in campos_forcados.items() if v})
     faltam = [v for v in campos.values() if v and v not in campos_arq]
@@ -645,6 +649,9 @@ def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, ac
     escala = None if (escala or '').strip().lower() in ('', 'nenhuma', 'nao_informada', '-') else escala
     meta = {'fonte': fonte or fonte_padrao, 'escala': escala, 'projecao_origem': crs_nome,
             'gerado_em': date.today().isoformat()}
+    if area_min_ha:
+        # declarado: partes e furos abaixo disto foram absorvidos pela zona em volta
+        meta['area_minima_ha'] = area_min_ha
     with open(os.path.join(saida, camada_id + '.geojson'), 'w', encoding='utf-8') as f:
         json.dump({'type': 'FeatureCollection', **meta, 'features': feats}, f, ensure_ascii=False, separators=(',', ':'))
     man_arq = os.path.join(saida, 'manifesto.json')
@@ -1063,6 +1070,21 @@ def autoteste():
         assert man3['escala'] is None and 99 <= man3['cobertura_pct'] <= 101 and man3['subzonas'] == 2, man3
         xs = [shape(f['geometry']).bounds for f in fc3['features']]
         assert abs(xs[0][0] - (-70.0)) < 1e-3 and abs(xs[1][2] - (-69.0)) < 1e-3, xs   # UTM → lon/lat certo
+        # o mesmo arquivo pelo caminho da área mínima (Douglas-Peucker + make_valid)
+        converter(base3 + '.shp', '3', {'zona': 'Zona', 'subzona': 'Zon_label', 'zona_nome': 'DescrZona',
+                                        'subzona_nome': 'DescSubZon', 'unidade_nome': 'DescUniman'},
+                  None, 'nenhuma', None, saida3, acre_arq, area_min_ha=1)
+        man3 = json.load(open(os.path.join(saida3, 'manifesto.json')))['camadas']['fase3_gestao']
+        assert man3['area_minima_ha'] == 1 and 99 <= man3['cobertura_pct'] <= 101 and man3['feicoes'] == 2, man3
+
+    # área mínima: furo miúdo some (vira da zona em volta), ilha miúda some,
+    # o que é grande fica
+    from shapely.geometry import MultiPolygon, Polygon
+    grande = Polygon([(0, 0), (0, 1000), (1000, 1000), (1000, 0)], [[(100, 100), (100, 150), (150, 150), (150, 100)],
+                                                                     [(500, 500), (500, 800), (800, 800), (800, 500)]])
+    ilha = Polygon([(2000, 0), (2000, 50), (2050, 50), (2050, 0)])
+    g, n_p, n_f = tirar_miudos(np.array([MultiPolygon([grande, ilha])], dtype=object), 10000)   # 1 ha
+    assert (n_p, n_f) == (1, 1) and len(g[0].interiors) == 1 and abs(g[0].area - (1e6 - 9e4)) < 1e-6, (n_p, n_f, g[0].area)
 
     # Fase III: código completo no Zon_label, nomes do próprio arquivo, ".0" = sem unidade
     c3 = {'zona': 'Zona', 'subzona': 'Zon_label', 'unidade': None, 'nome': None,
@@ -1117,6 +1139,8 @@ def main():
     ap.add_argument('--campo-unidade-nome', help='Fase III: DescUniman')
     ap.add_argument('--fundiario', help='converte a base fundiária do ZEE (ARQ; escolha o .shp com --shp)')
     ap.add_argument('--legenda')
+    ap.add_argument('--area-minima-ha', type=float, default=0,
+                    help='tira partes e furos menores que isto antes de simplificar (ZEE III: raster vetorizado)')
     ap.add_argument('--escala')
     ap.add_argument('--fonte')
     ap.add_argument('--saida', default='data/zee')
@@ -1138,7 +1162,7 @@ def main():
         converter(a.converter, a.fase, {'zona': a.campo_zona, 'subzona': a.campo_subzona, 'unidade': a.campo_unidade,
                                         'nome': a.campo_nome, 'zona_nome': a.campo_zona_nome,
                                         'subzona_nome': a.campo_subzona_nome, 'unidade_nome': a.campo_unidade_nome},
-                  a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp)
+                  a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp, a.area_minima_ha)
     elif a.perfil:
         perfil(a.perfil, a.shp, a.acre)
     elif a.extrair:
