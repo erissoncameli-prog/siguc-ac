@@ -294,7 +294,7 @@ def _escolher_shp(shps, raiz, escolha):
 
 def _extrair_aninhados(pasta, listar=False):
     """Pacote dentro do pacote (a Fase III traz 3 .rar com versões do mapa):
-    extrai cada um numa pasta irmã com o 7z do runner. Sem 7z, avisa e segue
+    extrai cada um numa pasta irmã (unrar, 7zz ou 7z). Sem extrator, avisa e segue
     — nunca falha o que já foi extraído."""
     import shutil
     import subprocess
@@ -302,21 +302,36 @@ def _extrair_aninhados(pasta, listar=False):
                 if f.lower().endswith(('.rar', '.7z', '.zip')) and os.path.dirname(os.path.join(r, f)) != pasta]
     if not internos:
         return
-    # 7zz (pacote 7zip + 7zip-rar) abre RAR5; o 7z antigo (p7zip) não abre
-    sete = shutil.which('7zz') or shutil.which('7z')
+    # Extratores em ordem: o p7zip do runner (7z) dá falha de segmentação (−11)
+    # em RAR5 — unrar (multiverse) e 7zz (pacote 7zip + 7zip-rar) abrem.
+    def _cmds(arq, destino):
+        out = []
+        if arq.lower().endswith('.rar') and shutil.which('unrar'):
+            out.append(['unrar', 'x', '-o+', '-y', '-idq', arq, destino + os.sep])
+        for b in ('7zz', '7z'):
+            if shutil.which(b):
+                out.append([b, 'x', '-y', f'-o{destino}', arq])
+        return out
     for arq in internos:
         destino = arq + '_extraido'
-        if not sete:
-            print(f'  (sem 7z no ambiente — não abri {os.path.relpath(arq, pasta)})')
+        cmds = _cmds(arq, destino)
+        if not cmds:
+            print(f'  (sem extrator no ambiente — não abri {os.path.relpath(arq, pasta)})')
             continue
-        # 7z recusa caminho absoluto/".." por padrão; o destino é pasta própria
-        r = subprocess.run([sete, 'x', '-y', f'-o{destino}', arq], capture_output=True, text=True)
-        if r.returncode != 0:
-            # extração quebrada deixa arquivos de 0 byte que se passariam
-            # por shapefile — fora (o 7z do runner não abre RAR5)
+        tentativas = []
+        for cmd in cmds:
+            os.makedirs(destino, exist_ok=True)
+            # destino é pasta própria; unrar e 7z recusam caminho absoluto/".."
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode == 0:
+                break
+            tentativas.append(f'{cmd[0]} saiu com {r.returncode}')
+            # extração quebrada deixa arquivos de 0 byte que se passariam por shapefile
             shutil.rmtree(destino, ignore_errors=True)
-            print(f'Pacote interno NÃO aberto: {os.path.relpath(arq, pasta)} (7z saiu com {r.returncode})')
+        else:
+            print(f'Pacote interno NÃO aberto: {os.path.relpath(arq, pasta)} ({"; ".join(tentativas)})')
             continue
+        print(f'Pacote interno aberto com {cmd[0]}: {os.path.relpath(arq, pasta)}')
         if listar:
             n = sum(len(fs) for _, _, fs in os.walk(destino)) if os.path.isdir(destino) else 0
             print(f'Pacote interno: {os.path.relpath(arq, pasta)} → {n} arquivo(s)' +
