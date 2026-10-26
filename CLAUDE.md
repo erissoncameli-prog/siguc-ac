@@ -1396,9 +1396,34 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
   `OBSERVACAO`; nome só de área pública (no imóvel rural, nome da fazenda =
   dono). O `--inspecionar` só CONTA campo com nome de dado pessoal
   (`CAMPO_PESSOAL`), nunca imprime — log de Actions pode ser público.
-- Pacote com vários shapefiles: `--inspecionar` lista tudo (e abre `.rar`/
-  `.7z`/`.zip` internos com o 7z do runner — RAR5 não abre, é descartado) e
-  `--shp TRECHO` escolhe; ambíguo para e lista.
+- Pacote com vários shapefiles: `--inspecionar` lista tudo (abre `.rar`/
+  `.7z`/`.zip` internos com `unrar`, depois `7zz`/`7z` — o p7zip falha em RAR5)
+  e mostra as planilhas `.xlsx` (openpyxl; linha com nome de dado pessoal na 1ª
+  célula não sai); `--shp TRECHO` escolhe; ambíguo para e lista.
+- **Áreas oficiais** (`data/zee/fase3_quantificacoes.json`, 26/10/2026): área de
+  cada zona/subzona/unidade em 2007 (Fase II) e 2020 (Fase III), da planilha
+  `quantificacoes ZEE FASE III_Revisao_04062020.xlsx` + tabela de atributos
+  (`Area_ha`) — transcrita do log do `--inspecionar` por script, somas conferidas
+  contra os totais da SEMA. A variação é calculada pelo SIGUC (as colunas
+  "Diferença" da planilha são inconsistentes). Popup mostra área oficial 2020 e
+  2007 ao lado da área do desenho; aba ganhou o **quadro de áreas 2007 × 2020**.
+- **Classes na aba** (`_zeeClassesHTML`): árvore zona › subzona › unidade com
+  caixa de mostrar/ocultar (`pref.ocultos`, salva em `siguc_zee`; ocultar a zona
+  trava os filhos), cor atual e área. "Colorir por" ganhou **unidade de manejo**
+  (subzona sem unidade conta como uma classe; tons da cor da zona). Classe oculta
+  sai do mapa e da legenda, nunca do quadro. ⚠️ Redesenhar o painel no `click`
+  tira o botão do DOM e o "clique fora" da barra fecha o painel — por isso
+  "Mostrar todas" redesenha no tique seguinte (`setTimeout`).
+- **ZEE nos relatórios do CAR** — fonte única `js/zee-imovel.js` (prefixo
+  `zim`): recorta o ZEE uma vez pelo retângulo do relatório e parte em células
+  de 0,05° (`zimPreparar`; 1,25°×1° ≈ 1,6 s), cada imóvel cruza só as células
+  dele (~2 ms). ⚠️ `turf.bboxClip` deixa anel com < 4 pontos e polígono sem
+  contorno externo — o `turf.intersect` recusa a geometria inteira; `_zimLimpar`
+  tira. "CAR na UC": classe por imóvel (parte na UC/ZA), card "ZEE Fase III"
+  clicável = filtro `zee` de `CARUC_FILTROS`, coluna no Excel/CSV, nota no PDF.
+  Relatório do imóvel (`_relZee`/`_relZeeHTML` em `js/relatorio-car.js`):
+  tabela na folha detalhada, linha na sintética. Falha = "ZEE não conferido",
+  nunca "fora do ZEE".
 - Dados SÓ por `scripts/zee_acre.py` (workflow `.github/workflows/zee-acre.yml`,
   modos descobrir/inspecionar/converter/fundiario/extrair/perfil — `*.ac.gov.br` e o Drive dão 403 nas
   sessões; o runner alcança). Travas: sem `.prj` para; feição sem zona para;
@@ -1417,7 +1442,10 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
 - Guarda: `tests/mapa-zee.test.js` (9, página real; contrafactual conferido —
   pane acima do overlay e link sem `noreferrer` reprovam; base fundiária com
   imóvel rural sem nome; arquivos REAIS: Fase III com 30 feições, um código um
-  nome, colorir por subzona, clique de verdade abrindo o popup da unidade).
+  nome, colorir por subzona e por unidade, ocultar zona, quadro 2007 × 2020,
+  clique de verdade abrindo o popup da unidade com a área oficial);
+  `tests/car-uc-relatorio.test.js` (+2: classe do ZEE e "não conferido") e
+  `tests/relatorios-mapa-padrao.test.js` (+1: relatório do imóvel).
   `tests/mapa-barra-camadas.test.js` passou a contar 11 abas.
 - Sem mudança em `pwa/sw.js` (tela de mesa; ícone `map` já existia).
 

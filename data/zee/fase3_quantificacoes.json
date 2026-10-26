@@ -1,0 +1,195 @@
+{
+ "fonte": "SEMA/AC — quantificacoes ZEE FASE III_Revisao_04062020.xlsx (Fase II 2007 × Fase III 2020) e tabela de atributos AC_MapaGestao_ZEE_III_Versao0506 (Area_ha)",
+ "pacote": "ZEE FASE III.zip (Núcleo do ZEE/SEMA, Google Drive)",
+ "area_acre_oficial_ha": 16422136,
+ "total_2007_ha": 16413060.95,
+ "total_2020_ha": 16431092.15,
+ "nota": "Área calculada pela SEMA no SIG. Variação = (2020 − 2007) ÷ 2007, calculada pelo SIGUC. Classe sem área em 2007 não existia na Fase II.",
+ "classes": {
+  "1": {
+   "nome": "Sistemas de Produção Agropecuários e Florestais Sustentáveis",
+   "area_2007_ha": 4054102.43,
+   "area_2020_ha": 6112695.33
+  },
+  "1.1": {
+   "nome": "Produção Familiar em Projetos de Assentamento",
+   "area_2007_ha": 1112805.9,
+   "area_2020_ha": 1148228.33
+  },
+  "1.1.1": {
+   "nome": "Áreas com alto potencial para sistemas de produção intensivos com agricultura (arroz, feijão, milho soja, mandioca, entre outras lavouras anuais) e pecuária",
+   "area_2007_ha": 134672.79,
+   "area_2020_ha": 206336.31
+  },
+  "1.1.2": {
+   "nome": "Áreas com alto potencial para a produção de culturas perenes e sistemas intensivos de integração lavoura-pecuária",
+   "area_2007_ha": 49740.81,
+   "area_2020_ha": 57531.28
+  },
+  "1.1.3": {
+   "nome": "Áreas com alto potencial para a produção em sistemas agroflorestais, consórcios agroflorestais e sistemas de integração lavoura-pecuária",
+   "area_2007_ha": 250027.87,
+   "area_2020_ha": 352625.65
+  },
+  "1.1.4": {
+   "nome": "Áreas com alto potencial para a produção em sistemas silvipastoris e sistemas intensivos de integração lavoura-pecuária",
+   "area_2007_ha": 66610.83,
+   "area_2020_ha": 94521.45
+  },
+  "1.1.5": {
+   "nome": "Áreas com alto potencial para a produção de culturas anuais em sistemas de rotação ou silvicultura",
+   "area_2007_ha": 34985.77,
+   "area_2020_ha": 35113.55
+  },
+  "1.1.6": {
+   "nome": "Áreas indicadas para recuperação ambiental ou silvicultura",
+   "area_2007_ha": 12585.0,
+   "area_2020_ha": 14680.07
+  },
+  "1.1.7": {
+   "nome": "Manejo Florestal de baixo impacto (Manejo Florestal Madeireiro)",
+   "area_2007_ha": 564182.83,
+   "area_2020_ha": 79217.34
+  },
+  "1.1.8": {
+   "nome": "Manejo Florestal Não Madeireiro",
+   "area_2007_ha": null,
+   "area_2020_ha": 308202.68
+  },
+  "1.2": {
+   "nome": "Produção agropecuária",
+   "area_2007_ha": 657584.8,
+   "area_2020_ha": 998626.72
+  },
+  "1.2.1": {
+   "nome": "Áreas para sistemas de produção intensivos com agricultura (arroz, feijão, milho soja, mandioca, entre outras lavouras anuais) e pecuária, bem como sistemas com integração lavoura-pecuária",
+   "area_2007_ha": 132716.81,
+   "area_2020_ha": 124012.16
+  },
+  "1.2.2": {
+   "nome": "Áreas para consolidação e intensificação do uso da terra",
+   "area_2007_ha": 524867.98,
+   "area_2020_ha": 548652.54
+  },
+  "1.2.3": {
+   "nome": "Áreas para consolidação e inserção de práticas de manejo sustentáveis",
+   "area_2007_ha": null,
+   "area_2020_ha": 325962.02
+  },
+  "1.3": {
+   "nome": "Produção florestal",
+   "area_2007_ha": 2283711.73,
+   "area_2020_ha": 3965840.28
+  },
+  "1.3.1": {
+   "nome": "Manejo Florestal Madeireiro",
+   "area_2007_ha": 2283711.73,
+   "area_2020_ha": 1259030.68
+  },
+  "1.3.2": {
+   "nome": "Manejo Florestal de Uso Múltiplo",
+   "area_2007_ha": null,
+   "area_2020_ha": 2706809.6
+  },
+  "2": {
+   "nome": "Uso Sustentável dos Recursos Naturais e Proteção Ambiental",
+   "area_2007_ha": 8035751.36,
+   "area_2020_ha": 8404501.56
+  },
+  "2.1": {
+   "nome": "Proteção Integral",
+   "area_2007_ha": 872076.92,
+   "area_2020_ha": 1618215.06
+  },
+  "2.2": {
+   "nome": "Florestas Nacionais e Florestas Estaduais",
+   "area_2007_ha": 1565751.1,
+   "area_2020_ha": 990164.15
+  },
+  "2.3": {
+   "nome": "Reserva Extrativistas",
+   "area_2007_ha": 2665580.42,
+   "area_2020_ha": 2657966.12
+  },
+  "2.4": {
+   "nome": "Projetos de Assentamento Diferenciados",
+   "area_2007_ha": 481779.62,
+   "area_2020_ha": 623831.23
+  },
+  "2.5": {
+   "nome": "Terras Indígenas",
+   "area_2007_ha": 2413137.17,
+   "area_2020_ha": 2450669.55
+  },
+  "2.6": {
+   "nome": "Áreas com relevância para a proteção ambiental",
+   "area_2007_ha": 37426.13,
+   "area_2020_ha": 63655.44
+  },
+  "3": {
+   "nome": "Áreas prioritárias para ordenamento territorial",
+   "area_2007_ha": 4296387.67,
+   "area_2020_ha": 1888799.83
+  },
+  "3.1": {
+   "nome": "Áreas com prioridade para regularização fundiária",
+   "area_2007_ha": 3832354.87,
+   "area_2020_ha": 1067533.44
+  },
+  "3.2": {
+   "nome": "Áreas de produção ribeirinha (pesca e agricultura familiar)",
+   "area_2007_ha": 464032.8,
+   "area_2020_ha": 221356.4
+  },
+  "3.3": {
+   "nome": "Áreas com alta prioridade para conservação",
+   "area_2007_ha": null,
+   "area_2020_ha": 33277.45
+  },
+  "3.4": {
+   "nome": "Áreas com muito alta prioridade para conservação",
+   "area_2007_ha": null,
+   "area_2020_ha": 103873.23
+  },
+  "3.5": {
+   "nome": "Área com extrema prioridade para conservação",
+   "area_2007_ha": null,
+   "area_2020_ha": 462759.31
+  },
+  "4": {
+   "nome": "Cidades do Acre",
+   "area_2007_ha": 26819.48,
+   "area_2020_ha": 25095.43
+  },
+  "4.1": {
+   "nome": "Cidades dos altos rios (Juruá, Tarauacá e Purus)",
+   "area_2007_ha": 269.71,
+   "area_2020_ha": 576.32
+  },
+  "4.2": {
+   "nome": "Cidades do médio Juruá",
+   "area_2007_ha": 1334.56,
+   "area_2020_ha": 1823.27
+  },
+  "4.3": {
+   "nome": "Cidades dos rios centrais (Iaco, Purus, Tarauacá e Envira)",
+   "area_2007_ha": 1155.54,
+   "area_2020_ha": 1809.1
+  },
+  "4.4": {
+   "nome": "Cidades do Alto Acre e de Integração Fronteiriça",
+   "area_2007_ha": 1013.97,
+   "area_2020_ha": 1606.99
+  },
+  "4.5": {
+   "nome": "Cidades do Baixo Acre e Abunã",
+   "area_2007_ha": 899.03,
+   "area_2020_ha": 1825.08
+  },
+  "4.6": {
+   "nome": "Capital do Acre",
+   "area_2007_ha": 22146.67,
+   "area_2020_ha": 17454.68
+  }
+ }
+}

@@ -381,6 +381,11 @@ const CARUC_FILTROS = [
       const z = (i.zonas || []).filter(x => x.ha >= CARUC_HA_MIN).map(x => x.nome)
       return z.length ? z : [i.local === 'za' ? 'Só na zona de amortecimento' : 'Fora de zona cadastrada']
     } },
+  // ZEE Fase III (js/zee-imovel.js): classe mais fina que o imóvel atinge
+  { chave: 'zee', rotulo: 'ZEE Fase III', valores: i => {
+      if (!i.zee) return ['ZEE não conferido']
+      return i.zee.length ? i.zee.map(c => carucZeeRotulo(c)) : ['Fora do ZEE']
+    } },
   { chave: 'titular', rotulo: 'Titular', valores: i => {
       const t = []
       if (i.titular_cars_relatorio > 1) t.push('Mais de um CAR nesta UC')
@@ -511,6 +516,23 @@ function _carucContar(lista, chave) {
   return [...m.values()].sort((a, b) => b.n - a.n || b.ha - a.ha)
 }
 
+// Rótulo da classe do ZEE no filtro e no quadro (mesmo texto nos dois:
+// o quadro é atalho para o filtro).
+function carucZeeRotulo(c) {
+  return typeof zimRotulo === 'function' ? zimRotulo(c) : String(c.cod)
+}
+
+function _carucPorZee(imoveis) {
+  const m = new Map()
+  for (const i of imoveis) for (const c of (i.zee || [])) {
+    const k = carucZeeRotulo(c)
+    const g = m.get(k) || { cod: c.cod, zona_cod: c.zona_cod, rotulo: k, n: 0, ha: 0 }
+    g.n++; g.ha += c.ha
+    m.set(k, g)
+  }
+  return [...m.values()].sort((a, b) => String(a.cod).localeCompare(String(b.cod), 'pt-BR', { numeric: true }))
+}
+
 function carucAgregar(imoveis, uc) {
   const naUC = imoveis.filter(i => i.local === 'uc')
   const soZa = imoveis.filter(i => i.local === 'za')
@@ -545,6 +567,8 @@ function carucAgregar(imoveis, uc) {
     por_tipo: _carucContar(imoveis, i => carucTipoImovel(i.tipo_imovel)),
     por_faixa: _carucContar(imoveis, i => carucFaixaModulos(i.modulos)),
     por_zona: [...porZona.values()].sort((a, b) => b.ha - a.ha),
+    por_zee: _carucPorZee(imoveis),
+    fora_zee: imoveis.filter(i => i.zee && !i.zee.length).length,
     por_prioridade: ['alta', 'media', 'baixa'].map(k => {
       const l = imoveis.filter(i => (i.prioridade?.nivel || 'baixa') === k)
       return { rotulo: CARUC_PRIORIDADE_ROTULO[k], nivel: k, n: l.length, ha: l.reduce((s, i) => s + (i.area_analise_ha || 0), 0) }
@@ -1035,6 +1059,26 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
     }
   }
 
+  // ZEE Fase III (fonte única: js/zee-imovel.js), na parte do imóvel na
+  // UC/ZA. Falha = "não conferido", nunca "fora do ZEE".
+  const zeeInfo = { conferido: false, falhou: null }
+  if (imoveis.length) {
+    if (typeof zimCarregar !== 'function') zeeInfo.falhou = 'módulo do ZEE não carregado'
+    else {
+      etapa('Cruzando com o ZEE Fase III…')
+      const gj = await zimCarregar()
+      if (!gj) zeeInfo.falhou = 'o arquivo do ZEE Fase III não carregou'
+      else {
+        const prep = zimPreparar(gj, bbox)
+        for (let k = 0; k < imoveis.length; k++) {
+          imoveis[k].zee = zimDoImovel(imoveis[k]._geom, prep)
+          if (k % 25 === 0) { etapa('Cruzando com o ZEE Fase III…', k, imoveis.length); await new Promise(r => setTimeout(r, 0)) }
+        }
+        zeeInfo.conferido = true
+      }
+    }
+  }
+
   etapa('Verificando sobreposição entre os CARs…', 0, imoveis.length)
   await carucSobreposicoesEntreCars(imoveis, (a, b) => etapa('Verificando sobreposição entre os CARs…', a, b))
 
@@ -1081,8 +1125,9 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
     fora,
     geo: { uc: carucGeomMapa(ucGeom), zonas: zonas.map(z => carucGeomMapa(z.geometry)).filter(Boolean) },
     resumo: carucAgregar(imoveis, uc),
-    falhas: { ambiental: falhasAmbiental, prodes: prodesInfo?.falhas || 0, prodes_quadrantes: prodesInfo?.quadrantes || 0, fora_sem_geom: foraSemGeom, embargos: embargosInfo.falhou },
+    falhas: { ambiental: falhasAmbiental, prodes: prodesInfo?.falhas || 0, prodes_quadrantes: prodesInfo?.quadrantes || 0, fora_sem_geom: foraSemGeom, embargos: embargosInfo.falhou, zee: zeeInfo.falhou },
     embargos: embargosInfo,
+    zee: zeeInfo,
   }
 }
 
@@ -1116,6 +1161,7 @@ function carucColunasExportacao(rel) {
     { rotulo: 'Sobreposição com outros CARs', valor: i => (i.sobreposicoes || []).map(o => `${o.cod} (${Number(o.ha).toFixed(2).replace('.', ',')} ha${o.mesmo_titular ? ', mesmo titular' : ''})`).join('; ') },
     { rotulo: 'Zonas atingidas', valor: i => (i.zonas || []).map(z => `${z.nome} (${Number(z.ha).toFixed(2).replace('.', ',')} ha)`).join('; ') },
     { rotulo: 'Inscrição no CAR', valor: i => i.data_inscricao ? i.data_inscricao.split('-').reverse().join('/') : '' },
+    { rotulo: 'ZEE Fase III (classe, ha e % da parte na UC/ZA)', valor: i => !i.zee ? 'não conferido' : i.zee.length ? zimTextoLongo(i.zee) : 'fora do ZEE' },
   ]
   if (o.focos) cols.push({ rotulo: `Focos ${o.focosDe}–${o.focosAte}`, valor: i => i.ambiental ? i.ambiental.focos_periodo : null, casas: 0 })
   if (o.deter) {

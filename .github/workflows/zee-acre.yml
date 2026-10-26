@@ -68,7 +68,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Dependências
-        run: pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1' 'pyogrio==0.11.1'
+        # unrar (e 7zip + 7zip-rar): abrem os .rar (RAR5) de dentro do pacote da
+        # Fase III — o p7zip que vem no runner dá falha de segmentação neles
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq unrar 7zip 7zip-rar >/dev/null || echo "unrar/7zip-rar indisponível — .rar internos seguem fechados"
+          command -v unrar 7zz 7z || true
+          pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1' 'pyogrio==0.11.1' 'openpyxl==3.1.5'
       - name: Autoteste (sem rede)
         run: python scripts/zee_acre.py --autoteste
       - name: Rodar

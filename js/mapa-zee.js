@@ -23,6 +23,11 @@
 // - Cor por ZONA em Okabe-Ito (legível em daltonismo); subzona = tons da cor
 //   da zona dela, nunca uma paleta solta.
 // - Popup reaproveita js/mapa-camadas-config.js (ccfPopupHTML).
+// - Área oficial (Fase III) e quadro 2007 × 2020 vêm de
+//   data/zee/fase3_quantificacoes.json (planilha de quantificações da SEMA);
+//   a tela nunca recalcula área oficial — a do desenho é outra medida.
+// - Ocultar classe (zona, subzona ou unidade) só esconde do mapa e da
+//   legenda; o arquivo e o quadro de áreas continuam inteiros.
 
 const ZEE_BASE = (typeof ZEE_DATA_URL !== 'undefined' ? ZEE_DATA_URL : '../data/zee/')
 const ZEE_PANE = 'zeePane'
@@ -72,7 +77,8 @@ const ZEE_COMP_PANE = 'zeeCompPane'
 const ZEE_ZONA_COR = { 1: '#E69F00', 2: '#009E73', 3: '#CC79A7', 4: '#0072B2' }
 const ZEE_COR_SEM = '#9CA3AF'
 
-const _zee = { mapa: null, aoMudar: null, manifesto: undefined, docs: undefined, cache: {}, ativa: null, layer: null, pref: {}, comp: {} }
+const _zee = { mapa: null, aoMudar: null, manifesto: undefined, docs: undefined, quant: undefined, cache: {}, ativa: null, layer: null, pref: {}, comp: {} }
+const ZEE_MODOS = ['zona', 'subzona', 'unidade']
 
 function _zeeEsc(s) { return typeof ccfEsc === 'function' ? ccfEsc(s) : String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
 function _zeeIcone(n) { return typeof bico === 'function' ? bico(n) : '' }
@@ -80,12 +86,13 @@ function _zeeIcone(n) { return typeof bico === 'function' ? bico(n) : '' }
 function _zeePrefCarregar() {
   try { _zee.pref = JSON.parse(localStorage.getItem('siguc_zee') || '{}') || {} } catch (_) { _zee.pref = {} }
   if (!ZEE_CAMADAS[_zee.pref.ativa]) _zee.pref.ativa = null
-  if (_zee.pref.colorir !== 'subzona') _zee.pref.colorir = 'zona'
+  if (!ZEE_MODOS.includes(_zee.pref.colorir)) _zee.pref.colorir = 'zona'
+  _zee.pref.ocultos = Array.isArray(_zee.pref.ocultos) ? _zee.pref.ocultos.filter(c => typeof c === 'string') : []
   if (typeof _zee.pref.opacidade !== 'number') _zee.pref.opacidade = 0.4
   _zee.pref.comp = Array.isArray(_zee.pref.comp) ? _zee.pref.comp.filter(id => ZEE_COMPLEMENTARES[id]) : []
 }
 function _zeePrefSalvar() {
-  try { localStorage.setItem('siguc_zee', JSON.stringify({ ativa: _zee.ativa, colorir: _zee.pref.colorir, opacidade: _zee.pref.opacidade, comp: Object.keys(_zee.comp) })) } catch (_) {}
+  try { localStorage.setItem('siguc_zee', JSON.stringify({ ativa: _zee.ativa, colorir: _zee.pref.colorir, opacidade: _zee.pref.opacidade, comp: Object.keys(_zee.comp), ocultos: _zee.pref.ocultos })) } catch (_) {}
 }
 
 function zeeMontar(mapa, opts = {}) {
@@ -125,6 +132,17 @@ async function zeeDocumentos() {
   return _zee.docs
 }
 
+// Quantificações oficiais da Fase III (null = arquivo ausente: o quadro some
+// e o popup mostra só a área do desenho).
+async function zeeQuantificacoes() {
+  if (_zee.quant !== undefined) return _zee.quant
+  try {
+    const r = await fetch(ZEE_BASE + 'fase3_quantificacoes.json')
+    _zee.quant = r.ok ? await r.json() : null
+  } catch (_) { _zee.quant = null }
+  return _zee.quant
+}
+
 function zeeDisponivel(id) { return !!(_zee.manifesto && _zee.manifesto[id]) }
 
 function _zeeEscala(id) {
@@ -141,26 +159,45 @@ function _zeeTom(hex, i, n) {
   return '#' + m.map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase()
 }
 
-// Mapa subzona → cor, a partir das subzonas que existem no arquivo.
-function _zeeCoresSubzona(gj) {
+// Classe de cada feição no modo de cor: zona, subzona, ou unidade de manejo
+// (subzona sem unidade conta como uma classe só).
+function _zeeChave(p, modo) {
+  if (modo === 'unidade') return p.unidade || p.subzona || p.zona_cod
+  if (modo === 'subzona') return p.subzona || p.zona_cod
+  return p.zona_cod
+}
+
+const _zeeOrdem = (a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true })
+
+// Mapa classe → cor (tons da cor da zona), a partir do que existe no arquivo.
+function _zeeCoresPor(gj, modo) {
   const porZona = {}
   for (const f of gj.features || []) {
     const p = f.properties || {}
-    if (!p.subzona) continue
-    ;(porZona[p.zona_cod] = porZona[p.zona_cod] || new Set()).add(p.subzona)
+    if (!p.zona_cod) continue
+    ;(porZona[p.zona_cod] = porZona[p.zona_cod] || new Set()).add(_zeeChave(p, modo))
   }
   const out = {}
   Object.entries(porZona).forEach(([z, set]) => {
-    const subs = [...set].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }))
-    subs.forEach((s, i) => { out[s] = _zeeTom(ZEE_ZONA_COR[z] || ZEE_COR_SEM, i, subs.length) })
+    const cl = [...set].sort(_zeeOrdem)
+    cl.forEach((c, i) => { out[c] = _zeeTom(ZEE_ZONA_COR[z] || ZEE_COR_SEM, i, cl.length) })
   })
   return out
 }
 
-function zeeCor(props, coresSub) {
-  const p = props || {}
-  if (_zee.pref.colorir === 'subzona' && p.subzona && coresSub && coresSub[p.subzona]) return coresSub[p.subzona]
+function zeeCor(props, reg) {
+  const p = props || {}, modo = _zee.pref.colorir
+  if (modo !== 'zona' && reg && reg.cores && reg.cores[modo]) {
+    const c = reg.cores[modo][_zeeChave(p, modo)]
+    if (c) return c
+  }
   return ZEE_ZONA_COR[p.zona_cod] || ZEE_COR_SEM
+}
+
+// Oculta se a zona, a subzona ou a unidade dela estiver desmarcada.
+function _zeeVisivel(p) {
+  const o = _zee.pref.ocultos
+  return !o.length || ![p.zona_cod, p.subzona, p.unidade].some(c => c && o.includes(c))
 }
 
 function _zeeRotuloSubzona(p) {
@@ -175,8 +212,14 @@ async function _zeeCarregar(id) {
   const r = await fetch(ZEE_BASE + arq)
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   const gj = await r.json()
-  ;(gj.features || []).forEach(f => { f.properties = f.properties || {}; f.properties._titulo = _zeeRotuloSubzona(f.properties) })
-  _zee.cache[id] = { gj, coresSub: _zeeCoresSubzona(gj) }
+  const q = id === 'fase3_gestao' ? await zeeQuantificacoes() : null
+  ;(gj.features || []).forEach(f => {
+    const p = f.properties = f.properties || {}
+    p._titulo = _zeeRotuloSubzona(p)
+    const of = q && q.classes && q.classes[p.unidade || p.subzona]
+    if (of) { p.area_oficial_ha = of.area_2020_ha; p.area_2007_ha = of.area_2007_ha }
+  })
+  _zee.cache[id] = { gj, cores: { subzona: _zeeCoresPor(gj, 'subzona'), unidade: _zeeCoresPor(gj, 'unidade') } }
   return _zee.cache[id]
 }
 
@@ -189,13 +232,15 @@ const _ZEE_POPUP = {
     { campo: 'unidade', rotulo: 'Unidade de manejo' },
     { campo: 'unidade_nome', rotulo: 'Indicação da unidade' },
     { campo: 'diretriz', rotulo: 'Diretriz de uso' },
+    { campo: 'area_oficial_ha', rotulo: 'Área oficial (SEMA, 2020)', sufixo: ' ha', casas: 0 },
+    { campo: 'area_2007_ha', rotulo: 'Área na Fase II (2007)', sufixo: ' ha', casas: 0 },
   ],
 }
 
 function zeePopupHTML(id, feature) {
   const cfg = ZEE_CAMADAS[id]
   const reg = _zee.cache[id]
-  const c = { id: 'zee-' + id, nome: cfg.curto, cor: zeeCor(feature.properties, reg && reg.coresSub), geojson: null, style_config: { popup: _ZEE_POPUP } }
+  const c = { id: 'zee-' + id, nome: cfg.curto, cor: zeeCor(feature.properties, reg), geojson: null, style_config: { popup: _ZEE_POPUP } }
   const corpo = typeof ccfPopupHTML === 'function'
     ? ccfPopupHTML(c, feature, {})
     : `<div class="camada-popup"><div class="cp-layer-nome">${_zeeEsc(feature.properties._titulo)}</div></div>`
@@ -214,7 +259,8 @@ function _zeeDesenhar() {
   const op = _zee.pref.opacidade
   _zee.layer = L.geoJSON(reg.gj, {
     pane: ZEE_PANE,
-    style: f => { const cor = zeeCor(f.properties, reg.coresSub); return { color: cor, weight: 0.8, opacity: 0.95, fillColor: cor, fillOpacity: op } },
+    filter: f => _zeeVisivel(f.properties || {}),
+    style: f => { const cor = zeeCor(f.properties, reg); return { color: cor, weight: 0.8, opacity: 0.95, fillColor: cor, fillOpacity: op } },
     onEachFeature: (f, layer) => layer.bindPopup(() => zeePopupHTML(id, f), { className: 'camada-popup-wrap', maxWidth: 380 }),
   }).addTo(_zee.mapa)
 }
@@ -224,7 +270,7 @@ async function zeeAlternar(id, ligar) {
   if (!ZEE_CAMADAS[id] || !_zee.mapa) return
   if (!ligar) {
     if (_zee.ativa === id) { _zee.ativa = null; _zeeDesenhar() }
-    _zeeStatus(id, ''); _zeePrefSalvar(); _zeeSincPainel(); _zee.aoMudar && _zee.aoMudar()
+    _zeeStatus(id, ''); _zeePrefSalvar(); _zeeSincPainel(); _zeeSincClasses(); _zee.aoMudar && _zee.aoMudar()
     return
   }
   const anterior = _zee.ativa
@@ -239,6 +285,7 @@ async function zeeAlternar(id, ligar) {
     if (_zee.ativa !== id) return // trocou ou desligou enquanto baixava
     _zeeDesenhar()
     _zeeStatus(id, `${(reg.gj.features || []).length.toLocaleString('pt-BR')} polígonos`)
+    _zeeSincClasses()
   } catch (e) {
     if (_zee.ativa === id) _zee.ativa = null
     _zeeStatus(id, e.message === 'sem-dado' ? 'Arquivo ainda não recebido.' : 'Não foi possível carregar o arquivo.', true)
@@ -248,8 +295,21 @@ async function zeeAlternar(id, ligar) {
 }
 
 function zeeColorirPor(modo) {
-  _zee.pref.colorir = modo === 'subzona' ? 'subzona' : 'zona'
-  _zeeDesenhar(); _zeePrefSalvar(); _zee.aoMudar && _zee.aoMudar()
+  _zee.pref.colorir = ZEE_MODOS.includes(modo) ? modo : 'zona'
+  _zeeDesenhar(); _zeePrefSalvar(); _zeeSincClasses(); _zee.aoMudar && _zee.aoMudar()
+}
+
+// Mostrar/ocultar uma classe (código de zona, subzona ou unidade).
+function zeeMostrarClasse(cod, mostrar) {
+  const o = new Set(_zee.pref.ocultos)
+  mostrar ? o.delete(cod) : o.add(cod)
+  _zee.pref.ocultos = [...o].sort(_zeeOrdem)
+  _zeeDesenhar(); _zeePrefSalvar(); _zeeSincClasses(); _zee.aoMudar && _zee.aoMudar()
+}
+
+function zeeMostrarTodas() {
+  _zee.pref.ocultos = []
+  _zeeDesenhar(); _zeePrefSalvar(); _zeeSincClasses(); _zee.aoMudar && _zee.aoMudar()
 }
 
 function zeeDefinirOpacidade(v) {
@@ -331,19 +391,25 @@ function _zeeItensLegendaComp() {
   return out
 }
 
+// Legenda por zona, subzona ou unidade (sem teto: cada classe tem a sua cor —
+// "outros" esconderia a que o usuário procura). Classe oculta não entra.
 function _zeeItensLegendaFase() {
   const id = zeeAtiva(); if (!id) return []
-  const reg = _zee.cache[id], op = _zee.pref.opacidade, nome = ZEE_CAMADAS[id].curto
-  const feats = reg.gj.features || []
-  if (_zee.pref.colorir === 'subzona') {
-    const vistos = new Map()
-    feats.forEach(f => { const p = f.properties; if (p.subzona && !vistos.has(p.subzona)) vistos.set(p.subzona, p.subzona_nome) })
-    const subs = [...vistos.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }))
-    if (subs.length) return subs.map(s => ({ simbolo: 'rect', cor: reg.coresSub[s], opacidade: op, label: `${nome} — Subzona ${s}${vistos.get(s) ? ' (' + vistos.get(s) + ')' : ''}` }))
-  }
-  const zonas = new Map()
-  feats.forEach(f => { const p = f.properties; if (!zonas.has(p.zona_cod)) zonas.set(p.zona_cod, p.zona) })
-  return [...zonas.keys()].sort().map(z => ({ simbolo: 'rect', cor: ZEE_ZONA_COR[z] || ZEE_COR_SEM, opacidade: op, label: `${nome} — ${zonas.get(z) || 'Zona ' + z}` }))
+  const reg = _zee.cache[id], op = _zee.pref.opacidade, nome = ZEE_CAMADAS[id].curto, modo = _zee.pref.colorir
+  const nomes = new Map()
+  ;(reg.gj.features || []).forEach(f => {
+    const p = f.properties
+    if (!_zeeVisivel(p)) return
+    const k = _zeeChave(p, modo)
+    if (nomes.has(k)) return
+    const n = k === p.unidade ? p.unidade_nome : k === p.subzona ? p.subzona_nome : p.zona
+    nomes.set(k, { n, tipo: k === p.unidade ? 'Unidade' : k === p.subzona ? 'Subzona' : null })
+  })
+  return [...nomes.keys()].sort(_zeeOrdem).map(k => {
+    const { n, tipo } = nomes.get(k)
+    const cor = modo === 'zona' ? (ZEE_ZONA_COR[k] || ZEE_COR_SEM) : reg.cores[modo][k]
+    return { simbolo: 'rect', cor, opacidade: op, label: tipo ? `${nome} — ${tipo} ${k}${n ? ' (' + n + ')' : ''}` : `${nome} — ${n || 'Zona ' + k}` }
+  })
 }
 
 function _zeeStatus(id, txt, erro) {
@@ -384,10 +450,13 @@ function _zeeCamadasHTML() {
   // O arquivo da Fase II recebido em 26/10/2026 só tem as 4 zonas: sem
   // subzona no manifesto, "Colorir por subzona" seria uma opção que não faz nada.
   const temSub = Object.values(_zee.manifesto || {}).some(m => m.subzonas > 0)
+  // unidade de manejo só existe na Fase III (Zona 1)
+  const temUni = zeeDisponivel('fase3_gestao')
   const ctrl = `<div class="zee-ctrl">
     ${temSub ? `<label>Colorir por <select data-zee-acao="colorir">
       <option value="zona"${_zee.pref.colorir === 'zona' ? ' selected' : ''}>Zona</option>
-      <option value="subzona"${_zee.pref.colorir === 'subzona' ? ' selected' : ''}>Subzona</option></select></label>` : ''}
+      <option value="subzona"${_zee.pref.colorir === 'subzona' ? ' selected' : ''}>Subzona</option>
+      ${temUni ? `<option value="unidade"${_zee.pref.colorir === 'unidade' ? ' selected' : ''}>Unidade de manejo</option>` : ''}</select></label>` : ''}
     <label>Opacidade <input type="range" min="0" max="100" step="5" value="${Math.round(_zee.pref.opacidade * 100)}" data-zee-acao="opacidade" aria-label="Opacidade do ZEE"></label>
   </div>`
   const comp = Object.entries(ZEE_COMPLEMENTARES).filter(([id]) => zeeDisponivel(id)).map(([id, t]) => {
@@ -402,6 +471,103 @@ function _zeeCamadasHTML() {
   }).join('')
   return aviso + html + (semDado || _zee.manifesto === undefined ? '' : ctrl) +
     (comp ? `<div class="zee-sec-tit">Camadas complementares</div>${comp}` : '')
+}
+
+// ── Classes da fase ligada: árvore zona › subzona › unidade, com caixa de
+// mostrar/ocultar, cor atual e área (oficial na Fase III; do desenho na II).
+const _zeeHa = v => v == null ? '—' : Math.round(v).toLocaleString('pt-BR') + ' ha'
+
+function _zeeArvore(gj) {
+  const zonas = new Map()
+  for (const f of gj.features || []) {
+    const p = f.properties || {}
+    if (!p.zona_cod) continue
+    const z = zonas.get(p.zona_cod) || { cod: p.zona_cod, nome: p.zona, area: 0, of: 0, subs: new Map() }
+    zonas.set(p.zona_cod, z)
+    z.area += p.area_ha || 0
+    if (!p.subzona) continue
+    const s = z.subs.get(p.subzona) || { cod: p.subzona, nome: p.subzona_nome, area: 0, of: null, unis: [] }
+    z.subs.set(p.subzona, s)
+    s.area += p.area_ha || 0
+    if (p.unidade) s.unis.push({ cod: p.unidade, nome: p.unidade_nome, area: p.area_ha, of: p.area_oficial_ha })
+    else s.of = p.area_oficial_ha
+  }
+  const q = _zee.ativa === 'fase3_gestao' && _zee.quant && _zee.quant.classes
+  const out = [...zonas.values()].sort((a, b) => _zeeOrdem(a.cod, b.cod))
+  out.forEach(z => {
+    z.subs = [...z.subs.values()].sort((a, b) => _zeeOrdem(a.cod, b.cod))
+    z.subs.forEach(s => { s.unis.sort((a, b) => _zeeOrdem(a.cod, b.cod)); if (q && q[s.cod]) s.of = q[s.cod].area_2020_ha })
+    z.of = q && q[z.cod] ? q[z.cod].area_2020_ha : null
+  })
+  return out
+}
+
+function _zeeClasseLinha(cod, rotulo, nome, cor, area, nivel, pai) {
+  const oculto = _zee.pref.ocultos.includes(cod)
+  return `<label class="zee-cl zee-cl-${nivel}${pai ? ' zee-cl-pai-oculto' : ''}">
+    <input type="checkbox" data-zee-acao="classe" data-zee-cod="${_zeeEsc(cod)}"${oculto ? '' : ' checked'}${pai ? ' disabled' : ''}
+      aria-label="Mostrar ${_zeeEsc(rotulo)} ${_zeeEsc(cod)}">
+    <span class="zee-cl-cor" style="background:${cor}"></span>
+    <span class="zee-cl-txt"><strong>${_zeeEsc(rotulo)} ${_zeeEsc(cod)}</strong>${nome ? ' — ' + _zeeEsc(nome) : ''}</span>
+    <span class="zee-cl-area">${_zeeHa(area)}</span></label>`
+}
+
+function _zeeClassesHTML() {
+  const id = zeeAtiva(), reg = id && _zee.cache[id]
+  if (!reg) return ''
+  const modo = _zee.pref.colorir, o = _zee.pref.ocultos, fase3 = id === 'fase3_gestao'
+  const corDe = (p, k) => { const c = modo !== 'zona' && reg.cores[modo] && reg.cores[modo][_zeeChave(p, modo)]; return c || ZEE_ZONA_COR[p.zona_cod] || ZEE_COR_SEM }
+  const arv = _zeeArvore(reg.gj)
+  const html = arv.map(z => {
+    const zOc = o.includes(z.cod)
+    const linhas = z.subs.map(s => {
+      const sOc = zOc || o.includes(s.cod)
+      const ps = { zona_cod: z.cod, subzona: s.cod }
+      return _zeeClasseLinha(s.cod, 'Subzona', s.nome, corDe(ps), fase3 ? s.of : s.area, 'sub', zOc) +
+        s.unis.map(u => _zeeClasseLinha(u.cod, 'Unidade', u.nome, corDe({ ...ps, unidade: u.cod }), fase3 ? u.of : u.area, 'uni', sOc)).join('')
+    }).join('')
+    const nomeZ = String(z.nome || '').replace(/^Zona \d+ — /, '')
+    return `<div class="zee-cl-grupo">${_zeeClasseLinha(z.cod, 'Zona', nomeZ, ZEE_ZONA_COR[z.cod] || ZEE_COR_SEM, fase3 ? z.of : z.area, 'zona', false)}${linhas}</div>`
+  }).join('')
+  return `<details class="zee-grupo" open><summary>Classes no mapa <span class="zee-grupo-n">${o.length ? o.length + ' oculta(s)' : 'todas visíveis'}</span></summary>
+    <div class="zee-cls">${html}</div>
+    <div class="zee-cl-rodape"><span class="zee-meta">${fase3 ? 'Área oficial calculada pela SEMA (2020).' : 'Área do desenho no mapa (o arquivo da Fase II não traz área oficial).'}
+      Desmarque para ocultar do mapa e da legenda.</span>
+      ${o.length ? '<button type="button" class="zee-btn" data-zee-acao="todas">Mostrar todas</button>' : ''}</div></details>`
+}
+
+function _zeeSincClasses() {
+  const el = document.getElementById('zee-classes')
+  if (el) el.innerHTML = _zeeClassesHTML()
+  const sel = document.querySelector('[data-zee-acao="colorir"]')
+  if (sel && sel.value !== _zee.pref.colorir) sel.value = _zee.pref.colorir
+}
+
+// ── Quadro de áreas oficiais: Fase II (2007) × Fase III (2020) ──
+function _zeeVariacao(a, b) {
+  if (a == null || !a) return '<span class="zee-q-nova">nova</span>'
+  const v = (b - a) / a * 100
+  const t = (v > 0 ? '+' : '') + v.toLocaleString('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '%'
+  return `<span class="${v >= 0 ? 'zee-q-mais' : 'zee-q-menos'}">${t}</span>`
+}
+
+function _zeeQuadroHTML() {
+  const q = _zee.quant
+  if (!q || !q.classes || !zeeDisponivel('fase3_gestao')) return ''
+  const tot = q.area_acre_oficial_ha
+  const linhas = Object.entries(q.classes).sort((a, b) => _zeeOrdem(a[0], b[0])).map(([cod, c]) => {
+    const nivel = cod.split('.').length
+    const rot = nivel === 1 ? 'Zona ' + cod : cod
+    const pct = tot ? (c.area_2020_ha / tot * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: nivel === 1 ? 1 : 2 }) + '%' : '—'
+    return `<tr class="zee-q-n${nivel}"><th scope="row" title="${_zeeEsc(c.nome || '')}">
+        <span class="zee-q-cod">${_zeeEsc(rot)}</span> <span class="zee-q-nome">${_zeeEsc(c.nome || '')}</span></th>
+      <td>${_zeeHa(c.area_2007_ha)}</td><td>${_zeeHa(c.area_2020_ha)}</td><td>${pct}</td><td>${_zeeVariacao(c.area_2007_ha, c.area_2020_ha)}</td></tr>`
+  }).join('')
+  return `<details class="zee-grupo"><summary>Quadro de áreas — Fase II (2007) × Fase III (2020)</summary>
+    <div class="zee-q-wrap"><table class="zee-q"><caption class="zee-meta">Área oficial de cada zona, subzona e unidade de manejo</caption>
+      <thead><tr><th scope="col">Classe</th><th scope="col">2007</th><th scope="col">2020</th><th scope="col">% do Acre</th><th scope="col">Variação</th></tr></thead>
+      <tbody>${linhas}</tbody></table></div>
+    <div class="zee-meta">${_zeeEsc(q.nota || '')} Fonte: ${_zeeEsc(q.fonte || '')}. % do Acre sobre ${_zeeHa(tot)} (área oficial do estado).</div></details>`
 }
 
 const _ZEE_DOC_ICONE = { pasta: 'paperclip', pdf: 'download', lei: 'file-text', pagina: 'file-text' }
@@ -429,6 +595,8 @@ function _zeeDocsHTML() {
 // zeeLigarPainel completa (manifesto e documentos chegam por fetch).
 function zeePainelHTML() {
   return `<div class="zee-sec" id="zee-camadas">${_zeeCamadasHTML()}</div>
+    <div class="zee-sec" id="zee-classes">${_zeeClassesHTML()}</div>
+    <div class="zee-sec" id="zee-quadro">${_zeeQuadroHTML()}</div>
     <div class="zee-sec-tit">Documentos do ZEE</div>
     <div class="zee-sec" id="zee-docs">${_zeeDocsHTML()}</div>
     <div class="zee-nota">Zoneamento Ecológico-Econômico do Estado do Acre (SEMA-AC). Zoneamento regional: orienta o
@@ -445,14 +613,21 @@ async function zeeLigarPainel(el) {
       if (t.dataset.zeeAcao === 'ligar') zeeAlternar(t.closest('[data-zee-camada]').dataset.zeeCamada, t.checked)
       else if (t.dataset.zeeAcao === 'comp') zeeComplementar(t.closest('[data-zee-comp]').dataset.zeeComp, t.checked)
       else if (t.dataset.zeeAcao === 'colorir') zeeColorirPor(t.value)
+      else if (t.dataset.zeeAcao === 'classe') zeeMostrarClasse(t.dataset.zeeCod, t.checked)
     })
+    // depois do clique terminar: redesenhar já tiraria o botão do DOM, e o
+    // "clique fora" da barra de camadas fecharia o painel
+    el.addEventListener('click', ev => { if (ev.target.closest('[data-zee-acao="todas"]')) setTimeout(zeeMostrarTodas, 0) })
     el.addEventListener('input', ev => {
       if (ev.target.dataset.zeeAcao === 'opacidade') zeeDefinirOpacidade(Number(ev.target.value) / 100)
     })
   }
   await Promise.all([zeeManifesto(), zeeDocumentos()])
-  const cam = el.querySelector('#zee-camadas'), docs = el.querySelector('#zee-docs')
+  if (zeeDisponivel('fase3_gestao')) await zeeQuantificacoes()
+  const cam = el.querySelector('#zee-camadas'), docs = el.querySelector('#zee-docs'), qd = el.querySelector('#zee-quadro')
   if (cam) cam.innerHTML = _zeeCamadasHTML()
+  if (qd) qd.innerHTML = _zeeQuadroHTML()
+  _zeeSincClasses()
   if (docs) docs.innerHTML = _zeeDocsHTML()
 }
 
@@ -495,6 +670,34 @@ function zeeEstilos() {
 .zee-grupo-n{font-size:10px;font-weight:600;background:#F1F5F9;color:var(--cinza-600,#4b5563);border-radius:999px;padding:1px 7px;}
 .zee-grupo summary:focus-visible{outline:2px solid #C9A84C;outline-offset:1px;border-radius:4px;}
 .zee-cab input:focus-visible,.zee-ctrl select:focus-visible,.zee-ctrl input:focus-visible,.zee-doc:focus-visible{outline:2px solid #C9A84C;outline-offset:1px;}
+.zee-cls{display:flex;flex-direction:column;gap:2px;padding:4px 0 6px;}
+.zee-cl-grupo{display:flex;flex-direction:column;gap:1px;padding:3px 0;border-top:1px solid var(--borda,#e5e7eb);}
+.zee-cl-grupo:first-child{border-top:0;}
+.zee-cl{display:flex;align-items:flex-start;gap:6px;font-size:11px;line-height:1.35;cursor:pointer;min-height:24px;padding:2px 0;}
+.zee-cl input{width:14px;height:14px;accent-color:#1F4E2C;flex-shrink:0;margin:1px 0 0;}
+.zee-cl-sub{padding-left:14px;}
+.zee-cl-uni{padding-left:28px;}
+.zee-cl-zona .zee-cl-txt strong{font-weight:700;}
+.zee-cl-pai-oculto{opacity:.45;cursor:default;}
+.zee-cl-cor{width:12px;height:12px;border-radius:3px;flex-shrink:0;margin-top:1px;border:1px solid rgba(0,0,0,.25);}
+.zee-cl-txt{flex:1;min-width:0;color:var(--cinza-700,#374151);}
+.zee-cl-txt strong{font-weight:600;color:var(--cinza-800,#1f2937);}
+.zee-cl-area{font-size:10.5px;color:var(--cinza-500,#6b7280);white-space:nowrap;font-variant-numeric:tabular-nums;}
+.zee-cl-rodape{display:flex;align-items:center;gap:8px;justify-content:space-between;padding-bottom:8px;}
+.zee-btn{min-height:26px;font-size:11px;border:1px solid var(--borda,#d1d5db);border-radius:5px;background:#fff;padding:0 8px;cursor:pointer;white-space:nowrap;}
+.zee-btn:focus-visible,.zee-cl input:focus-visible{outline:2px solid #C9A84C;outline-offset:1px;}
+.zee-q-wrap{overflow-x:auto;margin:4px 0 6px;}
+.zee-q{width:100%;border-collapse:collapse;font-size:10.5px;font-variant-numeric:tabular-nums;}
+.zee-q caption{text-align:left;padding-bottom:4px;}
+.zee-q th,.zee-q td{padding:3px 4px;border-bottom:1px solid var(--borda,#eef0f3);text-align:right;white-space:nowrap;}
+.zee-q th[scope=row],.zee-q thead th:first-child{text-align:left;white-space:normal;max-width:150px;}
+.zee-q thead th{font-weight:700;color:var(--cinza-600,#4b5563);}
+.zee-q-nome{font-weight:400;color:var(--cinza-600,#4b5563);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+.zee-q-n1 th,.zee-q-n1 td{font-weight:700;background:#F8FAFC;}
+.zee-q-n2 th{padding-left:10px;}
+.zee-q-n3 th{padding-left:18px;}
+.zee-q-mais,.zee-q-menos{color:var(--cinza-700,#374151);}
+.zee-q-nova{color:#1D4ED8;font-weight:600;}
 .zee-fonte{font-size:10.5px;color:var(--cinza-500,#6b7280);margin:6px 12px 8px;display:flex;flex-direction:column;gap:4px;}
 `
   document.head.appendChild(st)

@@ -260,6 +260,12 @@ def _resumo_zip(z):
     print(f'Pacote: {sum(n for n, _ in por_ext.values())} arquivos')
     for ext, (n, tam) in sorted(por_ext.items(), key=lambda kv: -kv[1][1]):
         print(f'  {ext:16} {n:5} arquivo(s)  {tam / 1e6:9.1f} MB')
+    # tudo que não é foto/fonte/arquivo de diagramação — é onde pode haver dado
+    outros = [i for i in z.infolist() if not i.is_dir() and os.path.splitext(i.filename)[1].lower()
+              not in ('.jpg', '.jpeg', '.png', '.otf', '.ttf', '.indd', '.idml', '.lock')]
+    print(f'Arquivos (sem fotos/fontes/diagramação): {len(outros)}')
+    for i in sorted(outros, key=lambda i: i.filename):
+        print(f'  {i.file_size / 1e6:9.2f} MB  {i.filename}')
     maiores = sorted((i for i in z.infolist() if not i.is_dir()), key=lambda i: -i.file_size)[:15]
     print('Maiores:')
     for i in maiores:
@@ -274,6 +280,10 @@ def _escolher_shp(shps, raiz, escolha):
         cand = [s for s in shps if escolha.lower() in rel[s].lower()]
         exatos = [s for s in cand if os.path.splitext(os.path.basename(s))[0].lower() == escolha.lower()]
         cand = exatos or cand
+        # o mesmo arquivo solto e dentro de um .rar interno (cópia): vale o solto
+        soltos = [c for c in cand if '_extraido' not in rel[c]]
+        if len(cand) > 1 and len(soltos) == 1:
+            cand = soltos
         if len(cand) == 1:
             return cand[0]
         raise SystemExit(f'--shp {escolha!r} casou {len(cand)} arquivo(s): {[rel[s] for s in cand] or sorted(rel.values())}')
@@ -284,7 +294,7 @@ def _escolher_shp(shps, raiz, escolha):
 
 def _extrair_aninhados(pasta, listar=False):
     """Pacote dentro do pacote (a Fase III traz 3 .rar com versões do mapa):
-    extrai cada um numa pasta irmã com o 7z do runner. Sem 7z, avisa e segue
+    extrai cada um numa pasta irmã (unrar, 7zz ou 7z). Sem extrator, avisa e segue
     — nunca falha o que já foi extraído."""
     import shutil
     import subprocess
@@ -292,20 +302,36 @@ def _extrair_aninhados(pasta, listar=False):
                 if f.lower().endswith(('.rar', '.7z', '.zip')) and os.path.dirname(os.path.join(r, f)) != pasta]
     if not internos:
         return
-    sete = shutil.which('7z') or shutil.which('7zz')
+    # Extratores em ordem: o p7zip do runner (7z) dá falha de segmentação (−11)
+    # em RAR5 — unrar (multiverse) e 7zz (pacote 7zip + 7zip-rar) abrem.
+    def _cmds(arq, destino):
+        out = []
+        if arq.lower().endswith('.rar') and shutil.which('unrar'):
+            out.append(['unrar', 'x', '-o+', '-y', '-idq', arq, destino + os.sep])
+        for b in ('7zz', '7z'):
+            if shutil.which(b):
+                out.append([b, 'x', '-y', f'-o{destino}', arq])
+        return out
     for arq in internos:
         destino = arq + '_extraido'
-        if not sete:
-            print(f'  (sem 7z no ambiente — não abri {os.path.relpath(arq, pasta)})')
+        cmds = _cmds(arq, destino)
+        if not cmds:
+            print(f'  (sem extrator no ambiente — não abri {os.path.relpath(arq, pasta)})')
             continue
-        # 7z recusa caminho absoluto/".." por padrão; o destino é pasta própria
-        r = subprocess.run([sete, 'x', '-y', f'-o{destino}', arq], capture_output=True, text=True)
-        if r.returncode != 0:
-            # extração quebrada deixa arquivos de 0 byte que se passariam
-            # por shapefile — fora (o 7z do runner não abre RAR5)
+        tentativas = []
+        for cmd in cmds:
+            os.makedirs(destino, exist_ok=True)
+            # destino é pasta própria; unrar e 7z recusam caminho absoluto/".."
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode == 0:
+                break
+            tentativas.append(f'{cmd[0]} saiu com {r.returncode}')
+            # extração quebrada deixa arquivos de 0 byte que se passariam por shapefile
             shutil.rmtree(destino, ignore_errors=True)
-            print(f'Pacote interno NÃO aberto: {os.path.relpath(arq, pasta)} (7z saiu com {r.returncode})')
+        else:
+            print(f'Pacote interno NÃO aberto: {os.path.relpath(arq, pasta)} ({"; ".join(tentativas)})')
             continue
+        print(f'Pacote interno aberto com {cmd[0]}: {os.path.relpath(arq, pasta)}')
         if listar:
             n = sum(len(fs) for _, _, fs in os.walk(destino)) if os.path.isdir(destino) else 0
             print(f'Pacote interno: {os.path.relpath(arq, pasta)} → {n} arquivo(s)' +
@@ -525,6 +551,28 @@ def inspecionar(alvo, escolha=None):
             print(f'\n{len(shp)} shapefiles no pacote (escolha um com --shp):')
             for s in shp:
                 _resumo_shp(s, tmp)
+            # planilhas (quantificações, tabela de atributos): só números e
+            # nomes de classe — mas a mesma regra de dado pessoal vale aqui
+            for raiz, _, fs in os.walk(tmp):
+                for f in sorted(fs):
+                    if not f.lower().endswith('.xlsx'):
+                        continue
+                    try:
+                        import openpyxl
+                        wb = openpyxl.load_workbook(os.path.join(raiz, f), read_only=True, data_only=True)
+                    except Exception as e:  # noqa: BLE001
+                        print(f'\n── {f}: não abriu ({e})')
+                        continue
+                    for ws in wb.worksheets:
+                        print(f'\n── {os.path.relpath(os.path.join(raiz, f), tmp)} › {ws.title} ──')
+                        for k, lin in enumerate(ws.iter_rows(values_only=True)):
+                            if k >= 80:
+                                print('   …'); break
+                            cel = ['' if v is None else str(v)[:40] for v in lin]
+                            while cel and cel[-1] == '':
+                                cel.pop()
+                            if cel and not CAMPO_PESSOAL.search(' '.join(cel[:1])):
+                                print('   ' + ' | '.join(cel))
             # metadado em texto (escala, datum, data, autoria do mapa)
             for raiz, _, fs in os.walk(tmp):
                 for f in fs:
@@ -1114,6 +1162,8 @@ def autoteste():
     shps = ['/r/a/Zonas_Gestao.shp', '/r/b/Zonas_Gestao_Sub.shp', '/r/c/Fundiario.shp']
     assert _escolher_shp(shps, '/r', 'zonas_gestao') == '/r/a/Zonas_Gestao.shp'   # nome exato vence
     assert _escolher_shp(shps, '/r', 'fundi') == '/r/c/Fundiario.shp'
+    # cópia dentro de .rar interno não torna a escolha ambígua
+    assert _escolher_shp(shps + ['/r/x.rar_extraido/Fundiario.shp'], '/r', 'fundi') == '/r/c/Fundiario.shp'
     for ruim in (None, 'zonas', 'nada'):
         try:
             _escolher_shp(shps, '/r', ruim)
