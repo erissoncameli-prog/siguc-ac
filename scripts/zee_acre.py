@@ -442,6 +442,24 @@ def inspecionar(alvo, escolha=None):
             print(f'  {c}: {len(vals)} valores — {vals[:12]}{" …" if len(vals) > 12 else ""}')
 
 
+def extrair(alvo, escolha, destino):
+    """Só o shapefile escolhido (.shp e irmãos), num .zip para o artefato do
+    workflow — é como a sessão de desenvolvimento mede as etapas sem o
+    pacote de 845 MB (o Drive dá 403 lá)."""
+    t0 = time.time()
+    with tempfile.TemporaryDirectory() as tmp:
+        shp = localizar_shp(alvo, tmp, escolha)
+        print(f'baixado e extraído em {time.time() - t0:.0f} s', flush=True)
+        base = os.path.basename(shp)[:-4]
+        irmaos = [os.path.join(os.path.dirname(shp), f) for f in os.listdir(os.path.dirname(shp))
+                  if os.path.splitext(f)[0] == base]
+        with zipfile.ZipFile(destino, 'w', zipfile.ZIP_DEFLATED) as z:
+            for c in sorted(irmaos):
+                z.write(c, os.path.basename(c))
+                print(f'  {os.path.getsize(c) / 1e6:8.1f} MB  {os.path.basename(c)}', flush=True)
+    print(f'{destino}: {os.path.getsize(destino) / 1e6:.1f} MB em {time.time() - t0:.0f} s', flush=True)
+
+
 def converter(alvo, fase, campos_forcados, legenda_csv, escala, fonte, saida, acre_arq, escolha=None):
     if fase not in CAMADAS:
         raise SystemExit('--fase deve ser 2 ou 3')
@@ -949,6 +967,8 @@ def main():
     ap.add_argument('--fonte')
     ap.add_argument('--saida', default='data/zee')
     ap.add_argument('--acre', default='data/acre_estado.geojson')
+    ap.add_argument('--extrair', help='baixa ARQ e zipa só o .shp escolhido (--shp) e os irmãos em --destino')
+    ap.add_argument('--destino', default='zee_extraido.zip')
     ap.add_argument('--shp', help='pacote com vários .shp: trecho do caminho/nome do escolhido')
     a = ap.parse_args()
     if a.autoteste:
@@ -964,6 +984,8 @@ def main():
                                         'nome': a.campo_nome, 'zona_nome': a.campo_zona_nome,
                                         'subzona_nome': a.campo_subzona_nome, 'unidade_nome': a.campo_unidade_nome},
                   a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp)
+    elif a.extrair:
+        extrair(a.extrair, a.shp, a.destino)
     elif a.fundiario:
         converter_fundiario(a.fundiario, a.saida, a.acre, a.shp)
     else:

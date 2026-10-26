@@ -14,14 +14,16 @@ name: ZEE do Acre (Mapa de Gestão)
 #   próprio branch (travas no script: sem .prj, sem zona, cobertura ≠ 95–105%).
 # - fundiario: base fundiária do ZEE Fase III → data/zee/fase3_fundiario.geojson,
 #   só com os campos públicos (sem proprietário, matrícula, certificação).
+# - extrair: baixa o pacote e publica como artefato SÓ o shapefile escolhido
+#   (`shp`) — para medir a conversão fora do runner. Não grava no branch.
 
 on:
   workflow_dispatch:
     inputs:
       modo:
-        description: 'descobrir | inspecionar | converter | fundiario'
+        description: 'descobrir | inspecionar | converter | fundiario | extrair'
         type: choice
-        options: [descobrir, inspecionar, converter, fundiario]
+        options: [descobrir, inspecionar, converter, fundiario, extrair]
         default: descobrir
       arquivo:
         description: 'URL do .zip do shapefile, ou drive:<id do arquivo no Drive>'
@@ -55,7 +57,7 @@ concurrency:
 jobs:
   zee:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90   # só segurança: a Fase III (190 MB de vértices) passou de 30
     permissions:
       contents: write   # grava data/zee/ no próprio branch (commit do bot)
     steps:
@@ -69,6 +71,7 @@ jobs:
         run: python scripts/zee_acre.py --autoteste
       - name: Rodar
         env:
+          PYTHONUNBUFFERED: '1'   # log sai na hora, não só no fim do job
           MODO: ${{ inputs.modo || 'descobrir' }}
           ARQUIVO: ${{ inputs.arquivo }}
           FASE: ${{ inputs.fase || '2' }}
@@ -83,7 +86,16 @@ jobs:
             converter)   # CAMPOS sem aspas de propósito: são flags (--campo-zona X ...)
                          python scripts/zee_acre.py --converter "$ARQUIVO" --fase "$FASE" --escala "$ESCALA" "${ESCOLHA[@]}" $CAMPOS ;;
             fundiario)   python scripts/zee_acre.py --fundiario "$ARQUIVO" "${ESCOLHA[@]}" ;;
+            extrair)     python scripts/zee_acre.py --extrair "$ARQUIVO" "${ESCOLHA[@]}" --destino zee_extraido.zip ;;
           esac
+      - name: Publicar o shapefile extraído
+        if: ${{ inputs.modo == 'extrair' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: zee-extraido
+          path: zee_extraido.zip
+          retention-days: 3
+          compression-level: 0   # já é .zip
       - name: Gravar no branch
         if: ${{ inputs.modo == 'converter' || inputs.modo == 'fundiario' }}
         # Commit feito com GITHUB_TOKEN não dispara workflow — sem laço.
