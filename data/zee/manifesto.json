@@ -1,0 +1,21 @@
+{
+ "camadas": {
+  "fase2_gestao": {
+   "fonte": "SEMA-AC — ZEE Fase II, Mapa de Gestão Territorial",
+   "escala": "1:250.000",
+   "projecao_origem": "WGS 84",
+   "gerado_em": "2026-10-26",
+   "arquivo": "fase2_gestao.geojson",
+   "feicoes": 4,
+   "area_ha": 16408179,
+   "cobertura_pct": 99.9,
+   "zonas": [
+    "1",
+    "2",
+    "3",
+    "4"
+   ],
+   "subzonas": 0
+  }
+ }
+}

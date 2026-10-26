@@ -1361,9 +1361,15 @@ geomorfologia, pedologia e vegetação (BDiA, 1:250 mil — `BDIA:geol_area`,
 ## Regra do sistema — ZEE do Acre no Mapa das UCs (25/10/2026)
 Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
 `js/mapa-zee.js` (prefixo `zee`). Plano e fontes em `docs/mapa-ucs/plano-zee.md`.
-- **Ainda SEM o arquivo vetorial** (pedido à SEMA): sem `data/zee/manifesto.json`
-  a aba diz "ainda não foi recebido", desabilita as caixas e segue oferecendo os
-  documentos. Nunca mostrar camada vazia sem explicação.
+- **Fase II carregada (26/10/2026)**: `data/zee/fase2_gestao.geojson`, do
+  `Zonas_Gestao_Consolidada.shp` enviado pelo usuário (RAR "ZEE II", WGS 84, 2016)
+  — só as 4 ZONAS (Z1 25,5% · Z2 48,2% · Z3 26,2% · Z4 0,2%), SEM subzona: com
+  `subzonas: 0` no manifesto a aba não oferece "colorir por subzona". O código
+  vem do campo `Label` ("Zona 01" — zero à esquerda; `ler_codigo` aceita) e o
+  nome segue a tabela `ZONAS` do script (conferido: mesma numeração do arquivo).
+  `.cpg` = "System" (QGIS) → lido como latin-1. Fase III segue sem arquivo: a
+  aba diz "ainda não recebido" e não deixa ligar. O mesmo RAR trouxe
+  `FUNDIARIO_250.shp` (459 polígonos de situação fundiária) — NÃO carregado.
 - Dados SÓ por `scripts/zee_acre.py` (workflow `.github/workflows/zee-acre.yml`,
   modos descobrir/inspecionar/converter — `*.ac.gov.br` e o Drive dão 403 nas
   sessões; o runner alcança). Travas: sem `.prj` para; feição sem zona para;
