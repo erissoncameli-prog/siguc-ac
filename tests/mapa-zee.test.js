@@ -176,7 +176,7 @@ test('colorir por subzona: tons da cor da zona, legenda por subzona, preferênci
 });
 
 test('arquivos REAIS (SEMA, 26/10/2026): Fase II só zonas, Fase III com subzona e unidade de manejo', async ({ page }) => {
-  test.setTimeout(60000);
+  test.setTimeout(180000);   // 15 MB; com outro teste em paralelo passava de 60 s
   await abrir(page, { reais: true });
   await abrirAba(page);
   await expect(page.locator('.zee-aviso')).toHaveCount(0);
@@ -262,6 +262,60 @@ test('arquivos REAIS (SEMA, 26/10/2026): Fase II só zonas, Fase III com subzona
   await page.mouse.move(alvo.x, alvo.y + 150); await page.mouse.down();
   await page.mouse.move(alvo.x + 200, alvo.y + 250, { steps: 10 }); await page.mouse.up();
   expect(Date.now() - t0).toBeLessThan(15000);
+});
+
+test('clique com UC/TI e CAR por cima: o ZEE responde pelo ponto (arquivo real)', async ({ page }) => {
+  test.setTimeout(180000);
+  await abrir(page, { reais: true });
+  await abrirAba(page);
+  await ligar(page, 'fase3_gestao');
+  await page.click('#mlb-dropdown .mlb-close');
+  const alvo = await page.evaluate(() => {
+    const l = _zee.layer.getLayers().find(l => l.feature.properties.unidade === '1.1.1')
+    const g = l.feature.geometry
+    const partes = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]
+    const maior = partes.map(c => turf.polygon(c)).sort((a, b) => turf.area(b) - turf.area(a))[0]
+    const [lng, lat] = turf.pointOnFeature(turf.buffer(maior, -1, { units: 'kilometers' })).geometry.coordinates
+    const c = L.latLng(lat, lng); mapaL.setView(c, 12, { animate: false })
+    window.__ll = { lat, lng, d: 0.004 }
+    // tela de cada ponto calculada na hora: o popup aberto arrasta o mapa (autoPan)
+    window.__px = (dlat, dlng) => { const p = mapaL.latLngToContainerPoint(L.latLng(lat + dlat, lng + dlng)), b = mapaL.getContainer().getBoundingClientRect(); return { x: b.left + p.x, y: b.top + p.y } }
+    // "UC" por cima do ponto (overlayPane, com popup próprio) — a Zona 2 inteira é assim
+    const d = 0.004
+    L.polygon([[lat - d, lng - d], [lat - d, lng], [lat + d, lng], [lat + d, lng - d]], { fillOpacity: 0.3 })
+      .bindPopup('<div class="uc-falsa">UC de teste</div>').addTo(mapaL)
+    const pt = ll => { const p = mapaL.latLngToContainerPoint(ll), b = mapaL.getContainer().getBoundingClientRect(); return { x: b.left + p.x, y: b.top + p.y } }
+    return { uc: pt(L.latLng(lat, lng - d / 2)), livre: pt(L.latLng(lat, lng + d / 2)), car: pt(L.latLng(lat + 0.027, lng + 0.028)) }
+  });
+  const popup = page.locator('.leaflet-popup-content');
+  // 1) dentro da UC: abre o popup da UC, com o ZEE do ponto no fim
+  await page.mouse.click(alvo.uc.x, alvo.uc.y);
+  await expect(popup.locator('.uc-falsa')).toBeVisible();
+  await expect(popup.locator('.zee-no-ponto')).toContainText(/Unidade de manejo 1\.1\.1/i);
+  await popup.locator('.zee-no-ponto button').click();
+  await expect(popup.locator('[data-zee-popup]')).toBeVisible();
+  await expect(popup).toHaveCount(1);   // o da UC fecha (animação de saída), fica só o do ZEE
+  expect(await popup.innerText()).toMatch(/Área na Fase II \(2007\):\s*134\.673 ha/);
+  // 2) CAR carregado: o canvas dele cobre o mapa inteiro (carPane 450). Fora
+  //    dos imóveis, o clique é do ZEE; num imóvel, só do CAR.
+  await page.evaluate(() => {
+    mapaL.closePopup()
+    const { lat, lng } = window.__ll, r = L.canvas({ pane: 'carPane' })
+    const car = L.polygon([[lat + 0.02, lng + 0.02], [lat + 0.02, lng + 0.035], [lat + 0.035, lng + 0.035], [lat + 0.035, lng + 0.02]], { renderer: r, pane: 'carPane' }).addTo(mapaL)
+    car.on('click', e => { L.DomEvent.stopPropagation(e); window.__car = (window.__car || 0) + 1 })
+  });
+  let q = await page.evaluate(() => __px(0, __ll.d / 2));
+  await page.mouse.click(q.x, q.y);
+  await expect(popup).toBeVisible();
+  const t = await popup.innerText();
+  expect(t).toMatch(/Unidade de manejo 1\.1\.1/i);
+  expect(t).toMatch(/Área oficial \(SEMA, 2020\):\s*206\.336 ha/);
+  await page.evaluate(() => mapaL.closePopup());
+  q = await page.evaluate(() => __px(0.027, 0.028));
+  await page.mouse.click(q.x, q.y);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__car)).toBe(1);
+  await expect(popup).toHaveCount(0);
 });
 
 test('Fase III liga e desliga a Fase II — nunca as duas no mapa', async ({ page }) => {

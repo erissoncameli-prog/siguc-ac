@@ -1424,8 +1424,23 @@ Aba "ZEE" da barra de camadas (`pages/mapa.html`), fonte única
   Relatório do imóvel (`_relZee`/`_relZeeHTML` em `js/relatorio-car.js`):
   tabela na folha detalhada, linha na sintética. Falha = "ZEE não conferido",
   nunca "fora do ZEE".
+- **Clique no ZEE responde pelo PONTO** (27/10/2026, relato do usuário: "não abre
+  nada quando clico"): a pane do ZEE (360) fica abaixo das UCs/TIs (overlayPane 400) e
+  do canvas do CAR (carPane 450), que cobre o mapa inteiro — o clique nunca chegava aos
+  polígonos, e a Zona 2 coincide com UCs e TIs. `_zeeCliqueMapa` (clique que nenhuma
+  camada tratou; o do CAR para a propagação) abre o popup por `zeeNoPonto` (bbox +
+  `turf.booleanPointInPolygon`); `_zeePopupAberto` acrescenta "ZEE neste ponto" ao popup
+  de outra camada pelo `setContent` (anexar só no DOM some no próximo `update()` do
+  Leaflet), com botão `[data-zee-ver]` escutado no documento (o popup corta a propagação).
+  O Meio Físico (pane 350) provavelmente tem o mesmo problema — não corrigido aqui.
+- **Mapa A0 da Fase III é IMAGEM** (modo `pdf` do workflow, 27/10/2026):
+  `MAPA_ZEE_ACRE_FASEIII.pdf` saiu do Illustrator (PDF/X-1 de gráfica), sem
+  georreferência, sem camadas (OCG) e sem atributos — o mapa é uma imagem de 5710×4006
+  px. UGAI, pistas de pouso e o resto do A0 não existem em arquivo vetorial no pacote
+  (só 2 shapefiles: gestão e fundiário). Vetorizar do PDF não serve; pedir os arquivos
+  ao Núcleo do ZEE ou usar fonte oficial (ANAC, IBGE).
 - Dados SÓ por `scripts/zee_acre.py` (workflow `.github/workflows/zee-acre.yml`,
-  modos descobrir/inspecionar/converter/fundiario/extrair/perfil — `*.ac.gov.br` e o Drive dão 403 nas
+  modos descobrir/inspecionar/converter/fundiario/extrair/perfil/pdf — `*.ac.gov.br` e o Drive dão 403 nas
   sessões; o runner alcança). Travas: sem `.prj` para; feição sem zona para;
   cobertura fora de 95–105% do Acre não grava. Nomes das zonas vivem SÓ no script
   (`ZONAS`, Lei 1.904/2007); o mapa lê o que vem no arquivo.

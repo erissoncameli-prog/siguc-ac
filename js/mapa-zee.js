@@ -107,6 +107,12 @@ function zeeMontar(mapa, opts = {}) {
     mapa.createPane(ZEE_COMP_PANE)
     mapa.getPane(ZEE_COMP_PANE).style.zIndex = 365 // por cima das zonas, abaixo de UC/TI/CAR
   }
+  // O ZEE fica ABAIXO de UC/TI (overlayPane) e do canvas do CAR (carPane):
+  // o clique nunca chegava aos polígonos dele. A Zona 2 coincide com UCs e
+  // TIs, e o canvas do CAR cobre o mapa inteiro — por isso o ZEE responde
+  // pelo PONTO clicado, não pelo polígono desenhado.
+  mapa.on('click', _zeeCliqueMapa)
+  mapa.on('popupopen', _zeePopupAberto)
   _zeePrefCarregar()
   if (_zee.pref.ativa) zeeAlternar(_zee.pref.ativa, true)
   _zee.pref.comp.forEach(id => zeeComplementar(id, true))
@@ -245,11 +251,75 @@ function zeePopupHTML(id, feature) {
     ? ccfPopupHTML(c, feature, {})
     : `<div class="camada-popup"><div class="cp-layer-nome">${_zeeEsc(feature.properties._titulo)}</div></div>`
   const man = (_zee.manifesto && _zee.manifesto[id]) || {}
-  return corpo + `<div class="zee-fonte">
+  return `<div data-zee-popup="${_zeeEsc(id)}">` + corpo + `<div class="zee-fonte">
     <div class="zee-sit ${cfg.vigente ? 'zee-vigente' : 'zee-subsidio'}">${_zeeEsc(cfg.situacao)}</div>
     ${_zeeEsc(man.fonte || 'SEMA-AC — Zoneamento Ecológico-Econômico')} · ${_zeeEsc(_zeeEscala(id))}.
-    Zoneamento regional — não substitui a análise do imóvel.</div>`
+    Zoneamento regional — não substitui a análise do imóvel.</div></div>`
 }
+
+// Feição do ZEE ligado que contém o ponto (só as classes visíveis). Divisa
+// simplificada deixa faixas finas de sobreposição: vale a primeira.
+function zeeNoPonto(latlng) {
+  const id = zeeAtiva(), reg = id && _zee.cache[id]
+  if (!reg || !latlng || typeof turf === 'undefined') return null
+  if (!reg.bbs) reg.bbs = (reg.gj.features || []).map(f => { try { return turf.bbox(f) } catch (_) { return null } })
+  const x = latlng.lng, y = latlng.lat, pt = turf.point([x, y])
+  const fs = reg.gj.features || []
+  for (let i = 0; i < fs.length; i++) {
+    const b = reg.bbs[i]
+    if (!b || x < b[0] || x > b[2] || y < b[1] || y > b[3] || !_zeeVisivel(fs[i].properties || {})) continue
+    try { if (turf.booleanPointInPolygon(pt, fs[i])) return { id, feature: fs[i] } } catch (_) {}
+  }
+  return null
+}
+
+function zeeAbrirPopupNoPonto(latlng) {
+  const r = zeeNoPonto(latlng)
+  if (!r) return false
+  L.popup({ className: 'camada-popup-wrap', maxWidth: 380 }).setLatLng(latlng)
+    .setContent(zeePopupHTML(r.id, r.feature)).openOn(_zee.mapa)
+  return true
+}
+
+// Clique que nenhuma camada tratou (o do CAR para a propagação; o da UC/TI
+// tem a sourceTarget dela) — inclusive em cima do canvas do CAR, fora dos
+// imóveis. Ferramenta de medição ligada: o clique é dela.
+function _zeeCliqueMapa(e) {
+  if (!zeeAtiva() || (e.sourceTarget && e.sourceTarget !== _zee.mapa)) return
+  if (_zee.mapa.getContainer().classList.contains('med-ativa')) return
+  zeeAbrirPopupNoPonto(e.latlng)
+}
+
+// Popup de outra camada (UC, TI, base fundiária…): ganha no fim o ZEE do
+// ponto, com o botão para os dados completos. Entra no CONTEÚDO do popup
+// (setContent) — acrescentado só no DOM, o próximo update() do Leaflet apaga.
+function _zeePopupAberto(e) {
+  const pop = e.popup
+  if (!pop || pop._zeeAnexado) return
+  const c = pop.getContent()
+  const ehZee = v => typeof v === 'string' ? /data-zee-popup|zee-no-ponto/.test(v) : !!(v && v.querySelector && v.querySelector('[data-zee-popup], .zee-no-ponto'))
+  if (typeof c !== 'function' && ehZee(c)) return
+  const ll = pop.getLatLng(), r = zeeNoPonto(ll)
+  if (!r) return
+  const p = r.feature.properties || {}
+  const html = `<div class="zee-no-ponto"><div class="zee-np-tit">${_zeeEsc(ZEE_CAMADAS[r.id].curto)} neste ponto</div>
+    <div class="zee-np-txt"><strong>${_zeeEsc(p._titulo || '')}</strong>${p.zona ? '<br>' + _zeeEsc(p.zona) : ''}</div>
+    <button type="button" class="zee-btn" data-zee-ver="${ll.lat},${ll.lng}">Ver dados do ZEE</button></div>`
+  pop._zeeAnexado = true
+  if (typeof c === 'string') pop.setContent(c + html)
+  else if (typeof c === 'function') pop.setContent(src => { const v = c(src); if (typeof v === 'string') return v + html; v.insertAdjacentHTML('beforeend', html); return v })
+  else if (c && c.insertAdjacentHTML) { c.insertAdjacentHTML('beforeend', html); pop.update() }
+  // fechou: a próxima abertura (outro ponto) recalcula
+  pop.once('remove', () => { pop._zeeAnexado = false; if (typeof c !== 'object' || !c) pop.setContent(c) })
+}
+
+// O popup do Leaflet não deixa o clique chegar ao mapa: escuta no documento.
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-zee-ver]')
+  if (!b || !_zee.mapa) return
+  const [lat, lng] = b.dataset.zeeVer.split(',').map(Number)
+  setTimeout(() => zeeAbrirPopupNoPonto(L.latLng(lat, lng)), 0)
+}, true)
 
 function _zeeDesenhar() {
   if (_zee.layer) { _zee.mapa.removeLayer(_zee.layer); _zee.layer = null }
@@ -698,6 +768,9 @@ function zeeEstilos() {
 .zee-q-n3 th{padding-left:18px;}
 .zee-q-mais,.zee-q-menos{color:var(--cinza-700,#374151);}
 .zee-q-nova{color:#1D4ED8;font-weight:600;}
+.zee-no-ponto{margin:8px 12px 10px;padding-top:8px;border-top:1px solid var(--borda,#e5e7eb);font-size:11px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;}
+.zee-np-tit{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--cinza-600,#4b5563);}
+.zee-np-txt{line-height:1.4;color:var(--cinza-700,#374151);}
 .zee-fonte{font-size:10.5px;color:var(--cinza-500,#6b7280);margin:6px 12px 8px;display:flex;flex-direction:column;gap:4px;}
 `
   document.head.appendChild(st)
