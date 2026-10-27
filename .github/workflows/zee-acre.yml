@@ -18,6 +18,8 @@ name: ZEE do Acre (Mapa de Gestão)
 #   (`shp`) — para medir a conversão fora do runner. Não grava no branch.
 # - perfil: mede cada etapa da conversão no runner, feição por feição, com
 #   orçamento de 25 min. Não grava nada.
+# - pdf: examina um PDF do pacote (padrão: o mapa A0; `shp` = trecho do nome)
+#   — georreferência, camadas e se há vetor extraível. Não grava nada.
 
 on:
   workflow_dispatch:
@@ -25,7 +27,7 @@ on:
       modo:
         description: 'descobrir | inspecionar | converter | fundiario | extrair | perfil'
         type: choice
-        options: [descobrir, inspecionar, converter, fundiario, extrair, perfil]
+        options: [descobrir, inspecionar, converter, fundiario, extrair, perfil, pdf]
         default: descobrir
       arquivo:
         description: 'URL do .zip do shapefile, ou drive:<id do arquivo no Drive>'
@@ -71,9 +73,9 @@ jobs:
         # unrar (e 7zip + 7zip-rar): abrem os .rar (RAR5) de dentro do pacote da
         # Fase III — o p7zip que vem no runner dá falha de segmentação neles
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq unrar 7zip 7zip-rar >/dev/null || echo "unrar/7zip-rar indisponível — .rar internos seguem fechados"
+          sudo apt-get update -qq && sudo apt-get install -y -qq unrar 7zip 7zip-rar gdal-bin poppler-utils >/dev/null || echo "unrar/7zip-rar indisponível — .rar internos seguem fechados"
           command -v unrar 7zz 7z || true
-          pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1' 'pyogrio==0.11.1' 'openpyxl==3.1.5'
+          pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyshp==2.3.1' 'pyogrio==0.11.1' 'openpyxl==3.1.5' 'pypdf==5.1.0'
       - name: Autoteste (sem rede)
         run: python scripts/zee_acre.py --autoteste
       - name: Rodar
@@ -94,6 +96,8 @@ jobs:
                          python scripts/zee_acre.py --converter "$ARQUIVO" --fase "$FASE" --escala "$ESCALA" "${ESCOLHA[@]}" $CAMPOS ;;
             fundiario)   python scripts/zee_acre.py --fundiario "$ARQUIVO" "${ESCOLHA[@]}" ;;
             perfil)      python scripts/zee_acre.py --perfil "$ARQUIVO" "${ESCOLHA[@]}" ;;
+            # SHP aqui = trecho do nome do PDF (padrão: o mapa A0)
+            pdf)         python scripts/zee_acre.py --pdf "$ARQUIVO" --pdf-trecho "${SHP:-MAPA_ZEE_ACRE_FASEIII}" ;;
             extrair)     python scripts/zee_acre.py --extrair "$ARQUIVO" "${ESCOLHA[@]}" --destino zee_extraido.zip ;;
           esac
       - name: Publicar o shapefile extraído

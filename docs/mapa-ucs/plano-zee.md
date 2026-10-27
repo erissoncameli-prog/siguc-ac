@@ -155,6 +155,17 @@ texto.
 - Relatórios "CAR na UC" e do imóvel: zona/subzona/unidade que o imóvel atinge,
   com hectares e % (`js/zee-imovel.js`).
 
+### Mapa A0 e clique (27/10/2026)
+
+- `MAPA_ZEE_ACRE_FASEIII.pdf` (72,6 MB, 1 página) examinado no runner (`zee_acre.py
+  --pdf`): gerado pelo Adobe Illustrator CS6 como PDF/X-1 (arquivo de gráfica), sem
+  georreferência (nem ISO 32000 nem OGC), sem camadas OCG, sem árvore de estrutura; o
+  GDAL não acha camada vetorial. O mapa é uma imagem CMYK de 5710 × 4006 px (150 dpi)
+  com ~220 imagens pequenas (ícones da legenda). Nada para extrair: UGAI, pistas de pouso,
+  sedes etc. só existem desenhados.
+- Clique nos polígonos não abria nada quando UC/TI ou CAR estavam ligados (panes por
+  cima). Agora o ZEE responde pelo ponto clicado e entra no popup das outras camadas.
+
 ## Fase II recebida (26/10/2026)
 
 O usuário enviou `ZEE_II.rar` (RAR5 — o `unar` 1.10 falha nos `.shp`; extrair com
