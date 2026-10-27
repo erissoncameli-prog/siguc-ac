@@ -595,6 +595,71 @@ def inspecionar(alvo, escolha=None):
             print(f'  {c}: {len(vals)} valores — {vals[:12]}{" …" if len(vals) > 12 else ""}')
 
 
+def _rodar(cmd, maximo=120):
+    """Ferramenta de linha de comando, saída resumida (ou o motivo de não rodar)."""
+    import shutil
+    import subprocess
+    if not shutil.which(cmd[0]):
+        print(f'  ({cmd[0]} não instalado)')
+        return ''
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    saida = (r.stdout + ('\n' + r.stderr if r.stderr.strip() else '')).strip()
+    linhas = saida.splitlines()
+    print('\n'.join('  ' + l for l in linhas[:maximo]) + (f'\n  … (+{len(linhas) - maximo} linhas)' if len(linhas) > maximo else ''))
+    return saida
+
+
+def examinar_pdf(alvo, trecho):
+    """O mapa A0 da Fase III só existe em PDF no pacote. Responde, sem gravar
+    nada: o PDF está georreferenciado (GeoPDF)? tem camadas (OCG) e quais?
+    as camadas trazem geometria vetorial com atributos que dê para extrair?
+    ou é imagem? É o que decide se UGAI, pistas etc. podem virar camada."""
+    with tempfile.TemporaryDirectory() as tmp:
+        if re.match(r'^(https?://|drive:)', alvo):
+            alvo = _baixar(alvo, tmp)
+        with zipfile.ZipFile(alvo) as z:
+            pdfs = [n for n in z.namelist() if n.lower().endswith('.pdf') and trecho.lower() in n.lower()]
+            if not pdfs:
+                raise SystemExit(f'nenhum PDF com {trecho!r} no pacote')
+            nome = sorted(pdfs, key=len)[0]  # o mesmo mapa vem em 2 pastas: tanto faz
+            print(f'PDF: {nome} ({z.getinfo(nome).file_size / 1e6:.1f} MB) — {len(pdfs)} cópia(s) no pacote')
+            pdf = os.path.join(tmp, 'mapa.pdf')
+            with z.open(nome) as o, open(pdf, 'wb') as d:
+                while True:
+                    b = o.read(1 << 20)
+                    if not b:
+                        break
+                    d.write(b)
+        print('\n── pdfinfo ──'); _rodar(['pdfinfo', pdf])
+        print('\n── imagens dentro do PDF (pdfimages -list) ──'); _rodar(['pdfimages', '-list', pdf], 40)
+        try:
+            from pypdf import PdfReader
+            rd = PdfReader(pdf)
+            raiz = rd.trailer['/Root']
+            print(f'\n── estrutura (pypdf) ── {len(rd.pages)} página(s)')
+            ocp = raiz.get('/OCProperties')
+            nomes = []
+            if ocp:
+                for g in ocp.get_object().get('/OCGs', []):
+                    nomes.append(str(g.get_object().get('/Name')))
+            print(f'Camadas (OCG): {len(nomes)}')
+            for n in nomes:
+                print(f'  · {n}')
+            pg = rd.pages[0]
+            vp = pg.get('/VP')
+            print('Georreferência ISO 32000 (/VP /Measure):', 'sim' if vp else 'não')
+            print('Georreferência OGC (/LGIDict):', 'sim' if pg.get('/LGIDict') else 'não')
+            st = raiz.get('/StructTreeRoot')
+            print('Árvore de estrutura (atributos de feição do ArcGIS):', 'sim' if st else 'não')
+            if '/PieceInfo' in raiz or '/PieceInfo' in pg:
+                print('PieceInfo presente (dados do aplicativo que gerou)')
+            print('Gerador:', rd.metadata.get('/Creator') if rd.metadata else None, '|', rd.metadata.get('/Producer') if rd.metadata else None)
+        except Exception as e:  # noqa: BLE001
+            print(f'pypdf não abriu: {e}')
+        print('\n── gdalinfo (georreferência) ──'); _rodar(['gdalinfo', '--config', 'GDAL_PDF_DPI', '10', pdf], 60)
+        print('\n── ogrinfo (camadas vetoriais) ──'); _rodar(['ogrinfo', '-ro', '-so', pdf], 200)
+
+
 def extrair(alvo, escolha, destino):
     """Só o shapefile escolhido (.shp e irmãos), num .zip para o artefato do
     workflow — é como a sessão de desenvolvimento mede as etapas sem o
@@ -1199,6 +1264,8 @@ def main():
     ap.add_argument('--destino', default='zee_extraido.zip')
     ap.add_argument('--perfil', help='mede cada etapa da conversão de ARQ (--shp), feição por feição, sem gravar')
     ap.add_argument('--shp', help='pacote com vários .shp: trecho do caminho/nome do escolhido')
+    ap.add_argument('--pdf', help='examina um PDF do pacote ARQ (georreferência, camadas, vetor): --pdf ARQ --pdf-trecho NOME')
+    ap.add_argument('--pdf-trecho', default='MAPA_ZEE_ACRE_FASEIII')
     a = ap.parse_args()
     if a.autoteste:
         autoteste()
@@ -1213,6 +1280,8 @@ def main():
                                         'nome': a.campo_nome, 'zona_nome': a.campo_zona_nome,
                                         'subzona_nome': a.campo_subzona_nome, 'unidade_nome': a.campo_unidade_nome},
                   a.legenda, a.escala, a.fonte, a.saida, a.acre, a.shp, a.area_minima_ha)
+    elif a.pdf:
+        examinar_pdf(a.pdf, a.pdf_trecho)
     elif a.perfil:
         perfil(a.perfil, a.shp, a.acre)
     elif a.extrair:
