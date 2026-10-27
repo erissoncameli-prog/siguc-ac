@@ -305,10 +305,22 @@ function _zeePopupAberto(e) {
   const html = `<div class="zee-no-ponto"><div class="zee-np-tit">${_zeeEsc(ZEE_CAMADAS[r.id].curto)} neste ponto</div>
     <div class="zee-np-txt"><strong>${_zeeEsc(p._titulo || '')}</strong>${p.zona ? '<br>' + _zeeEsc(p.zona) : ''}</div>
     <button type="button" class="zee-btn" data-zee-ver="${ll.lat},${ll.lng}">Ver dados do ZEE</button></div>`
+  // conteúdo em elemento: o bloco é montado em DOM (texto por textContent)
+  const no = () => {
+    const d = document.createElement('div'); d.className = 'zee-no-ponto'
+    const t1 = document.createElement('div'); t1.className = 'zee-np-tit'; t1.textContent = ZEE_CAMADAS[r.id].curto + ' neste ponto'
+    const t2 = document.createElement('div'); t2.className = 'zee-np-txt'
+    const st = document.createElement('strong'); st.textContent = p._titulo || ''; t2.appendChild(st)
+    if (p.zona) { t2.appendChild(document.createElement('br')); t2.appendChild(document.createTextNode(p.zona)) }
+    const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'zee-btn'
+    bt.dataset.zeeVer = `${ll.lat},${ll.lng}`; bt.textContent = 'Ver dados do ZEE'
+    d.append(t1, t2, bt)
+    return d
+  }
   pop._zeeAnexado = true
   if (typeof c === 'string') pop.setContent(c + html)
-  else if (typeof c === 'function') pop.setContent(src => { const v = c(src); if (typeof v === 'string') return v + html; v.insertAdjacentHTML('beforeend', html); return v })
-  else if (c && c.insertAdjacentHTML) { c.insertAdjacentHTML('beforeend', html); pop.update() }
+  else if (typeof c === 'function') pop.setContent(src => { const v = c(src); if (typeof v === 'string') return v + html; v.appendChild(no()); return v })
+  else if (c && c.appendChild) { c.appendChild(no()); pop.update() }
   // fechou: a próxima abertura (outro ponto) recalcula
   pop.once('remove', () => { pop._zeeAnexado = false; if (typeof c !== 'object' || !c) pop.setContent(c) })
 }
