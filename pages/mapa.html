@@ -572,6 +572,8 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <script src="../js/vendor/proj4-2.11.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
+<script src="../js/vendor/togeojson-7.1.2.umd.js"></script>
+<script src="../js/mapa-kml.js"></script>
 <script src="../js/mapa-cartografia.js"></script>
 <!-- Recorte geográfico (limite do Acre + ponto-em-UC): helper único,
      compartilhado com pages/alertas-ambientais.html. Ver js/mapa-recorte.js. -->
@@ -627,15 +629,16 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
           ondrop="event.preventDefault();this.classList.remove('hover');onNovaCamadaArquivo(event.dataTransfer.files[0])">
           <div class="nc-drop-icon">📂</div>
           <div class="nc-drop-txt">Clique ou arraste o arquivo aqui</div>
-          <div class="nc-drop-tipos">Aceita: <strong>.geojson</strong> · <strong>.json</strong> · <strong>.zip</strong> (Shapefile)</div>
+          <div class="nc-drop-tipos">Aceita: <strong>.geojson</strong> · <strong>.json</strong> · <strong>.zip</strong> (Shapefile) · <strong>.kml</strong> · <strong>.kmz</strong></div>
         </div>
-        <input type="file" id="nc-arquivo" accept=".geojson,.json,.zip" style="display:none"
+        <input type="file" id="nc-arquivo" accept=".geojson,.json,.zip,.kml,.kmz" style="display:none"
           onchange="onNovaCamadaArquivo(this.files[0])">
         <div id="nc-arquivo-status" style="font-size:11px;color:var(--cinza-400);margin-top:5px">Nenhum arquivo selecionado</div>
       </div>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:11px;color:#92400e;line-height:1.5">
         <strong>Shapefile:</strong> compacte os arquivos <code>.shp</code>, <code>.dbf</code> e <code>.prj</code> em um único <code>.zip</code>.<br>
-        <strong>GeoJSON:</strong> envie o arquivo <code>.geojson</code> ou <code>.json</code> diretamente.
+        <strong>GeoJSON:</strong> envie o arquivo <code>.geojson</code> ou <code>.json</code> diretamente.<br>
+        <strong>KML/KMZ</strong> (Google Earth): envie o arquivo diretamente. A cor é a escolhida acima; imagens sobrepostas e links para KML na internet não são importados.
       </div>
     </div>
     <div class="nc-footer">
@@ -2771,7 +2774,22 @@ function onNovaCamadaArquivo(file){
   if(!file) return;
   const statusEl=document.getElementById('nc-arquivo-status');
   statusEl.textContent='Processando…'; statusEl.style.color='var(--cinza-500)';
-  const isZip=file.name.toLowerCase().endsWith('.zip');
+  const nomeArq=file.name.toLowerCase();
+  if(/\.km[lz]$/.test(nomeArq)){
+    if(typeof kmlLerArquivo!=='function'){ statusEl.textContent='Leitor de KML não carregado — recarregue a página.'; statusEl.style.color='#dc2626'; return; }
+    kmlLerArquivo(file).then(r=>{
+      const count=r.geojson.features.length;
+      const ign=kmlTextoIgnorados(r.ignorados);
+      if(!count){ statusEl.textContent='Nenhuma geometria encontrada no KML.'+(ign?' ('+ign+')':''); statusEl.style.color='#dc2626'; return; }
+      _novaCamadaGeoJson=r.geojson;
+      const nomeEl=document.getElementById('nc-nome');
+      if(nomeEl&&!nomeEl.value.trim()&&r.nomeDocumento) nomeEl.value=r.nomeDocumento.replace(/\.km[lz]$/i,'');
+      statusEl.textContent=`✓ KML carregado — ${count} geometria${count>1?'s':''}`+(ign?` · ${ign}`:'');
+      statusEl.style.color='#16a34a';
+    }).catch(err=>{ statusEl.textContent='Erro no KML: '+err.message; statusEl.style.color='#dc2626'; });
+    return;
+  }
+  const isZip=nomeArq.endsWith('.zip');
   if(isZip){
     const reader=new FileReader();
     reader.onload=async e=>{
@@ -2821,7 +2839,7 @@ async function salvarNovaCamada(){
   const nome=document.getElementById('nc-nome').value.trim();
   const cor=document.getElementById('nc-cor').value;
   if(!nome){ toast('Informe um nome para a camada.','error'); return; }
-  if(!_novaCamadaGeoJson){ toast('Selecione um arquivo GeoJSON ou Shapefile .zip.','error'); return; }
+  if(!_novaCamadaGeoJson){ toast('Selecione um arquivo GeoJSON, Shapefile .zip ou KML/KMZ.','error'); return; }
   const btn=document.getElementById('btn-salvar-nova-camada');
   btn.disabled=true; btn.textContent='Salvando…';
   const uc_id=document.getElementById('nc-uc').value||null;
