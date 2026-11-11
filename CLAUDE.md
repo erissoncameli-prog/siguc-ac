@@ -1309,6 +1309,32 @@ no ⚙ da camada, gravado pelo "Salvar estilo" de sempre.
   conferido — `_siguc_pid` fora da lista de técnicos reprova). Sem mudança em
   `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — camada enviada em KML/KMZ (Mapa das UCs, 11/11/2026)
+O modal "Nova camada" (`pages/mapa.html`, `onNovaCamadaArquivo`) aceita `.kml` e
+`.kmz` além de GeoJSON e Shapefile. Fonte única da conversão: `js/mapa-kml.js`
+(prefixo `kml`, a página só chama `kmlLerArquivo(file)`), sobre a
+**@tmcw/togeojson 7.1.2** vendorizada (`js/vendor/togeojson-7.1.2.umd.js`,
+BSD-2). Depois da conversão o caminho é o de sempre (insert em `camadas_mapa` →
+`_renderizarCamada`) — nenhuma migration.
+- KML é sempre WGS 84: sem reprojeção. Altitude é DESCARTADA (mapa 2D).
+- **Tabela HTML da `description`** (exportação do Google Earth/ArcGIS/QGIS):
+  linha com 2 células vira atributo; o resto da tabela (cabeçalho com o nome da
+  camada) sai. É isso que faz um CPF escondido na descrição virar a coluna
+  `CPF`, que o gatilho da migration 367 tira do GeoJSON — a detecção de dado
+  pessoal é pelo NOME da coluna, e dentro de um HTML ela não acharia nada.
+- O resto da descrição vira TEXTO puro (`descricao`): HTML de arquivo enviado
+  nunca é interpretado (DOMParser + `textContent`).
+- `Folder` → atributo `pasta` ("A / B"). Estilo do KML (stroke/fill/icon/styleUrl…)
+  é descartado — a cor é a do modal, como no Shapefile (decisão do usuário).
+- Não entram, e o status do modal CONTA: `GroundOverlay` (imagem sobreposta),
+  `NetworkLink` para fora do pacote (http/https) e Placemark sem geometria. No
+  KMZ entram TODOS os `.kml` do zip (doc.kml primeiro) — link para KML interno do
+  pacote sai completo e não conta como ignorado.
+- Nome do `<Document>` preenche o nome da camada se o campo estiver vazio.
+- Guarda: `tests/mapa-camadas-kml.test.js` (5, página real, arquivo entregue pelo
+  próprio `<input type=file>`; contrafactual conferido — descrição crua reprova o
+  teste de XSS). Sem mudança em `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — Meio físico do Acre no Mapa das UCs (Fase 4, 24/10/2026)
 Aba "Meio Físico" da barra de camadas (`pages/mapa.html`), fonte única
 `js/mapa-meio-fisico.js` (prefixo `mf`). 7 temas — IBGE: geologia,
