@@ -561,6 +561,9 @@ test('celular (390px): filtros abertos e tabela sem rolagem lateral da página',
 
 // ── Resumo clicável (rodada 3) ────────────────────────────────────────
 test('todo número clicável do resumo leva exatamente a esse número de imóveis', async ({ page }) => {
+  // O quadro "Inscrições por ano e status" (368) somou alvos: mais cliques, mais tempo.
+  test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await abrir(page);
   await gerar(page, ['caruc-focos', 'caruc-deter']);
   const alvos = await page.locator('#caruc-conteudo [data-fk]:not(.caruc-clic-zero)').evaluateAll(els =>

@@ -280,7 +280,7 @@ function carucMapaRodapeSVG(dados, vistas, opts = {}) {
   const cor = CARUC_MAPA_COR[sat ? 'satelite' : 'sem']
   const halo = sat ? '#374151' : null
   const itens = [
-    { rotulo: 'CAR do titular no recorte (nº = linha da tabela)', cor: cor.car, tipo: 'area', preenchimento: sat ? '#FDE68A' : '#FDBA74' },
+    { rotulo: opts.rotuloCar || 'CAR do titular no recorte (nº = linha da tabela)', cor: cor.car, tipo: 'area', preenchimento: sat ? '#FDE68A' : '#FDBA74' },
     { rotulo: 'Limite da UC', cor: cor.uc, tipo: 'linha', halo },
   ]
   if (dados.zonas?.length) itens.push({ rotulo: 'Zonas de manejo', cor: sat ? '#FFFFFF' : '#0A1A0F', tipo: 'linha', tracejado: true, halo })

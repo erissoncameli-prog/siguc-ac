@@ -395,6 +395,7 @@ const CARUC_FILTROS = [
       if (!i.na_planilha) t.push('Sem dados na planilha local')
       return t.length ? t : ['Um CAR só']
     } },
+  { chave: 'ano_inscricao', rotulo: 'Ano de inscrição', valores: i => [carucAnoInscricao(i)] },
   { chave: 'inscricao', rotulo: 'Inscrição no CAR', valores: i => [{ antes: 'Antes da criação da UC', depois: 'Depois da criação da UC' }[i.inscricao_vs_uc] || 'Sem data'] },
   { chave: 'sobreposicao', rotulo: 'Sobreposição com outro CAR', valores: i => [(i.sobreposicoes || []).length ? 'Com sobreposição' : 'Sem sobreposição'] },
   { chave: 'ambiental', rotulo: 'Dado ambiental', valores: i => {
@@ -593,6 +594,104 @@ function carucAgregar(imoveis, uc) {
     prodes_pos_marco_ha: comProdes.length ? comProdes.reduce((s, i) => s + i.prodes.pos_marco_ha, 0) : null,
     prodes_ate2007_ha: comProdes.length ? comProdes.reduce((s, i) => s + i.prodes.ate2007_ha, 0) : null,
   }
+}
+
+// ── Inscrições no CAR por ano × status (aba CAR na UC) ───────────────
+// Status = o do SICAR ao vivo (AT/PE/SU/CA → carucStatus). Ano = data
+// de inscrição (planilha local, ou dat_criacao do WFS). Cancelados no
+// ano = data_cancelamento, que é a ÚLTIMA ATUALIZAÇÃO do registro no
+// SICAR (o SICAR não publica a data do cancelamento).
+// Paleta validada no validate_palette.js da skill de dataviz (light):
+// azul × âmbar × roxo × rosa — chroma, CVD e contraste PASS.
+const CARUC_STATUS_ORDEM = ['Ativo', 'Pendente', 'Suspenso', 'Cancelado', 'Não informado']
+const CARUC_STATUS_COR = { Ativo: '#2563EB', Pendente: '#D97706', Suspenso: '#9333EA', Cancelado: '#BE123C', 'Não informado': '#D1D5DB' }
+
+function carucAnoInscricao(i) {
+  const d = carucData(i?.data_inscricao)
+  return d ? d.slice(0, 4) : 'Sem data'
+}
+
+function carucSerieInscricoes(imoveis, uc) {
+  const porAno = new Map()
+  const linha = ano => {
+    if (!porAno.has(ano)) porAno.set(ano, { ano, total: 0, cancelados_no_ano: 0, por: Object.fromEntries(CARUC_STATUS_ORDEM.map(s => [s, 0])) })
+    return porAno.get(ano)
+  }
+  let semData = 0
+  const totais = Object.fromEntries(CARUC_STATUS_ORDEM.map(s => [s, 0]))
+  for (const i of (imoveis || [])) {
+    const st = CARUC_STATUS_ORDEM.includes(i.status) ? i.status : 'Não informado'
+    totais[st]++
+    const ano = carucAnoInscricao(i)
+    if (ano === 'Sem data') { semData++; continue }
+    const l = linha(ano); l.total++; l.por[st]++
+  }
+  for (const i of (imoveis || [])) {
+    const d = carucData(i.data_cancelamento)
+    if (d) linha(d.slice(0, 4)).cancelados_no_ano++
+  }
+  const anos = [...porAno.values()].sort((a, b) => a.ano.localeCompare(b.ano))
+  // Anos sem inscrição no meio da série aparecem como zero (eixo contínuo).
+  if (anos.length > 1) {
+    const ini = Number(anos[0].ano), fim = Number(anos[anos.length - 1].ano)
+    for (let a = ini; a <= fim; a++) linha(String(a))
+  }
+  const criacao = carucData(uc?.data_criacao)
+  return {
+    anos: [...porAno.values()].sort((a, b) => a.ano.localeCompare(b.ano)),
+    totais, sem_data: semData,
+    status_presentes: CARUC_STATUS_ORDEM.filter(s => totais[s] > 0),
+    ano_criacao_uc: criacao ? criacao.slice(0, 4) : null,
+    antes: (imoveis || []).filter(i => i.inscricao_vs_uc === 'antes').length,
+    depois: (imoveis || []).filter(i => i.inscricao_vs_uc === 'depois').length,
+  }
+}
+
+// Barras empilhadas em SVG (sem lib). Cada ano tem uma faixa invisível
+// com <title> e data-gt-ponto: é a régua do teclado (js/grafico-teclado.js)
+// e do tooltip nativo — um ponto por ano, não por segmento.
+function carucSerieSVG(serie) {
+  const anos = serie.anos
+  if (!anos.length) return ''
+  const W = 760, H = 250, ml = 38, mr = 10, mt = 14, mb = 34
+  const pw = W - ml - mr, ph = H - mt - mb
+  const max = Math.max(1, ...anos.map(a => a.total))
+  const passo = max <= 5 ? 1 : Math.ceil(max / 4 / 5) * 5 || 1
+  const topo = Math.ceil(max / passo) * passo
+  const bw = pw / anos.length
+  const larg = Math.max(2, Math.min(34, bw - 4))
+  const y = v => mt + ph - v / topo * ph
+  const e = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Inscrições no CAR por ano e status" style="font-family:'DM Sans',Arial,sans-serif;max-width:${W}px">`
+  for (let v = 0; v <= topo; v += passo) {
+    s += `<line x1="${ml}" x2="${W - mr}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#E5E7EB" stroke-width="1"/>`
+      + `<text x="${ml - 6}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#6B7280">${v}</text>`
+  }
+  const rotular = Math.ceil(anos.length / 14)
+  anos.forEach((a, k) => {
+    const x = ml + k * bw + (bw - larg) / 2
+    let acum = 0
+    for (const st of CARUC_STATUS_ORDEM) {
+      const n = a.por[st]
+      if (!n) continue
+      const y0 = y(acum), y1 = y(acum + n)
+      // 2 px de respiro entre segmentos (spacer da skill de dataviz).
+      const h = Math.max(1, y0 - y1 - (acum ? 2 : 0))
+      s += `<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${larg.toFixed(1)}" height="${h.toFixed(1)}" fill="${CARUC_STATUS_COR[st]}" rx="${acum ? 0 : 2}"/>`
+      acum += n
+    }
+    if (k % rotular === 0 || k === anos.length - 1) s += `<text x="${(ml + k * bw + bw / 2).toFixed(1)}" y="${H - mb + 14}" text-anchor="middle" font-size="10" fill="#374151">${e(a.ano)}</text>`
+    const det = CARUC_STATUS_ORDEM.filter(st => a.por[st]).map(st => `${st}: ${a.por[st]}`).join(', ')
+    s += `<rect data-gt-ponto x="${(ml + k * bw).toFixed(1)}" y="${mt}" width="${bw.toFixed(1)}" height="${ph}" fill="transparent"><title>${e(a.ano)}: ${a.total} inscrição(ões)${det ? ' — ' + e(det) : ''}${a.cancelados_no_ano ? ` · ${a.cancelados_no_ano} cancelado(s) no ano (última atualização no SICAR)` : ''}</title></rect>`
+  })
+  if (serie.ano_criacao_uc) {
+    const k = anos.findIndex(a => a.ano === serie.ano_criacao_uc)
+    const x = k >= 0 ? ml + k * bw + bw / 2 : (Number(serie.ano_criacao_uc) < Number(anos[0].ano) ? ml : null)
+    if (x != null) s += `<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${mt}" y2="${mt + ph}" stroke="#0A1A0F" stroke-width="1.5" stroke-dasharray="4 3"/>`
+      + `<text x="${(x + 4).toFixed(1)}" y="${mt + 10}" font-size="10" font-weight="700" fill="#0A1A0F">Criação da UC (${e(serie.ano_criacao_uc)})</text>`
+  }
+  s += `<line x1="${ml}" x2="${W - mr}" y1="${mt + ph}" y2="${mt + ph}" stroke="#9CA3AF" stroke-width="1"/>`
+  return s + '</svg>'
 }
 
 // Soma de focos no período escolhido a partir do {ano: n} da RPC.
@@ -1209,6 +1308,7 @@ if (typeof module !== 'undefined') {
     carucFaixaNaUC, carucPrioridade, carucEnriquecer, carucOpcoesFiltro, carucFiltrar,
     carucDescreverFiltros, carucRelFiltrado, CARUC_FILTROS, carucAgruparPorTitular, carucGrupoRotulo,
     carucGeomMapa, carucSituacaoAtual, carucDataAcre,
+    carucAnoInscricao, carucSerieInscricoes, carucSerieSVG, CARUC_STATUS_ORDEM, CARUC_STATUS_COR,
     carucEmbargosDoImovel, carucEmbargosVigentes, carucEmbargoRotulo, CARUC_EMBARGO_FONTE, carucEmbargosFonteTexto,
   }
 }
