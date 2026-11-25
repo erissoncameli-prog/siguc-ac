@@ -1034,6 +1034,56 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — CAR na UC: inscrições por ano e pedido ao IMAC (migration 368, 25/11/2026)
+Extensão da aba "CAR na UC" (`pages/relatorios.html`) + aba nova "Solicitações ao
+IMAC". Fonte única: `js/car-uc-cancelamento.js` (regra, modelo, PDF, acompanhamento);
+agregação do quadro em `js/car-uc-relatorio.js` (`carucSerieInscricoes`/`carucSerieSVG`).
+- **Quantos CARs por situação e por data**: quadro "Inscrições no CAR por ano e
+  status" (ano da inscrição × status SICAR ao vivo, linha da criação da UC, coluna
+  "Cancelados no ano" pela data da última atualização no SICAR). Números clicáveis =
+  filtros `status` e `ano_inscricao` de `CARUC_FILTROS` (o mesmo invariante do resumo).
+  Paleta validada no `validate_palette.js` (Ativo #2563EB, Pendente #D97706, Suspenso
+  #9333EA, Cancelado #BE123C). Um ponto de teclado por ANO (`data-gt-ponto`).
+- **Decisões do usuário**: destinatário IMAC; assina o(a) gestor(a) da UC (nenhuma UC
+  tem `gestor_id` — o nome/cargo de quem assina vai no pedido, sugerido pelo usuário
+  logado); acompanhamento no sistema; o Jurídico revisa a fundamentação.
+- **Nunca pedir cancelamento para tudo** (`carucDossieTipo`, trava repetida no banco
+  para APA/ARIE/RPPN/MONA/RVS): proteção integral ≥ 95% = cancelamento; parcial ou
+  borda (< 10%) = retificação de perímetro; RESEX/RDS/FLONA/FLOE com IRU ≥ 50% =
+  retificação (adequar a PCT ou excluir a área; sem isso, cancelamento); PCT em
+  domínio público, CAR já cancelado, imóvel só na ZA e categoria que admite
+  propriedade privada = sem pedido.
+- **Texto jurídico no banco, versionado** (`car_fundamentacao_modelos`, hash gerado,
+  editar = versão nova). Nasce MINUTA com marcas `[CONFERIR …]` onde o artigo não foi
+  confirmado; `car_modelo_validar` recusa enquanto houver marca, e o PDF de modelo não
+  validado sai com faixa vermelha de MINUTA. Nunca gerado por IA. Placeholders
+  `{{...}}` preenchidos por `carucPreencherModelo` — campo sem valor vira "—".
+- **Fatos congelados**: `snapshot` (área, %, zonas, ZEE, PRODES/DETER/embargos,
+  situação SICAR, geometria simplificada do imóvel) + texto final em
+  `fundamentacao_texto`. O dossiê **não leva nome nem CPF/CNPJ do titular** (o nº da
+  inscrição basta para o IMAC). PDF em bucket privado `car-dossies` **sem UPDATE nem
+  DELETE**; SHA-256 do arquivo em `pdf_sha256` (`car_solicitacao_registrar_pdf`, uma
+  vez só). Mapas e bibliotecas são preparados ANTES de pedir o protocolo — o que
+  pode falhar devagar não deixa pedido órfão. PDF que não chegou a ser guardado:
+  arquivar e emitir outro.
+- **Fluxo** (`car_solicitacao_mudar_status`): emitido → enviado ao IMAC (nº do
+  ofício obrigatório) → declarante notificado → deferido/indeferido/retificado
+  (decisão descrita); aberto → arquivado. Um pedido aberto por CAR+UC (índice único
+  parcial). Histórico em `car_solicitacoes_imac_historico`; trilha de auditoria (269)
+  nas duas tabelas. "Conferir situação no SICAR" grava a situação ao vivo; CAR que
+  aparece cancelado avisa quem emitiu, mas o status do pedido só muda por decisão
+  registrada.
+- Escrita só por RPC SECURITY DEFINER (`pode_editar('monitoramento')`); leitura
+  `pode_ver('monitoramento')`. Log LGPD `origem = dossie_car_imac`; ROPA TRAT-013.
+- Guarda: `tests/car-uc-cancelamento.test.js` (8 — regra, os 3 modelos REAIS da
+  migration sem `{{` cru, snapshot sem titular, PDF sem titular e com MINUTA/SNUC,
+  hash = SHA-256 do arquivo baixado, aba de acompanhamento). O teste "todo número
+  clicável" de `tests/car-uc-relatorio.test.js` ganhou tempo e `reducedMotion`
+  (mais alvos com o quadro novo).
+- Pendente (dado humano): Jurídico resolver os `[CONFERIR …]` e validar os 3
+  modelos; cadastrar o gestor das UCs (`unidades_conservacao.gestor_id`).
+- Sem mudança em `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — relatórios do mapa: moldura e cabeçalho únicos (17/10/2026)
 Os 4 relatórios que saem do Mapa das UCs e do CAR na UC seguem um padrão só:
 relatório do imóvel CAR (`js/relatorio-car.js`), impressão do mapa

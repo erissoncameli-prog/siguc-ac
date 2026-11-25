@@ -14,6 +14,8 @@
 <script src="../js/vendor/turf-6.5.0.min.js"></script>
 <script src="../js/zee-imovel.js"></script>
 <script src="../js/car-uc-relatorio.js"></script>
+<script src="../js/grafico-teclado.js"></script>
+<script src="../js/car-uc-cancelamento.js"></script>
 <script src="../js/vendor/proj4-2.11.0.min.js"></script>
 <script src="../js/mapa-moldura.js"></script>
 <script src="../js/car-uc-mapa.js"></script>
@@ -129,6 +131,9 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
 .caruc-seg input { position:absolute; opacity:0; pointer-events:none; }
 .caruc-seg input:checked + span { font-weight:700; }
 .caruc-seg label:has(input:checked) { background:var(--verde-medio); color:#fff; }
+.caruc-leg { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12px; margin-bottom:6px; }
+.caruc-leg > span { display:inline-flex; align-items:center; gap:6px; min-height:24px; }
+.caruc-leg-cor { width:12px; height:12px; border-radius:3px; display:inline-block; }
 .caruc-seg label:has(input:focus-visible) { outline:2px solid var(--verde-medio); outline-offset:-2px; }
 </style>
 </head>
@@ -145,6 +150,7 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
       <div class="tabs" role="tablist">
         <button class="tab-btn ativo" role="tab" id="aba-btn-geral" aria-selected="true" aria-controls="aba-geral" onclick="ativarAbaRel('geral')">Visão geral</button>
         <button class="tab-btn" role="tab" id="aba-btn-car" aria-selected="false" aria-controls="aba-car" onclick="ativarAbaRel('car')">CAR na UC</button>
+        <button class="tab-btn" role="tab" id="aba-btn-sol" aria-selected="false" aria-controls="aba-sol" onclick="ativarAbaRel('sol')">Solicitações ao IMAC</button>
       </div>
 
       <div class="tab-panel" id="aba-car" role="tabpanel" aria-labelledby="aba-btn-car" hidden>
@@ -196,6 +202,8 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
         <div id="caruc-resultado"></div>
       </div>
 
+      <div class="tab-panel" id="aba-sol" role="tabpanel" aria-labelledby="aba-btn-sol" hidden></div>
+
       <div class="tab-panel" id="aba-geral" role="tabpanel" aria-labelledby="aba-btn-geral">
       <div class="grid-2" style="gap:16px;margin-bottom:20px">
 
@@ -237,6 +245,7 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
   carregarLogosSidebar()
   carucIniciar()
   if (location.hash === '#car') ativarAbaRel('car')
+  else if (location.hash === '#sol') ativarAbaRel('sol')
   await carregarUCsOpcoes()
   await carregarGraficos()
   gerarResumoGeral()
@@ -340,14 +349,16 @@ async function gerarRelatorioUC() {
 // só junta as fontes, chama carucGerarRelatorio() e desenha.
 // ══════════════════════════════════════════════════════════════════════
 function ativarAbaRel(id) {
-  for (const k of ['geral', 'car']) {
+  for (const k of ['geral', 'car', 'sol']) {
     const on = k === id
     document.getElementById('aba-' + k).hidden = !on
     const b = document.getElementById('aba-btn-' + k)
     b.classList.toggle('ativo', on)
     b.setAttribute('aria-selected', on ? 'true' : 'false')
   }
-  history.replaceState(null, '', id === 'car' ? '#car' : location.pathname + location.search)
+  history.replaceState(null, '', id === 'geral' ? location.pathname + location.search : '#' + id)
+  // Acompanhamento dos pedidos (js/car-uc-cancelamento.js): recarrega a cada visita.
+  if (id === 'sol' && typeof carsolRenderAba === 'function') carsolRenderAba(document.getElementById('aba-sol'))
 }
 
 let _carucUCs = new Map()
@@ -364,7 +375,7 @@ async function carucIniciar() {
     ate.add(new Option(String(a), String(a), false, a === anoAtual))
   }
   const { data, error } = await db.from('unidades_conservacao')
-    .select('id,codigo,nome,sigla,categoria,grupo,esfera,area_ha,data_criacao')
+    .select('id,codigo,nome,sigla,categoria,grupo,esfera,area_ha,data_criacao,ato_criacao')
     .eq('ativo', true).order('nome')
   if (error) { toast('Não foi possível carregar as UCs: ' + error.message, 'error'); return }
   const sel = document.getElementById('caruc-uc')
@@ -457,6 +468,7 @@ async function carucGerar() {
     const { data: g, error } = await db.from('unidades_conservacao').select('geom').eq('id', id).single()
     if (error || !g?.geom?.coordinates) throw new Error('Limite da UC indisponível' + (error ? ': ' + error.message : '.'))
     _carucRel = await carucGerarRelatorio(uc, g.geom, _carucZonasUC, opcoes, _carucProgresso)
+    if (typeof carucSolCarregarUC === 'function') await carucSolCarregarUC(id)
     carucRender(_carucRel)
   } catch (e) {
     console.error('[caruc]', e)
@@ -544,6 +556,8 @@ function carucRender(rel) {
   if (typeof bIconsAplicar === 'function') bIconsAplicar(document.getElementById('caruc-resultado'))
   const cont = document.getElementById('caruc-conteudo')
   cont.addEventListener('click', ev => {
+    const dossie = ev.target.closest('[data-dossie]')
+    if (dossie && cont.contains(dossie)) { carucDossieAbrir(dossie.dataset.dossie); return }
     const alvo = ev.target.closest('[data-fk]')
     if (alvo && cont.contains(alvo)) carucClicarResumo(alvo.dataset.fk, alvo.dataset.fv)
   })
@@ -774,6 +788,8 @@ function _carucConteudoHTML(rel) {
       <div class="caruc-enq ${rel.enquadramento.nivel}"><strong>${esc(rel.enquadramento.rotulo)}.</strong> ${esc(rel.enquadramento.texto)}</div>
     </div></div>
 
+    ${_carucInscricoesHTML(rel)}
+
     <div class="caruc-grid4" style="margin-bottom:16px">
       ${_carucMiniTabela('Prioridade para fiscalização', r.por_prioridade.filter(p => p.n), 'Prioridade', 'prioridade')}
       <div class="card"><div class="card-header"><div class="card-title" style="font-size:13px">Titulares</div></div>
@@ -835,6 +851,36 @@ function _carucConteudoHTML(rel) {
     </div>`
 }
 
+// Quantos CARs por situação e por data: gráfico (status SICAR × ano de
+// inscrição) + tabela. Agregação em carucSerieInscricoes (js/car-uc-relatorio.js);
+// os números clicáveis ligam os MESMOS filtros da gaveta (status / ano_inscricao).
+function _carucInscricoesHTML(rel) {
+  const sr = carucSerieInscricoes(rel.imoveis, rel.uc)
+  if (!rel.imoveis.length) return ''
+  const svg = carucSerieSVG(sr)
+  const grafico = svg ? (typeof graficoTecladoEnvolver === 'function' ? graficoTecladoEnvolver(svg, { rotulo: 'Inscrições no CAR por ano e status', semTabela: true }) : svg) : ''
+  const leg = sr.status_presentes.map(st => `<span${_carucClic('status', st, sr.totais[st])}><span class="caruc-leg-cor" style="background:${CARUC_STATUS_COR[st]}"></span>${esc(st)} <strong>${formatNum(sr.totais[st], 0)}</strong></span>`).join('')
+  const cols = sr.status_presentes
+  const linhas = sr.anos.filter(a => a.total || a.cancelados_no_ano).map(a => `<tr>
+      <td><span${_carucClic('ano_inscricao', a.ano, a.total)}>${esc(a.ano)}</span></td>
+      ${cols.map(st => `<td class="num">${a.por[st] ? formatNum(a.por[st], 0) : '<span class="caruc-nota">—</span>'}</td>`).join('')}
+      <td class="num"><strong>${formatNum(a.total, 0)}</strong></td>
+      <td class="num">${a.cancelados_no_ano ? formatNum(a.cancelados_no_ano, 0) : '<span class="caruc-nota">—</span>'}</td>
+    </tr>`).join('')
+  return `<div class="card" style="margin-bottom:16px" id="caruc-inscricoes">
+    <div class="card-header"><div><div class="card-title">Inscrições no CAR por ano e status</div>
+      <div class="card-subtitle">Ano da inscrição × status atual no SICAR${sr.ano_criacao_uc ? ` · ${formatNum(sr.antes, 0)} inscritos antes e ${formatNum(sr.depois, 0)} depois da criação da UC (${esc(sr.ano_criacao_uc)})` : ''}</div></div></div>
+    <div class="card-body">
+      <div class="caruc-leg">${leg}</div>
+      ${grafico}
+      <div class="table-wrap" style="margin-top:10px"><table class="caruc-mini">
+        <thead><tr><th>Ano de inscrição</th>${cols.map(st => `<th class="num">${esc(st)}</th>`).join('')}<th class="num">Total</th><th class="num" title="Pela data da última atualização no SICAR">Cancelados no ano*</th></tr></thead>
+        <tbody>${linhas}${sr.sem_data ? `<tr><td><span${_carucClic('ano_inscricao', 'Sem data', sr.sem_data)}>Sem data de inscrição</span></td>${cols.map(() => '<td></td>').join('')}<td class="num"><strong>${formatNum(sr.sem_data, 0)}</strong></td><td></td></tr>` : ''}</tbody>
+      </table></div>
+      <p class="caruc-nota">* O SICAR não publica a data do cancelamento: conta pela data da última atualização do registro, que nos cancelados coincide com o lote de cancelamento. Status atual no SICAR, consultado agora.</p>
+    </div></div>`
+}
+
 function _carucLinhaHTML(i, o, pino) {
   const zonas = (i.zonas || []).map(z => `<span class="caruc-zona ${z.nivel}" title="${esc(formatNum(z.ha, 2))} ha">${esc(z.nome)}</span>`).join('')
   // Um parágrafo só, separado por " · ": um por linha deixava a linha da tabela alta demais.
@@ -851,7 +897,7 @@ function _carucLinhaHTML(i, o, pino) {
     + (o.prodes ? `<td class="num">${i.prodes ? formatNum(i.prodes.pos_marco_ha, 2) : '—'}</td>` : '')
   return `<tr class="caruc-imovel-tr">
     <td><span class="caruc-prio ${prio.nivel}">${esc(CARUC_PRIORIDADE_ROTULO[prio.nivel])}</span>${prio.motivos.length ? `<span class="caruc-nota" style="display:block;max-width:180px">${esc(prio.motivos.join('; '))}</span>` : ''}</td>
-    <td>${pino ? `<span class="caruc-pino" title="Nº no mapa do titular">${pino}</span>` : ''}<span class="caruc-cod"${pino ? ' style="display:inline"' : ''}>${esc(i.cod)}</span>${i.local === 'za' ? '<br><span class="caruc-nota">só na zona de amortecimento</span>' : ''}${aten}${emb}${sob ? `<span class="caruc-nota" style="display:block">Sobrepõe: ${sob}</span>` : ''}</td>
+    <td>${pino ? `<span class="caruc-pino" title="Nº no mapa do titular">${pino}</span>` : ''}<span class="caruc-cod"${pino ? ' style="display:inline"' : ''}>${esc(i.cod)}</span>${i.local === 'za' ? '<br><span class="caruc-nota">só na zona de amortecimento</span>' : ''}${aten}${emb}${sob ? `<span class="caruc-nota" style="display:block">Sobrepõe: ${sob}</span>` : ''}${typeof carucDossieBotaoHTML === 'function' ? carucDossieBotaoHTML(i) : ''}</td>
     <td>${esc(i.nome_imovel || '—')}<br><span class="caruc-nota">${esc(i.titular || 'sem dados na planilha local')}${i.documento ? ' · ' + esc(i.documento) : ''}</span>${tit}${i.homonimo ? '<span class="caruc-tit">mesmo nome de outro titular — verificar</span>' : ''}</td>
     <td>${esc(i.municipio || '—')}</td>
     <td>${esc(i.situacao || '—')}${_carucCanceladoHTML(i)}${i.classe ? `<br><span class="caruc-nota">${esc(i.classe)}</span>` : ''}</td>
