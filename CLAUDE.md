@@ -1,6 +1,18 @@
 # SIGUC-AC — Sistema de Gestão de Unidades de Conservação do Acre
 # Contexto para Claude Code — SEMA-AC / DIMA
 
+## Continuidade entre contas e dispositivos (ler primeiro)
+
+Este projeto é trabalhado com **duas contas do Claude** e em **três dispositivos** (Windows, Mac e
+iPhone/sessões na nuvem). A conversa não passa de uma sessão para outra: o que vale é o que está no repositório.
+
+- **Ao começar**: `git pull` e ler o `PROGRESSO.md` (estado atual e próximo passo).
+- **Ao parar**, ou quando o usuário pedir "salva o progresso": atualizar o `PROGRESSO.md` (o que foi feito,
+  o que ficou pela metade, próximo passo, decisões tomadas), depois commit e push na `main`.
+- Regras e decisões permanentes vão para este `CLAUDE.md`. O `PROGRESSO.md` é o diário curto da passagem de bastão.
+
+---
+
 ## Status do projeto
 Stack atual: HTML/JS Vanilla + Supabase. Não migrar para Next.js.
 Sistema já tem login, sidebar, layout e páginas funcionando.
