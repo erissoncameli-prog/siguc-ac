@@ -3,13 +3,21 @@
 
 ## Continuidade entre contas e dispositivos (ler primeiro)
 
-Este projeto é trabalhado com **duas contas do Claude** e em **três dispositivos** (Windows, Mac e
-iPhone/sessões na nuvem). A conversa não passa de uma sessão para outra: o que vale é o que está no repositório.
+Este projeto é trabalhado com **duas contas do Claude** e em **quatro dispositivos** (Windows de casa, computador da
+SEMA, Mac e iPhone/sessões na nuvem). Cada computador tem a **sua cópia**; o GitHub tem a oficial. A conversa não passa
+de uma sessão para outra: o que vale é o que está no repositório.
 
-- **Ao começar**: `git pull` e ler o `PROGRESSO.md` (estado atual e próximo passo).
-- **Ao parar**, ou quando o usuário pedir "salva o progresso": atualizar o `PROGRESSO.md` (o que foi feito,
-  o que ficou pela metade, próximo passo, decisões tomadas), depois commit e push na `main`.
-- Regras e decisões permanentes vão para este `CLAUDE.md`. O `PROGRESSO.md` é o diário curto da passagem de bastão.
+**Regras de sincronização — o Claude segue sem o usuário precisar pedir:**
+1. **Ao começar a sessão**: o aviso automático `.claude/hooks/sincronia.sh` diz se há novidades no GitHub ou trabalho
+   local não enviado. Antes de qualquer outra tarefa: `git pull --rebase` (se houver alterações locais, `git stash` antes
+   e `git stash pop` depois) e ler o `PROGRESSO.md`. Se houver commit ou alteração local sem enviar, contar ao usuário.
+2. **Ao terminar cada tarefa**: lembrar o usuário de salvar e oferecer commit + push. Trabalho não enviado fica preso
+   neste computador e os outros não o veem.
+3. **Quando o usuário pedir "salva o progresso"** (ou avisar que os tokens estão acabando): atualizar o `PROGRESSO.md`
+   (feito, pela metade, próximo passo, decisões, o que já foi aplicado no banco ou publicado), depois commit e push na `main`.
+4. **Nunca encerrar uma sessão com trabalho sem push sem avisar o usuário.**
+
+Regras e decisões permanentes vão para este `CLAUDE.md`. O `PROGRESSO.md` é o diário curto da passagem de bastão.
 
 ---
 

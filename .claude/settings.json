@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/sincronia.sh\"",
+            "timeout": 30,
+            "statusMessage": "Conferindo se o projeto está igual ao GitHub..."
+          }
+        ]
+      }
+    ]
+  }
+}
